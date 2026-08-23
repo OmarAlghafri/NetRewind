@@ -154,7 +154,28 @@ scenario_normal_traffic() {
     done
 }
 
-SCENARIOS="link_flap arp_change gateway_hijack duplicate_ip route_change default_route_moved default_route_lost service_unreachable normal_traffic"
+scenario_path_broke() {
+    echo "-- injecting: a working path is broken by an ARP change"
+    # The whole point of the recorder in one scenario: two machines that were
+    # connecting fine, a change on the path, and then they cannot. Both halves
+    # are observable, so the chain can be drawn between them.
+    ip netns exec "$H2" busybox nc -l -p 9200 >/dev/null 2>&1 &
+    listener=$!
+    sleep 1
+    echo hello | inlab busybox nc -w 2 10.99.1.11 9200 >/dev/null 2>&1 || true
+    sleep 1
+
+    # Point the neighbour entry at hardware that is not there. Packets now go
+    # into the void, so the handshake times out rather than being refused.
+    inlab ip neigh replace 10.99.1.11 lladdr 02:00:00:00:00:de dev nrlab1 nud permanent
+    sleep 1
+    inlab busybox nc -w 3 10.99.1.11 9200 </dev/null >/dev/null 2>&1 || true
+
+    kill "$listener" 2>/dev/null || true
+    inlab ip neigh del 10.99.1.11 dev nrlab1 2>/dev/null || true
+}
+
+SCENARIOS="link_flap arp_change gateway_hijack duplicate_ip route_change default_route_moved default_route_lost service_unreachable normal_traffic path_broke"
 
 run_one() {
     name=$(echo "$1" | tr '-' '_')
@@ -221,7 +242,7 @@ assert_expected() {
     fail=0
     for kind in link.down link.up l2.arp_binding_changed l2.duplicate_ip \
                 l3.route_added l3.default_route_changed l3.route_removed \
-                flow.handshake_fail flow.rollup; do
+                flow.handshake_fail flow.rollup flow.first_failure_for_pair; do
         n=$("$CLI" events --db "$DB" --last 10m --kind "$kind" -o json | grep -c '"event_id"' || true)
         if [ "$n" -ge 1 ]; then
             printf '  ok    %-28s %s recorded\n' "$kind" "$n"
@@ -234,7 +255,7 @@ assert_expected() {
     # Correlation has to reach the right conclusion, not merely have the
     # evidence available to reach it.
     for rule in gateway-hijack contested-address default-route-moved \
-                default-route-lost service-unreachable; do
+                default-route-lost service-unreachable change-broke-a-path; do
         n=$("$CLI" incidents --db "$DB" --last 10m --rule "$rule" -o json | grep -c '"incident_id"' || true)
         if [ "$n" -ge 1 ]; then
             printf '  ok    %-28s concluded\n' "$rule"

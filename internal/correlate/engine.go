@@ -119,15 +119,16 @@ func touches(r *Rule, ev *event.Event) bool {
 // later coincidence should not be preferred over the thing that actually
 // started it.
 func (e *Engine) tryRule(r *Rule, now time.Time) *incident.Incident {
+	anchor := r.Anchor()
 	for start := 0; start < len(e.window); start++ {
-		first := e.window[start]
-		if !r.Match[0].matches(first) {
+		at := e.window[start]
+		if !r.Match[anchor].matches(at) {
 			continue
 		}
-		if now.Sub(first.WallTime()) > r.Window {
+		if now.Sub(at.WallTime()) > r.Window {
 			continue // this opening is already too old to complete
 		}
-		matched, ok := e.walk(r, start)
+		matched, ok := e.walk(r, anchor, start)
 		if !ok {
 			continue
 		}
@@ -155,59 +156,117 @@ type match struct {
 	events []*event.Event
 }
 
-// walk matches the rule's clauses forward from an opening event.
-func (e *Engine) walk(r *Rule, start int) ([]match, bool) {
-	first := e.window[start]
-	deadline := first.WallTime().Add(r.Window)
+// walk matches a rule's clauses around the anchor event: the ones after it
+// forwards in time, the ones before it backwards.
+//
+// Searching backwards is what lets a rule ask the question the whole project
+// exists for. The symptom is what arrives - a pair that stopped working, a
+// route that vanished - and the useful question is what changed just before it.
+// A forward-only engine can only describe consequences.
+func (e *Engine) walk(r *Rule, anchor, start int) ([]match, bool) {
+	at := e.window[start]
+	latest := at.WallTime().Add(r.Window)
+	earliest := at.WallTime().Add(-r.Window)
 
-	// Fields that must agree across everything matched, taken from the
-	// opening event. Two failures happening at the same moment on different
-	// machines are two incidents, not one.
+	// Fields that must agree across everything matched, taken from the anchor.
+	// Two failures happening at the same moment on different machines are two
+	// incidents, not one.
 	pin := make(map[string]string, len(r.CorrelateOn))
 	for _, field := range r.CorrelateOn {
-		v, ok := fieldValue(first, field)
+		v, ok := fieldValue(at, field)
 		if !ok {
 			return nil, false
 		}
 		pin[field] = v
 	}
 
-	matched := make([]match, 0, len(r.Match))
-	cursor := start
+	found := make([][]*event.Event, len(r.Match))
+	found[anchor] = []*event.Event{at}
 
-	for i := range r.Match {
+	// Backwards, nearest first: the most recent change before a failure is the
+	// best explanation of it, and an older one would be a worse guess dressed
+	// up as the same claim.
+	cursor := start - 1
+	for i := anchor - 1; i >= 0; i-- {
 		clause := &r.Match[i]
-		need := clause.MinCount
-		if need < 1 {
-			need = 1
-		}
-
-		found := make([]*event.Event, 0, need)
+		need := clause.minCount()
+		hits := make([]*event.Event, 0, need)
 		scan := cursor
-		if i == 0 {
-			found = append(found, first)
-			scan = start + 1
-		}
-
-		for ; scan < len(e.window) && len(found) < need; scan++ {
+		for ; scan >= 0 && len(hits) < need; scan-- {
 			ev := e.window[scan]
-			if ev.WallTime().After(deadline) {
+			if ev.WallTime().Before(earliest) {
 				break
 			}
 			if !clause.matches(ev) || !agrees(ev, pin) {
 				continue
 			}
-			found = append(found, ev)
+			hits = append(hits, ev)
 		}
-
-		if len(found) < need {
+		if len(hits) < need {
 			if clause.Optional {
-				continue // the rule can complete without this consequence
+				continue
 			}
 			return nil, false
 		}
-		matched = append(matched, match{clause: clause, events: found})
+		// Put them back in time order so the chain reads forwards.
+		for l, r2 := 0, len(hits)-1; l < r2; l, r2 = l+1, r2-1 {
+			hits[l], hits[r2] = hits[r2], hits[l]
+		}
+		found[i] = hits
 		cursor = scan
+	}
+
+	// Forwards from the anchor.
+	cursor = start + 1
+	for i := anchor + 1; i < len(r.Match); i++ {
+		clause := &r.Match[i]
+		need := clause.minCount()
+		hits := make([]*event.Event, 0, need)
+		scan := cursor
+		for ; scan < len(e.window) && len(hits) < need; scan++ {
+			ev := e.window[scan]
+			if ev.WallTime().After(latest) {
+				break
+			}
+			if !clause.matches(ev) || !agrees(ev, pin) {
+				continue
+			}
+			hits = append(hits, ev)
+		}
+		if len(hits) < need {
+			if clause.Optional {
+				continue
+			}
+			return nil, false
+		}
+		found[i] = hits
+		cursor = scan
+	}
+
+	// The anchor clause may itself need repeating.
+	if need := r.Match[anchor].minCount(); need > 1 {
+		hits := []*event.Event{at}
+		for scan := start + 1; scan < len(e.window) && len(hits) < need; scan++ {
+			ev := e.window[scan]
+			if ev.WallTime().After(latest) {
+				break
+			}
+			if r.Match[anchor].matches(ev) && agrees(ev, pin) {
+				hits = append(hits, ev)
+			}
+		}
+		if len(hits) < need {
+			return nil, false
+		}
+		found[anchor] = hits
+	}
+
+	matched := make([]match, 0, len(r.Match))
+	for i := range r.Match {
+		if len(found[i]) == 0 {
+			continue
+		}
+		matched = append(matched, match{clause: &r.Match[i], events: found[i]})
 	}
 	return matched, true
 }

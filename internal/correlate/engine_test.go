@@ -286,3 +286,88 @@ func TestShippedRulesAreValid(t *testing.T) {
 		}
 	}
 }
+
+// The question the whole project exists to answer: the symptom has arrived, so
+// what changed just before it? A forward-only engine can only ever describe
+// consequences.
+func lookBackRule() *Rule {
+	return &Rule{
+		ID: "change-broke-it", Title: "a working path stopped working",
+		Severity: "error", Confidence: 88, Window: 5 * time.Minute, RootCause: "change",
+		Match: []Clause{
+			{As: "change", Kinds: []string{"l3.route_changed"}, Optional: true,
+				Why: "the path changed"},
+			{As: "breakage", Kinds: []string{"flow.first_failure_for_pair"},
+				Relation: incident.RelCauses, Why: "and then it stopped working"},
+		},
+	}
+}
+
+func TestAnOptionalClauseBeforeTheAnchorIsSearchedBackwards(t *testing.T) {
+	e := NewEngine([]*Rule{lookBackRule()}, quietLog())
+	now := time.Now()
+
+	// The change arrives first and on its own means nothing.
+	if got := e.Offer(at(event.KindRouteChanged, "10.0.0.0/24", now)); len(got) != 0 {
+		t.Fatal("fired on a routing change alone")
+	}
+	got := e.Offer(at(event.KindFlowFirstFailureForPair, "10.0.0.9", now.Add(20*time.Second)))
+	if len(got) != 1 {
+		t.Fatalf("got %d incidents, want 1", len(got))
+	}
+	if len(got[0].Chain) != 2 {
+		t.Fatalf("chain has %d links, want the change and the breakage", len(got[0].Chain))
+	}
+	if got[0].Chain[0].Kind != event.KindRouteChanged {
+		t.Errorf("the chain does not open with the change: %s", got[0].Chain[0].Kind)
+	}
+	if got[0].RootCause.Kind != event.KindRouteChanged {
+		t.Errorf("root cause = %s, want the change that preceded the breakage", got[0].RootCause.Kind)
+	}
+}
+
+// With nothing before it, the symptom still stands on its own.
+func TestTheAnchorFiresWithoutItsPrecedingCause(t *testing.T) {
+	e := NewEngine([]*Rule{lookBackRule()}, quietLog())
+
+	got := e.Offer(at(event.KindFlowFirstFailureForPair, "10.0.0.9", time.Now()))
+	if len(got) != 1 {
+		t.Fatalf("got %d incidents, want 1", len(got))
+	}
+	if len(got[0].Chain) != 1 {
+		t.Errorf("chain has %d links, want just the breakage", len(got[0].Chain))
+	}
+}
+
+// The nearest preceding change is the best explanation; an older one is a worse
+// guess wearing the same claim.
+func TestTheNearestPrecedingCauseIsChosen(t *testing.T) {
+	e := NewEngine([]*Rule{lookBackRule()}, quietLog())
+	now := time.Now()
+
+	e.Offer(at(event.KindRouteChanged, "old", now))
+	e.Offer(at(event.KindRouteChanged, "recent", now.Add(2*time.Minute)))
+
+	got := e.Offer(at(event.KindFlowFirstFailureForPair, "10.0.0.9", now.Add(150*time.Second)))
+	if len(got) != 1 {
+		t.Fatalf("got %d incidents, want 1", len(got))
+	}
+	if got[0].Chain[0].Subject != "recent" {
+		t.Errorf("blamed %q, want the change nearest the failure", got[0].Chain[0].Subject)
+	}
+}
+
+// A change too far in the past is not evidence about this failure.
+func TestACauseOutsideTheWindowIsNotUsed(t *testing.T) {
+	e := NewEngine([]*Rule{lookBackRule()}, quietLog())
+	now := time.Now()
+
+	e.Offer(at(event.KindRouteChanged, "ancient", now))
+	got := e.Offer(at(event.KindFlowFirstFailureForPair, "10.0.0.9", now.Add(10*time.Minute)))
+	if len(got) != 1 {
+		t.Fatalf("got %d incidents, want 1", len(got))
+	}
+	if len(got[0].Chain) != 1 {
+		t.Errorf("a change %v earlier was woven in anyway", 10*time.Minute)
+	}
+}

@@ -83,6 +83,25 @@ func Describe(e *Event) string {
 	case KindAddrRemoved:
 		return fmt.Sprintf("%s was removed from the interface", Str(e, "address"))
 
+	case KindFlowHandshakeFail:
+		return fmt.Sprintf("connections to %s port %s went unanswered",
+			e.Subject.Label, Str(e, "dport"))
+
+	case KindFlowFirstFailureForPair:
+		s := fmt.Sprintf("%s can no longer reach %s on port %s",
+			Str(e, "src"), Str(e, "dst"), Str(e, "dport"))
+		if ms, ok := Int(e, "last_success_ago_ms"); ok {
+			s += fmt.Sprintf(" - it worked %s ago",
+				(time.Duration(ms) * time.Millisecond).Round(time.Second))
+		}
+		return s
+
+	case KindFlowRollup:
+		opened, _ := Int(e, "opened")
+		closed, _ := Int(e, "closed")
+		failed, _ := Int(e, "handshake_failures")
+		return fmt.Sprintf("%d connections opened, %d closed, %d unanswered", opened, closed, failed)
+
 	case KindSystemGap:
 		if ms, ok := Int(e, "gap_duration_ms"); ok {
 			return fmt.Sprintf("the recorder was not watching for %s",

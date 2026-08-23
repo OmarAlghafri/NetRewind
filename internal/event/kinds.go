@@ -85,7 +85,11 @@ const (
 	KindFlowTimeoutNoClose  Kind = "flow.timeout_no_close"
 	KindFlowRetransmitSpike Kind = "flow.retransmit_spike"
 	KindFlowHandshakeFail   Kind = "flow.handshake_fail"
-	KindFlowRollup          Kind = "flow.rollup"
+	// KindFlowFirstFailureForPair is the strongest single signal in the system:
+	// two machines that were talking a moment ago can no longer connect, which
+	// means something changed - a filtering rule, an ACL, a route, a service.
+	KindFlowFirstFailureForPair Kind = "flow.first_failure_for_pair"
+	KindFlowRollup              Kind = "flow.rollup"
 )
 
 // dhcp.* and dns.* - naming and addressing. Metadata only, never payloads.

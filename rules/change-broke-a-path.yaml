@@ -1,0 +1,35 @@
+id: change-broke-a-path
+title: A path that was working stopped working
+severity: error
+confidence: 88
+window: 300s
+root_cause: change
+advice: >-
+  The change named here is the nearest one in time, not a proven cause. Confirm
+  it against your change record before acting: if it was intended, the breakage
+  is a side effect nobody planned; if it was not, something changed the network
+  without going through you.
+match:
+  - as: change
+    kinds:
+      - l2.arp_binding_changed
+      - l2.duplicate_ip
+      - l3.route_changed
+      - l3.default_route_changed
+      - l3.route_removed
+      - link.down
+      - change.config_applied
+    optional: true
+    why: >-
+      This is the last thing that changed on the path before it broke.
+  - as: breakage
+    kinds: [flow.first_failure_for_pair]
+    relation: causes
+    why: >-
+      Two machines that had been connecting successfully can no longer complete
+      a handshake. Whatever else is true, something between them changed.
+  - as: spread
+    kinds: [flow.first_failure_for_pair, flow.handshake_fail, l2.neighbor_failed]
+    optional: true
+    relation: correlates
+    why: Other connections started failing in the same window.

@@ -57,6 +57,11 @@ type Clause struct {
 	MinCount int `yaml:"min_count"`
 	// Optional lets the rule fire without this clause, which is how a rule can
 	// describe a consequence that sometimes follows and sometimes does not.
+	//
+	// Optional clauses placed *before* the first required one are searched
+	// backwards in time from it. That is how a rule asks the question this
+	// whole project exists for: the outage has happened, so what changed just
+	// before it?
 	Optional bool `yaml:"optional"`
 	// Relation is what this clause claims about its predecessor. The first
 	// clause has none.
@@ -112,10 +117,24 @@ func (r *Rule) Validate() error {
 	if r.RootCause != "" && !named[r.RootCause] {
 		return fmt.Errorf("rule %s blames %q, which is not one of its clauses", r.ID, r.RootCause)
 	}
-	if r.Match[0].Optional {
-		return fmt.Errorf("rule %s starts with an optional clause, so it can match nothing", r.ID)
+	if r.Anchor() < 0 {
+		return fmt.Errorf("rule %s has no required clause, so it would match everything", r.ID)
 	}
 	return nil
+}
+
+// Anchor is the index of the first required clause: the event whose arrival
+// makes the engine evaluate this rule at all.
+//
+// Clauses before it are searched backwards in time, clauses after it forwards.
+// Returns -1 if every clause is optional, which is not a rule.
+func (r *Rule) Anchor() int {
+	for i := range r.Match {
+		if !r.Match[i].Optional {
+			return i
+		}
+	}
+	return -1
 }
 
 func (r *Rule) severity() event.Severity {
@@ -224,4 +243,12 @@ func LoadRule(path string) (*Rule, error) {
 func isYAML(name string) bool {
 	ext := strings.ToLower(filepath.Ext(name))
 	return ext == ".yaml" || ext == ".yml"
+}
+
+// minCount is how many times a clause must match; unset means once.
+func (c *Clause) minCount() int {
+	if c.MinCount < 1 {
+		return 1
+	}
+	return c.MinCount
 }

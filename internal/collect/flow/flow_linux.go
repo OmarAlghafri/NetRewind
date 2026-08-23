@@ -6,6 +6,10 @@
 // "can these two machines still talk". A filtering change, a service that died,
 // and a route that stopped working are indistinguishable at layer 3 and obvious
 // here.
+//
+// This file is only the plumbing - load, attach, read, parse. Every judgement
+// about what a transition means lives in the platform-neutral Tracker, so it
+// can be tested without a kernel.
 package flow
 
 import (
@@ -16,8 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
-	"sync"
 	"time"
 
 	"github.com/OmarAlghafri/netrewind/internal/collect"
@@ -35,66 +37,20 @@ import (
 //go:embed bpf/flow.bpf.o
 var flowProgram []byte
 
-// TCP states, from the kernel's tcp_states.h. They are an ABI.
-const (
-	tcpEstablished = 1
-	tcpSynSent     = 2
-	tcpSynRecv     = 3
-	tcpClose       = 7
-	tcpListen      = 10
-)
+// eventSize must match struct flow_event in the C.
+const eventSize = 24
 
-const (
-	// rollupInterval is how often ordinary connection activity is summarised.
-	//
-	// Individual connections are not events. A busy segment opens thousands a
-	// second, and recording each would fill the store in a day while telling an
-	// operator nothing they could not get from a counter. Only the anomalies -
-	// a handshake that never completed - are worth a row of their own.
-	rollupInterval = 10 * time.Second
-	// maxTracked bounds the connection table. Beyond it, durations stop being
-	// measured and the shortfall is reported rather than hidden.
-	maxTracked = 65536
-	// eventSize must match struct flow_event in the C.
-	eventSize = 24
-)
-
-// Collector watches TCP state transitions.
+// Collector attaches the eBPF program and feeds what it reports to a Tracker.
 type Collector struct {
-	b   *event.Builder
-	log *slog.Logger
-
-	mu          sync.Mutex
-	established map[flowKey]time.Time
-	stats       rollup
-	untracked   uint64
+	log         *slog.Logger
+	tracker     *Tracker
+	observerID  string
 	lastDropped uint64
-}
-
-type flowKey struct {
-	saddr, daddr uint32
-	sport, dport uint16
-}
-
-// rollup accumulates the ordinary activity between two summaries.
-type rollup struct {
-	opened   int
-	closed   int
-	failed   int
-	refused  int
-	peers    map[uint32]struct{}
-	totalDur time.Duration
-}
-
-func (r *rollup) reset() {
-	*r = rollup{peers: make(map[uint32]struct{})}
 }
 
 // NewCollector returns a collector for TCP connection activity.
 func NewCollector(b *event.Builder, log *slog.Logger) *Collector {
-	c := &Collector{b: b, log: log, established: make(map[flowKey]time.Time)}
-	c.stats.reset()
-	return c
+	return &Collector{log: log, tracker: NewTracker(b, nil), observerID: b.ObserverID}
 }
 
 // Name implements collect.Collector.
@@ -130,7 +86,10 @@ func (c *Collector) Run(ctx context.Context, out chan<- *event.Event) error {
 	}
 	tp, err := link.Tracepoint("sock", "inet_sock_set_state", prog, nil)
 	if err != nil {
-		return fmt.Errorf("flow: attach tracepoint: %w", err)
+		// Entering a network namespace gets a fresh mount namespace with /sys
+		// remounted, which hides tracefs. Say so, because the bare error does
+		// not suggest the fix.
+		return fmt.Errorf("flow: attach tracepoint (is tracefs mounted in this mount namespace?): %w", err)
 	}
 	defer tp.Close()
 
@@ -152,7 +111,7 @@ func (c *Collector) Run(ctx context.Context, out chan<- *event.Event) error {
 		reader.Close()
 	}()
 
-	ticker := time.NewTicker(rollupInterval)
+	ticker := time.NewTicker(RollupInterval)
 	defer ticker.Stop()
 
 	done := make(chan struct{})
@@ -163,7 +122,12 @@ func (c *Collector) Run(ctx context.Context, out chan<- *event.Event) error {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				for _, e := range c.summarise(coll) {
+				if e := c.tracker.Rollup(); e != nil {
+					if !collect.Emit(ctx, out, e) {
+						return
+					}
+				}
+				if e := c.checkDropped(coll); e != nil {
 					if !collect.Emit(ctx, out, e) {
 						return
 					}
@@ -185,126 +149,20 @@ func (c *Collector) Run(ctx context.Context, out chan<- *event.Event) error {
 		if len(record.RawSample) < eventSize {
 			continue
 		}
-		if e := c.handle(record.RawSample); e != nil {
-			if !collect.Emit(ctx, out, e) {
-				<-done
-				return nil
-			}
+		raw := record.RawSample
+		e := c.tracker.Observe(
+			binary.LittleEndian.Uint32(raw[8:12]),  // saddr
+			binary.LittleEndian.Uint32(raw[12:16]), // daddr
+			binary.LittleEndian.Uint16(raw[16:18]), // sport
+			binary.LittleEndian.Uint16(raw[18:20]), // dport
+			raw[20],                                // oldstate
+			raw[21],                                // newstate
+		)
+		if e != nil && !collect.Emit(ctx, out, e) {
+			<-done
+			return nil
 		}
 	}
-}
-
-// handle turns one state transition into an event, or into a tally.
-func (c *Collector) handle(raw []byte) *event.Event {
-	saddr := binary.LittleEndian.Uint32(raw[8:12])
-	daddr := binary.LittleEndian.Uint32(raw[12:16])
-	sport := binary.LittleEndian.Uint16(raw[16:18])
-	dport := binary.LittleEndian.Uint16(raw[18:20])
-	oldstate := raw[20]
-	newstate := raw[21]
-
-	// A socket entering or leaving LISTEN is a service starting or stopping,
-	// not a connection opening or closing. Counting it as one made a server
-	// shutting down look like a client disconnecting, and put a closed
-	// connection in the rollup that was never opened.
-	if oldstate == tcpListen || newstate == tcpListen {
-		return nil
-	}
-
-	key := flowKey{saddr: saddr, daddr: daddr, sport: sport, dport: dport}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	switch {
-	case newstate == tcpEstablished:
-		c.stats.opened++
-		c.stats.peers[daddr] = struct{}{}
-		if len(c.established) < maxTracked {
-			c.established[key] = time.Now()
-		} else {
-			c.untracked++
-		}
-		return nil
-
-	case newstate == tcpClose && oldstate == tcpSynSent:
-		// A connection that went straight from the opening SYN to closed never
-		// got an answer. Something between here and there refused it, dropped
-		// it, or was not listening - and which of those it was is exactly what
-		// the timeline around it will say.
-		c.stats.failed++
-		c.stats.peers[daddr] = struct{}{}
-		delete(c.established, key)
-		return c.handshakeFailed(saddr, daddr, sport, dport)
-
-	case newstate == tcpClose:
-		if openedAt, ok := c.established[key]; ok {
-			c.stats.totalDur += time.Since(openedAt)
-			delete(c.established, key)
-		}
-		if oldstate == tcpSynRecv {
-			// An inbound connection abandoned after the SYN was answered.
-			c.stats.refused++
-		}
-		c.stats.closed++
-		return nil
-	}
-	return nil
-}
-
-func (c *Collector) handshakeFailed(saddr, daddr uint32, sport, dport uint16) *event.Event {
-	dst := ipString(daddr)
-	return c.b.New(event.SourceEBPF, event.KindFlowHandshakeFail, event.SevNotice,
-		event.Host(dst, "")).
-		WithAttr("src", ipString(saddr)).
-		WithAttr("dst", dst).
-		WithAttr("dport", int(dport)).
-		WithAttr("sport", int(sport)).
-		// One unanswered connection is ordinary; a run of them to the same
-		// service is not, so they fold together and the count carries the
-		// weight. Folding on the destination and port also keeps a port scan
-		// from filling the store with one row per port.
-		WithDedup(fmt.Sprintf("flow.handshake_fail|%s|%d", dst, dport)).
-		WithEvidence("transition", "SYN_SENT -> CLOSE")
-}
-
-// summarise emits the periodic rollup and reports anything the kernel had to
-// throw away.
-func (c *Collector) summarise(coll *ebpf.Collection) []*event.Event {
-	c.mu.Lock()
-	stats := c.stats
-	untracked := c.untracked
-	tracked := len(c.established)
-	c.stats.reset()
-	c.untracked = 0
-	c.mu.Unlock()
-
-	var out []*event.Event
-
-	if stats.opened+stats.closed+stats.failed > 0 {
-		e := c.b.New(event.SourceEBPF, event.KindFlowRollup, event.SevInfo,
-			event.Observer(c.b.ObserverID)).
-			WithAttr("opened", stats.opened).
-			WithAttr("closed", stats.closed).
-			WithAttr("handshake_failures", stats.failed).
-			WithAttr("distinct_peers", len(stats.peers)).
-			WithAttr("window_seconds", int(rollupInterval.Seconds())).
-			WithAttr("tracked", tracked)
-		if stats.closed > 0 {
-			e.WithAttr("mean_duration_ms", (stats.totalDur / time.Duration(stats.closed)).Milliseconds())
-		}
-		if untracked > 0 {
-			// Say so rather than quietly reporting fewer connections.
-			e.WithAttr("untracked", untracked)
-			e.Severity = event.SevNotice
-		}
-		out = append(out, e)
-	}
-
-	if e := c.checkDropped(coll); e != nil {
-		out = append(out, e)
-	}
-	return out
 }
 
 // checkDropped reads the kernel-side loss counter.
@@ -322,27 +180,18 @@ func (c *Collector) checkDropped(coll *ebpf.Collection) *event.Event {
 	if err := m.Lookup(&key, &total); err != nil {
 		return nil
 	}
-	c.mu.Lock()
 	delta := total - c.lastDropped
 	c.lastDropped = total
-	c.mu.Unlock()
-
 	if delta == 0 {
 		return nil
 	}
 	c.log.Warn("kernel dropped events", "count", delta)
-	return c.b.New(event.SourceEBPF, event.KindSystemDrop, event.SevWarn,
-		event.Observer(c.b.ObserverID)).
+	return c.tracker.b.New(event.SourceEBPF, event.KindSystemDrop, event.SevWarn,
+		event.Observer(c.observerID)).
 		WithAttr("dropped", delta).
 		WithAttr("total_dropped", total).
 		WithAttr("source", "ringbuf").
 		WithEvidence("reason", "ring buffer full: transitions arrived faster than they could be read")
-}
-
-func ipString(addr uint32) string {
-	var b [4]byte
-	binary.LittleEndian.PutUint32(b[:], addr)
-	return net.IP(b[:]).String()
 }
 
 var _ collect.Collector = (*Collector)(nil)
