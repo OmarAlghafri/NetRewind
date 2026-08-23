@@ -127,7 +127,34 @@ scenario_default_route_lost() {
     inlab ip route del default 2>/dev/null || true
 }
 
-SCENARIOS="link_flap arp_change gateway_hijack duplicate_ip route_change default_route_moved default_route_lost"
+scenario_service_unreachable() {
+    echo "-- injecting: a service that does not answer"
+    # Nothing is listening on 9999, so each attempt goes from the opening SYN
+    # straight to closed - which is what a filtered port, a dead service and a
+    # broken path all look like from the client.
+    # busybox explicitly: whichever netcat is installed changes the flags, and
+    # a scenario that silently stops connecting proves nothing.
+    i=0
+    while [ "$i" -lt 4 ]; do
+        inlab busybox nc -w 1 10.99.0.11 9999 </dev/null >/dev/null 2>&1 || true
+        i=$((i + 1))
+    done
+}
+
+scenario_normal_traffic() {
+    echo "-- generating: connections that succeed, for the rollup"
+    i=0
+    while [ "$i" -lt 3 ]; do
+        ip netns exec "$H1" busybox nc -l -p 9100 >/dev/null 2>&1 &
+        listener=$!
+        sleep 1
+        echo hello | inlab busybox nc -w 2 10.99.0.11 9100 >/dev/null 2>&1 || true
+        kill "$listener" 2>/dev/null || true
+        i=$((i + 1))
+    done
+}
+
+SCENARIOS="link_flap arp_change gateway_hijack duplicate_ip route_change default_route_moved default_route_lost service_unreachable normal_traffic"
 
 run_one() {
     name=$(echo "$1" | tr '-' '_')
@@ -149,7 +176,12 @@ all() {
 
     # The recorder starts after the topology exists, so the healthy state is its
     # baseline and only the injected faults read as changes.
-    inlab "$DAEMON" --db "$DB" --rules "$RULES" --log-level info >"$LOG" 2>&1 &
+    #
+    # tracefs has to be mounted inside the same `ip netns exec` that runs the
+    # recorder: entering a network namespace gets a fresh mount namespace with
+    # /sys remounted, and eBPF tracepoints cannot be attached without it.
+    inlab sh -c "mount -t tracefs tracefs /sys/kernel/tracing 2>/dev/null || true
+                 exec '$DAEMON' --db '$DB' --rules '$RULES' --log-level info" >"$LOG" 2>&1 &
     pid=$!
     sleep 2
     kill -0 "$pid" 2>/dev/null || { echo "recorder died:" >&2; cat "$LOG" >&2; teardown; exit 1; }
@@ -161,7 +193,10 @@ all() {
         sleep 1
     done
 
-    sleep 2
+    # Connection activity is summarised on a timer rather than reported per
+    # connection, so the run has to outlast one rollup interval to see it.
+    echo "-- waiting for a connection rollup"
+    sleep 12
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
     sleep 1
@@ -185,7 +220,8 @@ all() {
 assert_expected() {
     fail=0
     for kind in link.down link.up l2.arp_binding_changed l2.duplicate_ip \
-                l3.route_added l3.default_route_changed l3.route_removed; do
+                l3.route_added l3.default_route_changed l3.route_removed \
+                flow.handshake_fail flow.rollup; do
         n=$("$CLI" events --db "$DB" --last 10m --kind "$kind" -o json | grep -c '"event_id"' || true)
         if [ "$n" -ge 1 ]; then
             printf '  ok    %-28s %s recorded\n' "$kind" "$n"
@@ -197,7 +233,8 @@ assert_expected() {
     echo
     # Correlation has to reach the right conclusion, not merely have the
     # evidence available to reach it.
-    for rule in gateway-hijack contested-address default-route-moved default-route-lost; do
+    for rule in gateway-hijack contested-address default-route-moved \
+                default-route-lost service-unreachable; do
         n=$("$CLI" incidents --db "$DB" --last 10m --rule "$rule" -o json | grep -c '"incident_id"' || true)
         if [ "$n" -ge 1 ]; then
             printf '  ok    %-28s concluded\n' "$rule"

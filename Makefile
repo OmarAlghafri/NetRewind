@@ -86,3 +86,19 @@ lab-up:
 .PHONY: lab-down
 lab-down:
 	sudo lab/inject.sh teardown
+
+# eBPF objects are compiled separately by clang, not by the Go toolchain, and
+# the result is committed so the tree still builds on a machine without clang.
+# Regenerate after editing anything under internal/collect/flow/bpf.
+BPF_SRC := internal/collect/flow/bpf/flow.bpf.c
+BPF_OBJ := internal/collect/flow/bpf/flow.bpf.o
+
+.PHONY: bpf
+bpf:
+	clang -O2 -g -target bpf -D__TARGET_ARCH_x86 \
+	    -Wall -Werror -c $(BPF_SRC) -o $(BPF_OBJ)
+	@echo "built $(BPF_OBJ)"
+
+.PHONY: kernel-check
+kernel-check:
+	sudo lab/check-kernel.sh

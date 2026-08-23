@@ -7,11 +7,12 @@ of an outage after it is over, when the evidence would normally be gone.
 > This is a lab project, built and demonstrated on GNS3. Nothing here has been
 > deployed to production hardware.
 
-**Status: M1.** Layers 1 to 3 are recorded and can be replayed as a narrative.
-A synthetic lab injects seven real faults - a flapping port, a hijacked gateway,
-a contested address, a re-pointed route, a vanished default - and every one of
-them is reconstructed from the record afterwards. eBPF flow observation is next,
-then the correlation engine. See [the roadmap](#roadmap).
+**Status: M3.** Layers 1 to 3 are recorded, replayed as a narrative, and
+correlated into incidents with an explicit causal chain. A synthetic lab injects
+seven real faults — a flapping port, a hijacked gateway, a contested address, a
+re-pointed route, a vanished default — and checks both that every one is
+reconstructed from the record and that correlation names the cause. eBPF flow
+observation is next. See [the roadmap](#roadmap).
 
 ## The problem
 
@@ -84,9 +85,33 @@ $ netrewind what-happened --host 10.99.0.11 --at 15:00 --window 10m
   !! 12:16:01.713  +2.02s     the default route was removed - nothing beyond the local segment is reachable
 ```
 
-Planned next: eBPF flow observation, then the correlation engine that turns
-these events into incidents with an explicit causal chain, then a web timeline
-and an appliance image.
+- Correlates those events into incidents — and states, for every step, whether
+  it *caused* the next one or merely happened alongside it
+
+```
+$ netrewind incidents --last 1h
+
+!! The default gateway is being answered by a different machine
+   12:26:49 to 12:26:55  (6s)   rule gateway-hijack, confidence 90%
+   affected: 10.99.0.201
+
+   1  12:26:49.579  l2.arp_binding_changed  10.99.0.201
+      The hardware address answering for the default gateway changed.
+      Every host on this segment now sends its outbound traffic to a
+      different machine.
+      |  which caused
+   2  12:26:55.633  l3.default_route_changed  default
+      Routing followed the change, so traffic is now leaving through a
+      path nobody chose.
+
+   root cause: l2.arp_binding_changed on 10.99.0.201 (confidence 90%)
+   next:
+      Find which switch port the new hardware address is learned on
+      before changing anything. A failover looks identical to an attack
+      from here; the port tells them apart.
+```
+
+Planned next: eBPF flow observation, then a web timeline and an appliance image.
 
 ## How it is different
 
@@ -151,14 +176,15 @@ sudo make lab
 | **M0** | envelope, store, interface state, CLI | done |
 | **M1** | neighbours, routes, addresses; temporal identity; narrative queries; fault-injection lab | done |
 | M2 | eBPF flows, nftables decisions, rollups, `system.drop` | |
-| M3 | Isnad correlation engine, incidents, rule library | |
+| **M3** | Isnad correlation engine, incidents, ten-rule library | done |
 | M4 | GNS3 lab, documentation, public release | |
 | M5 | web timeline, appliance image, Prometheus/OTel export | |
 
 ## Documentation
 
 - [The event schema](docs/schema.md) — the contract everything else depends on
-- [Development environment](docs/dev-environment.md) — VM, kernel requirements, GNS3 wiring
+- [Writing a rule](docs/rules.md) — how correlation recognises a failure, and how to teach it a new one
+- [Development environment](docs/dev-environment.md) — kernel requirements, the synthetic lab, GNS3 wiring
 
 ## Licence
 

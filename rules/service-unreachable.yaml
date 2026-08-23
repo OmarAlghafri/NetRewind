@@ -1,0 +1,26 @@
+id: service-unreachable
+title: A service stopped answering
+severity: warn
+confidence: 80
+window: 120s
+correlate_on: [subject]
+root_cause: failures
+advice: >-
+  Check whether the service is listening before blaming the network. If it is,
+  look at the timeline for a filtering change or a route change just before the
+  first failure - both look identical from the client.
+match:
+  - as: failures
+    kinds: [flow.handshake_fail]
+    min_count: 3
+    why: >-
+      Repeated connections to this service went from the opening SYN straight to
+      closed without ever being answered. Something refused them, dropped them,
+      or was not listening.
+  - as: context
+    kinds: [l3.route_changed, l3.default_route_changed, l2.arp_binding_changed, link.down]
+    optional: true
+    relation: correlates
+    why: >-
+      The path to it changed around the same time, which would produce exactly
+      this from the client's side.
