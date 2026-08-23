@@ -1,0 +1,11 @@
+# Normalise line endings: text files stored as LF in the repository.
+* text=auto eol=lf
+
+# Treat images as binary.
+*.png binary
+*.gif binary
+
+# eBPF C sources and Go sources are always LF.
+*.c text eol=lf
+*.h text eol=lf
+*.go text eol=lf

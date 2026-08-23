@@ -1,0 +1,37 @@
+[Unit]
+Description=NetRewind network black box recorder
+Documentation=https://github.com/OmarAlghafri/netrewind
+After=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/netrewindd --db /var/lib/netrewind/events.db
+Restart=always
+RestartSec=2s
+
+# Reading netlink notifications needs CAP_NET_ADMIN. From M2, loading eBPF
+# programs additionally needs CAP_BPF and CAP_PERFMON. The service runs
+# unprivileged otherwise: it never needs to write outside its own state
+# directory, and it never changes anything on the network.
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_BPF CAP_PERFMON
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_BPF CAP_PERFMON
+NoNewPrivileges=yes
+
+StateDirectory=netrewind
+StateDirectoryMode=0750
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+
+# The recorder must survive the conditions it is there to record, so it is
+# exempt from the OOM killer's usual attention.
+OOMScoreAdjust=-500
+
+[Install]
+WantedBy=multi-user.target

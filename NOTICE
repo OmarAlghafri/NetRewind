@@ -1,0 +1,9 @@
+NetRewind - Network Black Box & Forensic Timeline
+Copyright 2026 Omar Al-Ghafri
+
+This product is licensed under the GNU Affero General Public License,
+Version 3.0. See the LICENSE file for the full license text.
+
+The correlation core is named "Isnad" after the classical Arabic method of
+establishing a chain of transmission in which every link is named and every
+link is verifiable.
