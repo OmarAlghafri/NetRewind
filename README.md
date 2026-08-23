@@ -8,7 +8,7 @@ of an outage after it is over, when the evidence would normally be gone.
 > deployed to production hardware.
 
 **Status: layers 1–4 recorded, correlated, and proven end to end.** A synthetic
-lab injects ten real faults — a flapping port, a hijacked gateway, a contested
+lab injects eleven real faults — a flapping port, a hijacked gateway, a contested
 address, a re-pointed route, a vanished default, a path broken under a working
 connection — and checks both that every one is reconstructed from the record and
 that correlation names the cause. See [the roadmap](#roadmap).
@@ -89,6 +89,9 @@ $ netrewind what-happened --host 10.99.0.11 --at 15:00 --window 10m
   strongest single signal that something just changed. Ordinary activity is
   summarised every ten seconds rather than recorded per connection, and when the
   kernel has to drop something, it says so
+- Watches the filtering rules in force, so a change to them lands on the same
+  timeline as the connections it breaks — qualified by table and chain, because
+  the same rule in a different chain is a different rule
 - Correlates those events into incidents — and states, for every step, whether
   it *caused* the next one or merely happened alongside it
 
@@ -121,7 +124,7 @@ same time` is only co-occurrence. The engine never blurs the two, because a tool
 that does teaches its operator to distrust it — and an operator who distrusts
 the timeline is back to guessing.
 
-Planned next: nftables filtering decisions and conntrack, then a web timeline
+Planned next: conntrack for connection lifetimes and resets, then a web timeline
 and an appliance image.
 
 ## How it is different
@@ -189,7 +192,8 @@ sudo make lab
 | **M0** | envelope, store, interface state, CLI | done |
 | **M1** | neighbours, routes, addresses; temporal identity; narrative queries; fault-injection lab | done |
 | **M2** | eBPF connection observation, rollups, `system.drop` | done |
-| M2b | nftables filtering decisions, conntrack, flow open/close/reset | |
+| **M2b** | nftables rule changes | done |
+| M2c | conntrack: connection lifetimes, resets, `flow.timeout_no_close` | |
 | **M3** | Isnad correlation engine with backward cause matching, twelve-rule library | done |
 | M4 | GNS3 lab, documentation, public release | |
 | M5 | web timeline, appliance image, Prometheus/OTel export | |

@@ -160,13 +160,31 @@ the client's point of view, which nothing at layer 3 can do.
 Never payloads. Query names are recorded behind a switch that can be turned off
 entirely, because there are networks where recording them is not permitted.
 
-### `policy.*` — filtering decisions, from nftables
+### `policy.*` — the filtering rules in force, from nftables
 
-`drop_burst` · `rule_changed` · **`first_drop_for_pair`** ⭐⭐
+**`rule_changed`** — implemented. `drop_burst` — planned, and needing rule
+counters rather than the ruleset itself.
 
-`first_drop_for_pair` — the first rejection between two endpoints that were
-previously talking successfully — is the strongest single signal that a
-configuration change just broke something.
+The collector records that the ruleset changed and what changed in it, never
+what the right ruleset would be. Each rule is qualified by the table and chain
+containing it, so the evidence reads
+`table inet filter / chain input :: tcp dport 9300 drop`. Comparing bare rule
+text would report a rule moved from one chain to another as no change at all —
+and that is exactly the sort of edit that breaks a network quietly.
+
+Adding a rule that drops or rejects is a `warn`; adding one that logs or counts
+is a `notice`. Rule handles and packet counters are stripped before comparison:
+they move constantly on a live firewall without the policy moving, and a
+collector that cried wolf every few seconds would stop being read.
+
+> **Known limitation.** This collector polls every five seconds, so a change
+> made and reverted inside one interval is invisible. Parsing `nft monitor`
+> output would catch it, and would break whenever `nft` changes how it prints.
+
+The corresponding *consequence* — the first failure between two endpoints that
+were previously talking — lives in `flow.first_failure_for_pair` ⭐⭐, because it
+is observable no matter what did the blocking: a rule here, an ACL on a switch,
+or a firewall three hops away.
 
 ### `metric.*` — measured series
 
