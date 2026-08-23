@@ -24,6 +24,7 @@ import (
 	"github.com/OmarAlghafri/netrewind/internal/collect"
 	"github.com/OmarAlghafri/netrewind/internal/collect/flow"
 	"github.com/OmarAlghafri/netrewind/internal/collect/netlink"
+	"github.com/OmarAlghafri/netrewind/internal/collect/policy"
 	"github.com/OmarAlghafri/netrewind/internal/correlate"
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/identity"
@@ -149,6 +150,7 @@ func run(log *slog.Logger, cfg config) error {
 		netlink.NewRouteCollector(builder, log),
 		netlink.NewAddrCollector(builder, log),
 		flow.NewCollector(builder, log),
+		policy.NewCollector(builder, log),
 	}
 	for _, c := range collectors {
 		wg.Add(1)

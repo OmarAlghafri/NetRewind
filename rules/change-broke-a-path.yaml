@@ -18,6 +18,7 @@ match:
       - l3.default_route_changed
       - l3.route_removed
       - link.down
+      - policy.rule_changed
       - change.config_applied
     optional: true
     why: >-

@@ -102,6 +102,20 @@ func Describe(e *Event) string {
 		failed, _ := Int(e, "handshake_failures")
 		return fmt.Sprintf("%d connections opened, %d closed, %d unanswered", opened, closed, failed)
 
+	case KindPolicyRuleChanged:
+		added, _ := Int(e, "added")
+		removed, _ := Int(e, "removed")
+		switch {
+		case added > 0 && removed > 0:
+			return fmt.Sprintf("the filtering rules changed: %d added, %d removed", added, removed)
+		case added > 0:
+			return fmt.Sprintf("%d filtering rule(s) were added", added)
+		case removed > 0:
+			return fmt.Sprintf("%d filtering rule(s) were removed", removed)
+		default:
+			return "the filtering rules changed"
+		}
+
 	case KindSystemGap:
 		if ms, ok := Int(e, "gap_duration_ms"); ok {
 			return fmt.Sprintf("the recorder was not watching for %s",

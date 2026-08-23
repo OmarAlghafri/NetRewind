@@ -65,6 +65,9 @@ setup() {
     ip netns exec "$H2" ip addr add 10.99.1.11/24 dev nrp1
     ip netns exec "$H2" ip link set nrp1 up
 
+    # nft is needed by the filtering scenario and by the policy collector.
+    apk add --no-cache nftables >/dev/null 2>&1 || true
+
     # Give the neighbour table something real to start from, and install a
     # default route so the gateway scenarios have one to attack.
     inlab ping -c1 -W1 10.99.0.11 >/dev/null 2>&1 || true
@@ -175,7 +178,38 @@ scenario_path_broke() {
     inlab ip neigh del 10.99.1.11 dev nrlab1 2>/dev/null || true
 }
 
-SCENARIOS="link_flap arp_change gateway_hijack duplicate_ip route_change default_route_moved default_route_lost service_unreachable normal_traffic path_broke"
+scenario_policy_broke_a_path() {
+    echo "-- injecting: a filtering rule breaks a path that was working"
+    if ! command -v nft >/dev/null 2>&1; then
+        echo "   (skipped: nft not installed)"
+        return 0
+    fi
+
+    ip netns exec "$H1" busybox nc -l -p 9300 >/dev/null 2>&1 &
+    listener=$!
+    sleep 1
+    echo hello | inlab busybox nc -w 2 10.99.0.11 9300 >/dev/null 2>&1 || true
+    sleep 1
+
+    # nftables is per network namespace, so this cannot escape the lab.
+    inlab nft add table inet nrlab 2>/dev/null || true
+    inlab nft add chain inet nrlab out '{ type filter hook output priority 0; }' 2>/dev/null || true
+    inlab nft add rule inet nrlab out tcp dport 9300 drop
+
+    # The ruleset is polled, so the change has to be given time to be noticed
+    # before the consequence arrives - otherwise the chain reads backwards.
+    echo "   waiting for the ruleset poll"
+    sleep 7
+
+    # Dropped rather than refused, so the handshake times out instead of being
+    # answered. That is what a filtering change looks like from the client.
+    inlab busybox nc -w 3 10.99.0.11 9300 </dev/null >/dev/null 2>&1 || true
+
+    kill "$listener" 2>/dev/null || true
+    inlab nft delete table inet nrlab 2>/dev/null || true
+}
+
+SCENARIOS="link_flap arp_change gateway_hijack duplicate_ip route_change default_route_moved default_route_lost service_unreachable normal_traffic path_broke policy_broke_a_path"
 
 run_one() {
     name=$(echo "$1" | tr '-' '_')
@@ -242,7 +276,8 @@ assert_expected() {
     fail=0
     for kind in link.down link.up l2.arp_binding_changed l2.duplicate_ip \
                 l3.route_added l3.default_route_changed l3.route_removed \
-                flow.handshake_fail flow.rollup flow.first_failure_for_pair; do
+                flow.handshake_fail flow.rollup flow.first_failure_for_pair \
+                policy.rule_changed; do
         n=$("$CLI" events --db "$DB" --last 10m --kind "$kind" -o json | grep -c '"event_id"' || true)
         if [ "$n" -ge 1 ]; then
             printf '  ok    %-28s %s recorded\n' "$kind" "$n"
