@@ -56,13 +56,44 @@ event; the same port going down five times in five minutes is a fault, and only
 the second is worth waking someone for.
 
 `optional: true` lets the rule fire without a clause. Use it for consequences
-that sometimes follow and sometimes do not. The first clause may not be
-optional — a rule that opens with one could match nothing at all, and the
-validator rejects it.
+that sometimes follow and sometimes do not.
 
 When an optional clause arrives after the rule has already fired, the incident
 **grows**: the fuller account replaces the thinner one rather than appearing
 beside it as a near-duplicate.
+
+## Asking what changed *before* it broke
+
+The first **required** clause is the rule's anchor: the event whose arrival makes
+the engine evaluate the rule at all. Clauses after it are searched forwards in
+time. Clauses **before** it are searched backwards — nearest first.
+
+That is how a rule asks the question this whole project exists for. The symptom
+is what arrives: a pair that stopped connecting, a route that vanished. The
+useful question is what changed just before it.
+
+```yaml
+match:
+  - as: change                              # optional, searched BACKWARDS
+    kinds: [l2.arp_binding_changed, l3.route_changed, link.down]
+    optional: true
+    why: This is the last thing that changed on the path before it broke.
+
+  - as: breakage                            # required - the anchor
+    kinds: [flow.first_failure_for_pair]
+    relation: causes
+    why: Two machines that had been connecting can no longer complete a handshake.
+```
+
+With no preceding change in the window the rule still fires, with a one-link
+chain: the symptom stands on its own. With one, the chain opens on the cause.
+
+The nearest change is chosen deliberately: an older one would be a worse guess
+wearing the same claim. This is also why such a rule's `advice` must say plainly
+that the named change is the nearest in time, not a proven cause.
+
+Every rule needs at least one required clause. A rule where all of them are
+optional would match everything, and the validator rejects it.
 
 ## Relation is the whole discipline
 

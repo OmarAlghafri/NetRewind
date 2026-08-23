@@ -112,9 +112,25 @@ different causes and completely different fixes.
 
 ### `flow.*` — layer 4, from eBPF and conntrack
 
-**`handshake_fail`** ⭐ · `rollup` — implemented.
-`open` · `close` · `reset` · `timeout_no_close` · `retransmit_spike` — planned,
-and needing conntrack rather than the state tracepoint.
+**`first_failure_for_pair`** ⭐⭐ · **`handshake_fail`** ⭐ · `rollup` —
+implemented. `open` · `close` · `reset` · `timeout_no_close` ·
+`retransmit_spike` — planned, and needing conntrack rather than the state
+tracepoint.
+
+`first_failure_for_pair` is the strongest single signal in the system. An
+unanswered connection on its own is ordinary — closed ports are closed. An
+unanswered connection between two machines that *were talking a moment ago*
+means something changed: a filtering rule, an ACL, a route, a service.
+
+The pair is (source, destination, destination port) — the ephemeral source port
+is not part of the relationship. A success is remembered for 24 hours, because a
+service that last worked a month ago is not evidence that anything just changed.
+It is reported once per break and re-armed the moment the pair works again, so a
+fault that recurs after a recovery is reported afresh rather than swallowed.
+
+> **Known limitation.** The memory of which pairs worked is in-process. After a
+> restart the recorder has no baseline and reports ordinary `handshake_fail`
+> until it sees a pair succeed again.
 
 The source is an eBPF program on the `sock/inet_sock_set_state` tracepoint. A
 stable tracepoint rather than a kprobe: kprobes break silently when the kernel
@@ -193,6 +209,12 @@ rule_id
 separates this from a log aggregator: the engine states explicitly when it has
 only observed co-occurrence rather than causation. Nothing is permitted to claim
 causality it cannot show.
+
+A rule's first **required** clause is its anchor. Clauses after it are matched
+forwards in time; clauses before it are matched **backwards**, nearest first.
+That is what lets a rule answer the question the project exists for — the
+symptom has arrived, so what changed just before it — rather than only being
+able to describe consequences. See [writing a rule](rules.md).
 
 ## Six decisions settled up front
 

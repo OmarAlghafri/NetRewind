@@ -7,12 +7,11 @@ of an outage after it is over, when the evidence would normally be gone.
 > This is a lab project, built and demonstrated on GNS3. Nothing here has been
 > deployed to production hardware.
 
-**Status: M3 + eBPF.** Layers 1 to 4 are recorded, replayed as a narrative, and
-correlated into incidents with an explicit causal chain. A synthetic lab injects
-nine real faults — a flapping port, a hijacked gateway, a contested address, a
-re-pointed route, a vanished default, a service that will not answer — and
-checks both that every one is reconstructed from the record and that correlation
-names the cause. See [the roadmap](#roadmap).
+**Status: layers 1–4 recorded, correlated, and proven end to end.** A synthetic
+lab injects ten real faults — a flapping port, a hijacked gateway, a contested
+address, a re-pointed route, a vanished default, a path broken under a working
+connection — and checks both that every one is reconstructed from the record and
+that correlation names the cause. See [the roadmap](#roadmap).
 
 ## The problem
 
@@ -85,36 +84,42 @@ $ netrewind what-happened --host 10.99.0.11 --at 15:00 --window 10m
   !! 12:16:01.713  +2.02s     the default route was removed - nothing beyond the local segment is reachable
 ```
 
-- Watches TCP connections from inside the kernel with eBPF, so a connection
-  that was never answered is recorded — the one signal that tells a filtering
-  change, a dead service and a broken path apart from a client's point of view.
-  Ordinary activity is summarised every ten seconds rather than recorded per
-  connection, and when the kernel has to drop something, it says so
+- Watches TCP connections from inside the kernel with eBPF, and reports when
+  **two machines that were talking a moment ago can no longer connect** — the
+  strongest single signal that something just changed. Ordinary activity is
+  summarised every ten seconds rather than recorded per connection, and when the
+  kernel has to drop something, it says so
 - Correlates those events into incidents — and states, for every step, whether
   it *caused* the next one or merely happened alongside it
 
 ```
 $ netrewind incidents --last 1h
 
-!! The default gateway is being answered by a different machine
-   12:26:49 to 12:26:55  (6s)   rule gateway-hijack, confidence 90%
-   affected: 10.99.0.201
+!! A path that was working stopped working
+   19:09:19 to 19:09:23  (4s)   rule change-broke-a-path, confidence 88%
+   affected: 10.99.1.11
 
-   1  12:26:49.579  l2.arp_binding_changed  10.99.0.201
-      The hardware address answering for the default gateway changed.
-      Every host on this segment now sends its outbound traffic to a
-      different machine.
+   1  19:09:19.078  l2.arp_binding_changed  10.99.1.11
+      This is the last thing that changed on the path before it broke.
       |  which caused
-   2  12:26:55.633  l3.default_route_changed  default
-      Routing followed the change, so traffic is now leaving through a
-      path nobody chose.
+   2  19:09:23.086  flow.first_failure_for_pair  10.99.1.11
+      Two machines that had been connecting successfully can no longer
+      complete a handshake. Whatever else is true, something between
+      them changed.
+      |  and at the same time
+   3  19:09:23.090  l2.neighbor_failed  10.99.1.11
+      Other connections started failing in the same window.
 
-   root cause: l2.arp_binding_changed on 10.99.0.201 (confidence 90%)
+   root cause: l2.arp_binding_changed on 10.99.1.11 (confidence 88%)
    next:
-      Find which switch port the new hardware address is learned on
-      before changing anything. A failover looks identical to an attack
-      from here; the port tells them apart.
+      The change named here is the nearest one in time, not a proven
+      cause. Confirm it against your change record before acting.
 ```
+
+Note the middle column. `which caused` is a claim about mechanism; `and at the
+same time` is only co-occurrence. The engine never blurs the two, because a tool
+that does teaches its operator to distrust it — and an operator who distrusts
+the timeline is back to guessing.
 
 Planned next: nftables filtering decisions and conntrack, then a web timeline
 and an appliance image.
@@ -184,8 +189,8 @@ sudo make lab
 | **M0** | envelope, store, interface state, CLI | done |
 | **M1** | neighbours, routes, addresses; temporal identity; narrative queries; fault-injection lab | done |
 | **M2** | eBPF connection observation, rollups, `system.drop` | done |
-| M2b | nftables decisions, conntrack, `policy.first_drop_for_pair` | |
-| **M3** | Isnad correlation engine, incidents, ten-rule library | done |
+| M2b | nftables filtering decisions, conntrack, flow open/close/reset | |
+| **M3** | Isnad correlation engine with backward cause matching, twelve-rule library | done |
 | M4 | GNS3 lab, documentation, public release | |
 | M5 | web timeline, appliance image, Prometheus/OTel export | |
 
