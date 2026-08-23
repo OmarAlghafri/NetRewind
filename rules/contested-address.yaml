@@ -1,0 +1,21 @@
+id: contested-address
+title: Two machines are claiming the same address
+severity: error
+confidence: 85
+window: 120s
+root_cause: conflict
+advice: >-
+  Check for a statically configured host inside the DHCP pool, or a second DHCP
+  server. Both produce this, and both keep producing it until one is removed.
+match:
+  - as: conflict
+    kinds: [l2.duplicate_ip]
+    why: >-
+      The hardware address answering for this address kept changing between the
+      same few machines, which is what an address conflict looks like from the
+      neighbour table.
+  - as: fallout
+    kinds: [l2.neighbor_failed]
+    optional: true
+    relation: causes
+    why: The address stopped answering reliably while it was contested.

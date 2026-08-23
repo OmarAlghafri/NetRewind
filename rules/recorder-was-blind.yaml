@@ -1,0 +1,16 @@
+id: recorder-was-blind
+title: The record has a hole in it
+severity: warn
+confidence: 100
+window: 60s
+root_cause: gap
+advice: >-
+  Nothing can be concluded about this period from this recorder. If the outage
+  being investigated falls inside it, look for another source before deciding
+  what happened.
+match:
+  - as: gap
+    kinds: [system.gap, system.drop]
+    why: >-
+      The recorder was not watching, or lost events it could not keep up with.
+      An absence of events here does not mean an absence of problems.

@@ -1,0 +1,24 @@
+id: default-route-lost
+title: The default route disappeared
+severity: error
+confidence: 95
+window: 120s
+root_cause: loss
+advice: >-
+  Look at the timeline immediately before this. A default route rarely leaves on
+  its own; it follows an interface going down, a DHCP lease expiring, or a
+  routing daemon losing its peer. Fix that, not the route.
+match:
+  - as: loss
+    kinds: [l3.route_removed]
+    where:
+      attrs:
+        is_default: "true"
+    why: >-
+      The default route was withdrawn. Nothing beyond the local segment is
+      reachable from here.
+  - as: fallout
+    kinds: [l2.neighbor_failed, l3.route_removed]
+    optional: true
+    relation: causes
+    why: Reachability began failing once there was no default path.

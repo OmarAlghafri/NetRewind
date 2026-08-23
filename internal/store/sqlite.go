@@ -81,7 +81,7 @@ func OpenSQLite(path string) (*SQLite, error) {
 	// One writer. SQLite serialises writes anyway, and this keeps "database is
 	// locked" out of the collector's hot path.
 	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(schemaDDL + identityDDL); err != nil {
+	if _, err := db.Exec(schemaDDL + identityDDL + incidentDDL); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("store: apply schema: %w", err)
 	}
@@ -102,20 +102,26 @@ INSERT INTO events (
     subject_attrs, related, attrs, evidence, dedup_key, count
 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
 
-// foldSQL extends an existing event rather than inserting a duplicate. It only
-// matches inside the fold window, so the same fact recurring an hour later is
-// correctly a new event and not a bigger old one. ts_wall keeps the first
-// occurrence and ts_last tracks the most recent, because an incident timeline
-// needs to know when something started, not only that it is still going.
-const foldSQL = `
-UPDATE events SET count = count + ?, ts_last = ?
-WHERE event_id = (
-    SELECT event_id FROM events
-    WHERE dedup_key = ? AND dedup_key <> '' AND ts_last >= ?
-    ORDER BY ts_last DESC LIMIT 1
-)`
+// findFoldSQL locates the row a repeat should join, if there is one inside the
+// fold window. The same fact recurring an hour later is correctly a new event
+// and not a bigger old one.
+const findFoldSQL = `
+SELECT event_id FROM events
+WHERE dedup_key = ? AND dedup_key <> '' AND ts_last >= ?
+ORDER BY ts_last DESC LIMIT 1`
+
+// foldSQL extends that row. ts_wall keeps the first occurrence and ts_last
+// tracks the most recent, because an incident timeline needs to know when
+// something started, not only that it is still going.
+const foldSQL = `UPDATE events SET count = count + ?, ts_last = ? WHERE event_id = ?`
 
 // Append writes events in one transaction.
+//
+// An event that folds into an existing row has its ID rewritten to that row's,
+// because after folding it is that row. Anything downstream - above all the
+// correlation engine, which cites event ids as the evidence for its
+// conclusions - must reference a row that exists. An incident whose chain
+// points at an event the store never kept is worse than no incident.
 func (s *SQLite) Append(ctx context.Context, events ...*event.Event) error {
 	if len(events) == 0 {
 		return nil
@@ -126,6 +132,11 @@ func (s *SQLite) Append(ctx context.Context, events ...*event.Event) error {
 	}
 	defer tx.Rollback()
 
+	find, err := tx.PrepareContext(ctx, findFoldSQL)
+	if err != nil {
+		return fmt.Errorf("store: prepare fold lookup: %w", err)
+	}
+	defer find.Close()
 	fold, err := tx.PrepareContext(ctx, foldSQL)
 	if err != nil {
 		return fmt.Errorf("store: prepare fold: %w", err)
@@ -143,12 +154,16 @@ func (s *SQLite) Append(ctx context.Context, events ...*event.Event) error {
 		}
 		if e.DedupKey != "" {
 			cutoff := e.TSWall - int64(FoldWindow)
-			res, err := fold.ExecContext(ctx, e.Count, e.TSWall, e.DedupKey, cutoff)
-			if err != nil {
-				return fmt.Errorf("store: fold %s: %w", e.Kind, err)
-			}
-			if n, _ := res.RowsAffected(); n > 0 {
+			var survivor string
+			switch err := find.QueryRowContext(ctx, e.DedupKey, cutoff).Scan(&survivor); {
+			case err == nil:
+				if _, err := fold.ExecContext(ctx, e.Count, e.TSWall, survivor); err != nil {
+					return fmt.Errorf("store: fold %s: %w", e.Kind, err)
+				}
+				e.ID = survivor
 				continue
+			case err != sql.ErrNoRows:
+				return fmt.Errorf("store: fold lookup %s: %w", e.Kind, err)
 			}
 		}
 		subjAttrs, err := marshalMap(e.Subject.Attrs)

@@ -22,6 +22,7 @@ BUILD="${BUILD:-./build}"
 DAEMON="$BUILD/netrewindd"
 CLI="$BUILD/netrewind"
 DB="${NETREWIND_DB:-/tmp/netrewind-lab/events.db}"
+RULES="${RULES:-./rules}"
 LOG=/tmp/netrewind-lab/recorder.log
 
 LAB=nrlab
@@ -148,7 +149,7 @@ all() {
 
     # The recorder starts after the topology exists, so the healthy state is its
     # baseline and only the injected faults read as changes.
-    inlab "$DAEMON" --db "$DB" --log-level info >"$LOG" 2>&1 &
+    inlab "$DAEMON" --db "$DB" --rules "$RULES" --log-level info >"$LOG" 2>&1 &
     pid=$!
     sleep 2
     kill -0 "$pid" 2>/dev/null || { echo "recorder died:" >&2; cat "$LOG" >&2; teardown; exit 1; }
@@ -172,6 +173,9 @@ all() {
     echo "================ following one host across the incident ========"
     "$CLI" what-happened --db "$DB" --host 10.99.0.11 --at now --window 10m
     echo
+    echo "================ what correlation concluded ===================="
+    "$CLI" incidents --db "$DB" --last 10m
+    echo
 
     teardown
     assert_expected
@@ -191,11 +195,24 @@ assert_expected() {
         fi
     done
     echo
+    # Correlation has to reach the right conclusion, not merely have the
+    # evidence available to reach it.
+    for rule in gateway-hijack contested-address default-route-moved default-route-lost; do
+        n=$("$CLI" incidents --db "$DB" --last 10m --rule "$rule" -o json | grep -c '"incident_id"' || true)
+        if [ "$n" -ge 1 ]; then
+            printf '  ok    %-28s concluded\n' "$rule"
+        else
+            printf '  MISS  %-28s not concluded\n' "$rule"
+            fail=1
+        fi
+    done
+
+    echo
     if [ "$fail" -eq 0 ]; then
-        echo "M1 PASS: every injected fault was reconstructed from the record"
+        echo "PASS: every injected fault was reconstructed, and correlation named the cause"
         exit 0
     fi
-    echo "M1 FAIL: some faults left no trace" >&2
+    echo "FAIL: something injected left no trace, or was not recognised" >&2
     echo "recorder log:" >&2
     cat "$LOG" >&2
     exit 1

@@ -1,0 +1,20 @@
+id: link-down-isolated-hosts
+title: A link went down and took hosts with it
+severity: warn
+confidence: 80
+window: 90s
+root_cause: link
+advice: >-
+  The hosts did not fail. Restore the link and they will return; investigating
+  them individually wastes the outage.
+match:
+  - as: link
+    kinds: [link.down]
+    why: An interface went down.
+  - as: isolation
+    kinds: [l2.neighbor_failed]
+    min_count: 1
+    relation: causes
+    why: >-
+      Hosts stopped answering at layer 2 immediately afterwards, which is the
+      link failure showing up as apparent host failures.

@@ -1,0 +1,16 @@
+id: host-moved-ports
+title: A machine appeared behind a different interface
+severity: warn
+confidence: 70
+window: 60s
+root_cause: move
+advice: >-
+  Ordinary if someone re-patched a cable or a wireless client roamed. Suspicious
+  if the machine is a server, or if the same hardware address appears in two
+  places at once rather than moving between them.
+match:
+  - as: move
+    kinds: [l2.mac_moved]
+    why: >-
+      The same hardware address is now reached through a different interface
+      than before.

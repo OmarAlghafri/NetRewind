@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/OmarAlghafri/netrewind/internal/event"
+	"github.com/OmarAlghafri/netrewind/internal/incident"
 )
 
 // Filter selects a slice of history. A zero Filter means "everything", which
@@ -53,6 +54,10 @@ type Store interface {
 	Query(ctx context.Context, f Filter) ([]*event.Event, error)
 	// Prune deletes events older than the cutoff and reports how many went.
 	Prune(ctx context.Context, before time.Time) (int64, error)
+	// AppendIncidents stores what correlation concluded.
+	AppendIncidents(ctx context.Context, incidents ...*incident.Incident) error
+	// QueryIncidents returns matching incidents, oldest first.
+	QueryIncidents(ctx context.Context, f IncidentFilter) ([]*incident.Incident, error)
 	// GetMeta and SetMeta hold small recorder state that must survive a
 	// restart - most importantly the heartbeat that makes gap detection
 	// possible.

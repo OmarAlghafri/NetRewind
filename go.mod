@@ -7,6 +7,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/vishvananda/netlink v1.3.1
 	golang.org/x/sys v0.47.0
+	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.57.0
 )
 

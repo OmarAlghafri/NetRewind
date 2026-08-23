@@ -1,0 +1,32 @@
+id: gateway-hijack
+title: The default gateway is being answered by a different machine
+severity: error
+confidence: 90
+window: 180s
+root_cause: hijack
+advice: >-
+  Find which switch port the new hardware address is learned on before changing
+  anything. A failover looks identical to an attack from here; the port tells
+  them apart.
+match:
+  - as: hijack
+    kinds: [l2.arp_binding_changed]
+    where:
+      attrs:
+        is_gateway: "true"
+    why: >-
+      The hardware address answering for the default gateway changed. Every
+      host on this segment now sends its outbound traffic to a different
+      machine.
+  - as: reroute
+    kinds: [l3.default_route_changed, l3.route_removed]
+    optional: true
+    relation: causes
+    why: >-
+      Routing followed the change, so traffic is now leaving through a path
+      nobody chose.
+  - as: fallout
+    kinds: [l2.neighbor_failed, link.down]
+    optional: true
+    relation: correlates
+    why: Connectivity was lost while the gateway was being answered elsewhere.

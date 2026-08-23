@@ -1,0 +1,23 @@
+id: route-flapping
+title: A route is flapping
+severity: error
+confidence: 85
+window: 300s
+correlate_on: [subject]
+root_cause: flap
+advice: >-
+  Repeated reconvergence usually means an unstable adjacency rather than a
+  routing misconfiguration. Find the link underneath the neighbour that keeps
+  being lost before touching the routing configuration.
+match:
+  - as: flap
+    kinds: [l3.route_changed, l3.default_route_changed]
+    min_count: 3
+    why: >-
+      The winning path to this destination changed repeatedly in a few minutes.
+      Traffic was being moved back and forth faster than sessions can survive.
+  - as: cause
+    kinds: [link.down, l2.neighbor_failed]
+    optional: true
+    relation: correlates
+    why: A link or neighbour was failing underneath the reconvergence.

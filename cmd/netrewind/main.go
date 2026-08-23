@@ -39,7 +39,10 @@ func newRootCmd() *cobra.Command {
 		SilenceErrors: true,
 	}
 	root.PersistentFlags().String("db", store.DefaultPath(), "path to the event store")
-	root.AddCommand(newEventsCmd(), newTimelineCmd(), newWhatHappenedCmd(), newVersionCmd())
+	root.AddCommand(
+		newEventsCmd(), newTimelineCmd(), newWhatHappenedCmd(),
+		newIncidentsCmd(), newRulesCmd(), newVersionCmd(),
+	)
 	return root
 }
 

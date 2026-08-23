@@ -23,8 +23,10 @@ import (
 
 	"github.com/OmarAlghafri/netrewind/internal/collect"
 	"github.com/OmarAlghafri/netrewind/internal/collect/netlink"
+	"github.com/OmarAlghafri/netrewind/internal/correlate"
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/identity"
+	"github.com/OmarAlghafri/netrewind/internal/incident"
 	"github.com/OmarAlghafri/netrewind/internal/store"
 )
 
@@ -53,29 +55,61 @@ func main() {
 		logLevel   = flag.String("log-level", "info", "debug, info, warn or error")
 		retention  = flag.Duration("retention", 7*24*time.Hour, "how much history to keep")
 		gapAfter   = flag.Duration("gap-threshold", defaultGapThreshold, "absence longer than this is recorded as a gap in the record")
+		rulesDir   = flag.String("rules", "rules", "directory of correlation rules; empty disables correlation")
 	)
 	flag.Parse()
 
 	log := newLogger(*logLevel)
 
-	if err := run(log, *dbPath, *observerID, *retention, *gapAfter); err != nil {
+	cfg := config{
+		dbPath:     *dbPath,
+		observerID: *observerID,
+		retention:  *retention,
+		gapAfter:   *gapAfter,
+		rulesDir:   *rulesDir,
+	}
+	if err := run(log, cfg); err != nil {
 		log.Error("netrewindd stopped", "err", err)
 		os.Exit(1)
 	}
 }
 
-func run(log *slog.Logger, dbPath, observerID string, retention, gapAfter time.Duration) error {
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
+type config struct {
+	dbPath     string
+	observerID string
+	rulesDir   string
+	retention  time.Duration
+	gapAfter   time.Duration
+}
+
+func run(log *slog.Logger, cfg config) error {
+	if err := os.MkdirAll(filepath.Dir(cfg.dbPath), 0o755); err != nil {
 		return fmt.Errorf("create store directory: %w", err)
 	}
-	st, err := store.OpenSQLite(dbPath)
+	st, err := store.OpenSQLite(cfg.dbPath)
 	if err != nil {
 		return err
 	}
 	defer st.Close()
 
+	dbPath, observerID, retention, gapAfter := cfg.dbPath, cfg.observerID, cfg.retention, cfg.gapAfter
 	clock := event.NewClock()
 	builder := event.NewBuilder(observerID, clock)
+
+	// Correlation runs beside recording rather than after it, so an incident is
+	// available while it is still happening. It is optional: a recorder with no
+	// rules still records everything, and the rules can be replayed over stored
+	// history later.
+	var engine *correlate.Engine
+	if cfg.rulesDir != "" {
+		rules, err := correlate.LoadRules(cfg.rulesDir)
+		if err != nil {
+			log.Warn("correlation disabled", "err", err)
+		} else {
+			engine = correlate.NewEngine(rules, log)
+			log.Info("correlation enabled", "rules", len(rules), "from", cfg.rulesDir)
+		}
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -92,7 +126,7 @@ func run(log *slog.Logger, dbPath, observerID string, retention, gapAfter time.D
 	writerDone := make(chan struct{})
 	go func() {
 		defer close(writerDone)
-		writer(context.WithoutCancel(ctx), st, queue, log)
+		writer(context.WithoutCancel(ctx), st, engine, queue, log)
 	}()
 
 	for _, e := range startupEvents {
@@ -150,17 +184,39 @@ func run(log *slog.Logger, dbPath, observerID string, retention, gapAfter time.D
 // daemon: on shutdown the collectors stop first, then the writer flushes what
 // they already produced. Dropping buffered events at exit would put an
 // unexplained hole at the end of every recording.
-func writer(ctx context.Context, st store.Store, queue <-chan *event.Event, log *slog.Logger) {
+func writer(ctx context.Context, st store.Store, engine *correlate.Engine, queue <-chan *event.Event, log *slog.Logger) {
 	ticker := time.NewTicker(flushInterval)
 	defer ticker.Stop()
 
 	batch := make([]*event.Event, 0, flushSize)
+
+	// Correlation runs over a batch only once that batch is durable, so an
+	// incident can never point at evidence that was never written. The cost is
+	// that an incident lags its last event by up to one flush interval, which
+	// is a better trade than a conclusion whose evidence is missing.
 	flush := func() {
 		if len(batch) == 0 {
 			return
 		}
 		if err := st.Append(ctx, batch...); err != nil {
 			log.Error("append failed", "events", len(batch), "err", err)
+			batch = batch[:0]
+			return
+		}
+		if engine != nil {
+			var incidents []*incident.Incident
+			for _, e := range batch {
+				incidents = append(incidents, engine.Offer(e)...)
+			}
+			if len(incidents) > 0 {
+				if err := st.AppendIncidents(ctx, incidents...); err != nil {
+					log.Error("could not store incidents", "err", err)
+				}
+				for _, inc := range incidents {
+					log.Warn("incident", "title", inc.Title, "rule", inc.RuleID,
+						"severity", inc.Severity, "confidence", inc.Confidence, "links", len(inc.Chain))
+				}
+			}
 		}
 		batch = batch[:0]
 	}

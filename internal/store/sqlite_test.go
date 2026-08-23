@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/OmarAlghafri/netrewind/internal/event"
+	"github.com/OmarAlghafri/netrewind/internal/incident"
 )
 
 func openTestStore(t *testing.T) *SQLite {
@@ -322,5 +323,114 @@ func TestAppendRejectsInvalidEvents(t *testing.T) {
 
 	if err := st.Append(context.Background(), bad); err == nil {
 		t.Error("Append accepted an invalid event")
+	}
+}
+
+// A folded event becomes the row that absorbed it. Anything downstream that
+// cites an event id - above all the correlation engine, whose whole claim is
+// that its conclusions can be checked against the record - must be pointed at a
+// row that exists.
+func TestFoldedEventsAdoptTheSurvivingRowID(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	b := event.NewBuilder("obs-1", nil)
+	now := time.Now()
+
+	first := build(b, event.KindLinkDown, "eth1", now)
+	first.WithDedup("link.down|eth1")
+	second := build(b, event.KindLinkDown, "eth1", now.Add(time.Second))
+	second.WithDedup("link.down|eth1")
+	originalID := second.ID
+
+	if err := st.Append(ctx, first, second); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+	if second.ID == originalID {
+		t.Error("a folded event kept an id that is not in the store")
+	}
+	if second.ID != first.ID {
+		t.Errorf("folded event points at %s, want the surviving row %s", second.ID, first.ID)
+	}
+
+	stored, err := st.Query(ctx, Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 1 || stored[0].ID != second.ID {
+		t.Errorf("the id a folded event now carries is not the stored row")
+	}
+}
+
+func TestIncidentsRoundTripAndGrow(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	now := time.Now()
+
+	inc := &incident.Incident{
+		ID: "01INCIDENT0000000000000000", OpenedAt: now.UnixNano(), ClosedAt: now.UnixNano(),
+		Status: incident.StatusClosed, Title: "gateway moved", Severity: event.SevError,
+		Confidence: 90, RuleID: "gateway-hijack",
+		RootCause: incident.RootCause{Kind: event.KindARPBindingChanged, Entity: "10.0.0.1", Confidence: 90},
+		Chain: []incident.Link{
+			{Seq: 0, EventID: "e1", Kind: event.KindARPBindingChanged, At: now.UnixNano(), Why: "it moved"},
+		},
+		Victims: []string{"10.0.0.1"},
+		Advice:  "check the switch port",
+	}
+	if err := st.AppendIncidents(ctx, inc); err != nil {
+		t.Fatalf("AppendIncidents: %v", err)
+	}
+
+	// The same conclusion arriving later with a consequence attached must
+	// replace the thinner account, not stand beside it.
+	inc.Chain = append(inc.Chain, incident.Link{
+		Seq: 1, EventID: "e2", Kind: event.KindDefaultRouteChanged,
+		At: now.Add(time.Second).UnixNano(), Relation: incident.RelCauses, Why: "routing followed",
+	})
+	inc.ClosedAt = now.Add(time.Second).UnixNano()
+	if err := st.AppendIncidents(ctx, inc); err != nil {
+		t.Fatalf("AppendIncidents again: %v", err)
+	}
+
+	got, err := st.QueryIncidents(ctx, IncidentFilter{})
+	if err != nil {
+		t.Fatalf("QueryIncidents: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("got %d incidents, want 1 that grew", len(got))
+	}
+	if len(got[0].Chain) != 2 {
+		t.Errorf("chain has %d links, want 2", len(got[0].Chain))
+	}
+	if got[0].Chain[1].Relation != incident.RelCauses {
+		t.Error("relation was not round-tripped")
+	}
+	if got[0].Advice == "" || got[0].Victims == nil {
+		t.Error("advice or victims lost in round trip")
+	}
+}
+
+func TestQueryIncidentsFiltersBySeverity(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	now := time.Now()
+
+	mk := func(id string, sev event.Severity) *incident.Incident {
+		return &incident.Incident{
+			ID: id, OpenedAt: now.UnixNano(), Status: incident.StatusClosed,
+			Title: "t", Severity: sev, Confidence: 80, RuleID: "r",
+			Chain: []incident.Link{{EventID: "e", At: now.UnixNano()}},
+		}
+	}
+	if err := st.AppendIncidents(ctx, mk("a", event.SevWarn), mk("b", event.SevError), mk("c", event.SevInfo)); err != nil {
+		t.Fatalf("AppendIncidents: %v", err)
+	}
+
+	got, err := st.QueryIncidents(ctx, IncidentFilter{MinSeverity: event.SevWarn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Errorf("got %d incidents at warn or above, want 2", len(got))
 	}
 }

@@ -1,0 +1,23 @@
+id: port-flapping
+title: A port is flapping
+severity: warn
+confidence: 88
+window: 300s
+correlate_on: [subject]
+root_cause: flap
+advice: >-
+  A port that flaps repeatedly is usually a failing transceiver, a marginal
+  cable, or a duplex mismatch. Restarting the interface will not fix any of
+  those, and hides the evidence.
+match:
+  - as: flap
+    kinds: [link.down]
+    min_count: 3
+    why: >-
+      The same interface went down repeatedly in a few minutes. One outage is an
+      event; a run of them is a fault in the link itself.
+  - as: recovery
+    kinds: [link.up]
+    optional: true
+    relation: correlates
+    why: It came back each time, which is why nobody noticed it was failing.

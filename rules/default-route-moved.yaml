@@ -1,0 +1,20 @@
+id: default-route-moved
+title: The default route was re-pointed
+severity: error
+confidence: 85
+window: 120s
+root_cause: change
+advice: >-
+  Confirm this was intended. Compare the time against your change record: an
+  unplanned default route change means outbound traffic is leaving through a
+  path nobody chose.
+match:
+  - as: change
+    kinds: [l3.default_route_changed]
+    why: >-
+      The route all outbound traffic follows now points somewhere else.
+  - as: fallout
+    kinds: [l2.neighbor_failed, l3.route_removed]
+    optional: true
+    relation: causes
+    why: Reachability changed once the traffic started taking the new path.

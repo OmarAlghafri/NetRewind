@@ -1,0 +1,18 @@
+id: address-changed-hands
+title: An address moved to a different machine
+severity: warn
+confidence: 75
+window: 60s
+root_cause: handover
+advice: >-
+  Normal after a DHCP lease expires. Worth a look if the address is a server, is
+  statically assigned, or moved without a lease renewal near it.
+match:
+  - as: handover
+    kinds: [l2.arp_binding_changed]
+    where:
+      attrs:
+        address_changed_hands: "true"
+    why: >-
+      This address is now answered by hardware that was not previously bound to
+      it, so the machine behind it is a different machine.
