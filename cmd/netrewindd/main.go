@@ -24,6 +24,7 @@ import (
 	"github.com/OmarAlghafri/netrewind/internal/collect"
 	"github.com/OmarAlghafri/netrewind/internal/collect/netlink"
 	"github.com/OmarAlghafri/netrewind/internal/event"
+	"github.com/OmarAlghafri/netrewind/internal/identity"
 	"github.com/OmarAlghafri/netrewind/internal/store"
 )
 
@@ -98,8 +99,20 @@ func run(log *slog.Logger, dbPath, observerID string, retention, gapAfter time.D
 		queue <- e
 	}
 
+	// Identity resolution runs at ingest so an event records which machine we
+	// believed it was about at the time. The temporal table behind the resolver
+	// keeps the history, so a query can still follow a machine across an
+	// address change even if that belief later needs revising.
+	ids, err := identity.New(ctx, st)
+	if err != nil {
+		return err
+	}
+
 	collectors := []collect.Collector{
 		netlink.NewLinkCollector(builder, log),
+		netlink.NewNeighCollector(builder, log, ids),
+		netlink.NewRouteCollector(builder, log),
+		netlink.NewAddrCollector(builder, log),
 	}
 	for _, c := range collectors {
 		wg.Add(1)

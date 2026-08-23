@@ -81,7 +81,7 @@ func OpenSQLite(path string) (*SQLite, error) {
 	// One writer. SQLite serialises writes anyway, and this keeps "database is
 	// locked" out of the collector's hot path.
 	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(schemaDDL); err != nil {
+	if _, err := db.Exec(schemaDDL + identityDDL); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("store: apply schema: %w", err)
 	}

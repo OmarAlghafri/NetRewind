@@ -54,6 +54,35 @@ func Observer(id string) EntityRef {
 	return EntityRef{Kind: EntityObserver, ID: id, Label: id}
 }
 
+// Host builds a reference to a machine on the network. Either identifier may be
+// empty; the label prefers the address, because that is what an operator knows
+// a machine by when something breaks. ID stays empty until the identity
+// resolver fills it in.
+func Host(ip, mac string) EntityRef {
+	attrs := make(map[string]string, 2)
+	if ip != "" {
+		attrs["ip"] = ip
+	}
+	if mac != "" {
+		attrs["mac"] = mac
+	}
+	label := ip
+	if label == "" {
+		label = mac
+	}
+	return EntityRef{Kind: EntityHost, Label: label, Attrs: attrs}
+}
+
+// Subnet builds a reference to an IP prefix, or to "default" for the route that
+// covers everything else.
+func Subnet(prefix string) EntityRef {
+	return EntityRef{
+		Kind:  EntitySubnet,
+		Label: prefix,
+		Attrs: map[string]string{"prefix": prefix},
+	}
+}
+
 func itoa(i int) string {
 	if i == 0 {
 		return "0"
