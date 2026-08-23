@@ -7,10 +7,11 @@ of an outage after it is over, when the evidence would normally be gone.
 > This is a lab project, built and demonstrated on GNS3. Nothing here has been
 > deployed to production hardware.
 
-**Status: M0.** The envelope, the event store and the interface-state collector
-work end to end; `netrewind events` will show you a link going down and coming
-back. Layer 2 and layer 3 are next, eBPF after that, and the correlation engine
-after that. See [the roadmap](#roadmap).
+**Status: M1.** Layers 1 to 3 are recorded and can be replayed as a narrative.
+A synthetic lab injects seven real faults - a flapping port, a hijacked gateway,
+a contested address, a re-pointed route, a vanished default - and every one of
+them is reconstructed from the record afterwards. eBPF flow observation is next,
+then the correlation engine. See [the roadmap](#roadmap).
 
 ## The problem
 
@@ -55,19 +56,37 @@ itself:
 - Watches interface state through netlink, distinguishing an administratively
   shut port from a dropped carrier — different causes, different fixes, and
   every other tool reports them identically
-- Records each observation in a common envelope with two clocks, a stable
-  identity, and the evidence that justifies it
+- Watches the neighbour table, so an ARP binding moving under a running network
+  is recorded — and flagged as an error rather than a warning when the address
+  it moved under is the default gateway
+- Watches routing, reporting a change only when the route that actually *wins*
+  for a destination changes, so a standby path being installed is not mistaken
+  for traffic moving
+- Ties observations to machines through a temporal identity table, so asking
+  about an address as it was last Tuesday returns the machine that held it
+  *then*, not the one holding it now
 - Folds repeats so a flapping interface is one growing event rather than ten
   thousand rows
 - Records its own blind spots: `system.gap` states exactly how long the recorder
   was not watching, because a gap that is not recorded is indistinguishable from
   a quiet period
-- Answers questions after the fact:
-  `netrewind events --last 24h --host 192.168.20.10`
+- Reads the record back as a narrative, not a table
 
-Planned, in order: ARP and route changes, then eBPF flow observation, then the
-correlation engine that turns events into incidents with an explicit causal
-chain, then a web timeline and an appliance image.
+```
+$ netrewind what-happened --host 10.99.0.11 --at 15:00 --window 10m
+
+  !  12:15:50.621             nrlab1 was shut down administratively
+  -  12:15:52.628  +2.01s     nrlab1 came back after 2.006s
+  !  12:15:53.639  +1.01s     10.99.0.11 moved from 02:00:00:00:00:11 to 02:00:00:00:00:aa
+  !! 12:15:54.647  +970ms     10.99.0.201 moved from 02:00:00:00:00:01 to 02:00:00:00:00:ff - this is the default gateway
+  !! 12:15:55.660  +1.01s     10.99.0.11 is being claimed by more than one machine  (x3)
+  -  12:15:59.685  +4.02s     route to 10.200.0.0/24 now goes via 10.99.1.11 (was 10.99.0.11)
+  !! 12:16:01.713  +2.02s     the default route was removed - nothing beyond the local segment is reachable
+```
+
+Planned next: eBPF flow observation, then the correlation engine that turns
+these events into incidents with an explicit causal chain, then a web timeline
+and an appliance image.
 
 ## How it is different
 
@@ -114,7 +133,15 @@ Building and testing work on any platform. Observing requires Linux — see
 ```bash
 make all                                          # fmt, vet, test, build
 sudo ./build/netrewindd --db ./var/events.db      # record
-./build/netrewind events --last 15m               # ask what happened
+./build/netrewind timeline --last 15m             # read it back
+```
+
+To see the whole thing work without a network to break, run the synthetic lab.
+It builds a topology in network namespaces, records it, injects seven faults and
+checks that every one of them can be found in the record afterwards:
+
+```bash
+sudo make lab
 ```
 
 ## Roadmap
@@ -122,10 +149,10 @@ sudo ./build/netrewindd --db ./var/events.db      # record
 | | | |
 |---|---|---|
 | **M0** | envelope, store, interface state, CLI | done |
-| M1 | ARP, neighbours, routes; identity resolution; `what-happened` | |
+| **M1** | neighbours, routes, addresses; temporal identity; narrative queries; fault-injection lab | done |
 | M2 | eBPF flows, nftables decisions, rollups, `system.drop` | |
 | M3 | Isnad correlation engine, incidents, rule library | |
-| M4 | fault-injection lab, documentation, public release | |
+| M4 | GNS3 lab, documentation, public release | |
 | M5 | web timeline, appliance image, Prometheus/OTel export | |
 
 ## Documentation

@@ -72,3 +72,17 @@ sync:
 .PHONY: clean
 clean:
 	rm -rf $(BUILD) var
+
+# The synthetic lab: a topology in network namespaces that faults can be
+# injected into safely, because nothing in it touches the real network.
+.PHONY: lab
+lab: build
+	sudo BUILD=$(BUILD) lab/inject.sh all
+
+.PHONY: lab-up
+lab-up:
+	sudo lab/inject.sh setup
+
+.PHONY: lab-down
+lab-down:
+	sudo lab/inject.sh teardown
