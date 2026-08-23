@@ -7,12 +7,12 @@ of an outage after it is over, when the evidence would normally be gone.
 > This is a lab project, built and demonstrated on GNS3. Nothing here has been
 > deployed to production hardware.
 
-**Status: M3.** Layers 1 to 3 are recorded, replayed as a narrative, and
+**Status: M3 + eBPF.** Layers 1 to 4 are recorded, replayed as a narrative, and
 correlated into incidents with an explicit causal chain. A synthetic lab injects
-seven real faults — a flapping port, a hijacked gateway, a contested address, a
-re-pointed route, a vanished default — and checks both that every one is
-reconstructed from the record and that correlation names the cause. eBPF flow
-observation is next. See [the roadmap](#roadmap).
+nine real faults — a flapping port, a hijacked gateway, a contested address, a
+re-pointed route, a vanished default, a service that will not answer — and
+checks both that every one is reconstructed from the record and that correlation
+names the cause. See [the roadmap](#roadmap).
 
 ## The problem
 
@@ -85,6 +85,11 @@ $ netrewind what-happened --host 10.99.0.11 --at 15:00 --window 10m
   !! 12:16:01.713  +2.02s     the default route was removed - nothing beyond the local segment is reachable
 ```
 
+- Watches TCP connections from inside the kernel with eBPF, so a connection
+  that was never answered is recorded — the one signal that tells a filtering
+  change, a dead service and a broken path apart from a client's point of view.
+  Ordinary activity is summarised every ten seconds rather than recorded per
+  connection, and when the kernel has to drop something, it says so
 - Correlates those events into incidents — and states, for every step, whether
   it *caused* the next one or merely happened alongside it
 
@@ -111,7 +116,8 @@ $ netrewind incidents --last 1h
       from here; the port tells them apart.
 ```
 
-Planned next: eBPF flow observation, then a web timeline and an appliance image.
+Planned next: nftables filtering decisions and conntrack, then a web timeline
+and an appliance image.
 
 ## How it is different
 
@@ -135,9 +141,11 @@ netlink · eBPF · conntrack · nftables · DHCP/DNS · LLDP · config
                           |
                     common envelope         internal/event
                           |
+              identity resolution           internal/identity
+                          |
                      event store            internal/store
                           |
-              Isnad correlation engine      internal/correlate   (M3)
+              Isnad correlation engine      internal/correlate
                           |
         incidents with an explicit causal chain
                           |
@@ -175,7 +183,8 @@ sudo make lab
 |---|---|---|
 | **M0** | envelope, store, interface state, CLI | done |
 | **M1** | neighbours, routes, addresses; temporal identity; narrative queries; fault-injection lab | done |
-| M2 | eBPF flows, nftables decisions, rollups, `system.drop` | |
+| **M2** | eBPF connection observation, rollups, `system.drop` | done |
+| M2b | nftables decisions, conntrack, `policy.first_drop_for_pair` | |
 | **M3** | Isnad correlation engine, incidents, ten-rule library | done |
 | M4 | GNS3 lab, documentation, public release | |
 | M5 | web timeline, appliance image, Prometheus/OTel export | |

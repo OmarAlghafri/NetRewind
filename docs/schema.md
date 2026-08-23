@@ -110,14 +110,31 @@ different causes and completely different fixes.
 **`default_route_changed`** ⭐ · `addr_added` · `addr_removed` ·
 `icmp_unreachable` · `mtu_blackhole`
 
-### `flow.*` — layer 4, from conntrack and eBPF
+### `flow.*` — layer 4, from eBPF and conntrack
 
-`open` · `close` · `reset` · `timeout_no_close` · `retransmit_spike` ·
-**`handshake_fail`** ⭐ · `rollup`
+**`handshake_fail`** ⭐ · `rollup` — implemented.
+`open` · `close` · `reset` · `timeout_no_close` · `retransmit_spike` — planned,
+and needing conntrack rather than the state tracepoint.
 
-> **Cardinality decision.** Individual flows are *not* recorded as events. Only
-> anomalous flows are; everything else is aggregated into a `flow.rollup` every
-> 10 seconds. Without this the store fills in a day.
+The source is an eBPF program on the `sock/inet_sock_set_state` tracepoint. A
+stable tracepoint rather than a kprobe: kprobes break silently when the kernel
+renames or inlines a function, and a recorder that stops recording without
+saying so is the failure mode this project exists to prevent.
+
+A connection going straight from the opening SYN to closed was never answered.
+Something refused it, dropped it, or was not listening — and that single signal
+is what tells a filtering change, a dead service and a broken path apart from
+the client's point of view, which nothing at layer 3 can do.
+
+> **Cardinality decision.** Individual connections are *not* recorded as events.
+> A busy segment opens thousands a second, and recording each would fill the
+> store in a day while telling an operator nothing a counter could not. Only
+> anomalies earn a row; everything else is aggregated into a `flow.rollup` every
+> 10 seconds. Failures fold by destination and port, so a port scan cannot flood
+> the store either.
+
+> **Not a connection.** A socket entering or leaving `LISTEN` is a service
+> starting or stopping, not a connection opening or closing, and is ignored.
 
 ### `dhcp.*` and `dns.*` — naming and addressing, metadata only
 
@@ -153,8 +170,11 @@ the family that lets the timeline answer *what were we doing when it broke*.
 `gap` · `drop` · `clock_step` · `start` · `stop`
 
 Never remove these. `system.gap` records exactly how long the recorder was
-blind; `system.drop` records how many events were lost to a full buffer. A
-recorder that silently omits what it missed is not evidence of anything.
+blind, measured against a heartbeat written every ten seconds. `system.drop`
+records how many events the kernel had to throw away when the eBPF ring buffer
+overflowed. A recorder that silently omits what it missed is not evidence of
+anything: the record would show a quiet network, and a quiet network is what an
+operator concludes when nothing is wrong.
 
 ## The incident
 

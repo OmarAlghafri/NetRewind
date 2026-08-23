@@ -34,11 +34,45 @@ wsl --import netrewind-lab C:\Users\<you>\wsl\netrewind-lab alpine.tar.gz
 wsl -d netrewind-lab -u root -- apk add --no-cache iproute2
 ```
 
+Check what the kernel can actually do before writing anything against it —
+BTF, ring buffers and each tracepoint are separate capabilities, and finding a
+missing one after building a collector on it is expensive:
+
+```bash
+sudo lab/check-kernel.sh
+```
+
 Then, from the distro, with the cross-compiled binaries in `build/`:
 
 ```bash
 ./lab/accept-m0.sh ./build     # interface state
 ./lab/inject.sh all            # the full fault suite
+```
+
+Editing on Windows and running in WSL2 is easier through a space-free path, so
+nothing has to be quoted through three layers of shell:
+
+```powershell
+New-Item -ItemType Junction -Path C:\netrewind-src -Target "C:\My project\NetRewind"
+wsl -d netrewind-lab -u root -- sh /mnt/c/netrewind-src/lab/wsl-sync.sh all
+```
+
+The eBPF toolchain, if you want to rebuild the program rather than use the
+committed object:
+
+```bash
+apk add --no-cache clang llvm libbpf-dev linux-headers bpftool   # ~500 MB
+make bpf
+```
+
+### A trap worth knowing
+
+Entering a network namespace gets a fresh **mount** namespace with `/sys`
+remounted, so tracefs disappears and no eBPF tracepoint can be attached. It has
+to be mounted inside the same `ip netns exec` that runs the recorder:
+
+```bash
+ip netns exec nrlab sh -c 'mount -t tracefs tracefs /sys/kernel/tracing; exec netrewindd ...'
 ```
 
 ## The realistic one: a VM wired into GNS3
