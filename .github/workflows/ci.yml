@@ -1,0 +1,96 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: fmt, vet, test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l ./cmd ./internal)
+          if [ -n "$unformatted" ]; then
+            echo "not gofmt'd:"; echo "$unformatted"; exit 1
+          fi
+
+      # Vetted for both targets. The collectors are Linux-only and have
+      # non-Linux stubs precisely so the tree stays buildable off Linux; if the
+      # stubs drift out of step with the real thing, this is where it shows.
+      - name: vet (linux)
+        run: go vet ./...
+      - name: vet (windows)
+        run: GOOS=windows go vet ./...
+      - name: vet (darwin)
+        run: GOOS=darwin go vet ./...
+
+      - name: test
+        run: go test -race ./...
+
+      - name: build static binaries
+        run: CGO_ENABLED=0 make linux
+
+  bpf:
+    name: eBPF object matches its source
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install clang
+        run: sudo apt-get update && sudo apt-get install -y clang llvm libbpf-dev
+
+      # The compiled object is committed so the tree builds without a BPF
+      # toolchain. Committed build output drifts from its source unless
+      # something checks, so this rebuilds it and fails if it differs.
+      - name: rebuild and compare
+        run: |
+          cp internal/collect/flow/bpf/flow.bpf.o /tmp/committed.o
+          make bpf
+          if ! cmp -s /tmp/committed.o internal/collect/flow/bpf/flow.bpf.o; then
+            echo "the committed eBPF object does not match flow.bpf.c"
+            echo "run 'make bpf' and commit the result"
+            exit 1
+          fi
+
+  lab:
+    name: fault injection
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: kernel capabilities
+        run: sudo bash lab/check-kernel.sh
+
+      - name: install nftables
+        run: sudo apt-get update && sudo apt-get install -y nftables netcat-openbsd
+
+      - name: build
+        run: CGO_ENABLED=0 make build
+
+      # The real gate. Builds a topology in network namespaces, records it,
+      # injects eleven faults, and asserts that every one can be found in the
+      # record afterwards *and* that correlation named the cause. A green tick
+      # here means the thing works, not that it compiles.
+      - name: inject faults and check the record
+        run: sudo BUILD=./build lab/inject.sh all
+
+      - name: recorder log on failure
+        if: failure()
+        run: cat /tmp/netrewind-lab/recorder.log || true

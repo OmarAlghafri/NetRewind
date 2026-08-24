@@ -37,6 +37,31 @@ GW_B=10.99.0.202
 
 inlab() { ip netns exec "$LAB" "$@"; }
 
+# The two netcats in circulation take different flags for listening, and a
+# scenario that silently stops connecting proves nothing. These pick the right
+# invocation once so the lab runs the same on Alpine and on Ubuntu.
+if command -v busybox >/dev/null 2>&1 && busybox nc --help 2>&1 | grep -q '\-l'; then
+    NC_LISTEN_FMT="busybox nc -l -p"
+    NC_CONNECT="busybox nc"
+elif nc -h 2>&1 | grep -q '\-p port'; then
+    NC_LISTEN_FMT="nc -l -p"   # traditional netcat
+    NC_CONNECT="nc"
+else
+    NC_LISTEN_FMT="nc -l"      # OpenBSD netcat
+    NC_CONNECT="nc"
+fi
+
+# nc_listen NETNS PORT - starts a listener in the background, prints its pid.
+nc_listen() {
+    ip netns exec "$1" $NC_LISTEN_FMT "$2" >/dev/null 2>&1 &
+    echo $!
+}
+
+# nc_connect HOST PORT TIMEOUT [payload-on-stdin]
+nc_connect() {
+    inlab $NC_CONNECT -w "$3" "$1" "$2" >/dev/null 2>&1 || true
+}
+
 setup() {
     teardown 2>/dev/null || true
     ip netns add "$LAB"
@@ -136,11 +161,9 @@ scenario_service_unreachable() {
     # Nothing is listening on 9999, so each attempt goes from the opening SYN
     # straight to closed - which is what a filtered port, a dead service and a
     # broken path all look like from the client.
-    # busybox explicitly: whichever netcat is installed changes the flags, and
-    # a scenario that silently stops connecting proves nothing.
     i=0
     while [ "$i" -lt 4 ]; do
-        inlab busybox nc -w 1 10.99.0.11 9999 </dev/null >/dev/null 2>&1 || true
+        nc_connect 10.99.0.11 9999 1 </dev/null
         i=$((i + 1))
     done
 }
@@ -149,10 +172,9 @@ scenario_normal_traffic() {
     echo "-- generating: connections that succeed, for the rollup"
     i=0
     while [ "$i" -lt 3 ]; do
-        ip netns exec "$H1" busybox nc -l -p 9100 >/dev/null 2>&1 &
-        listener=$!
+        listener=$(nc_listen "$H1" 9100)
         sleep 1
-        echo hello | inlab busybox nc -w 2 10.99.0.11 9100 >/dev/null 2>&1 || true
+        echo hello | nc_connect 10.99.0.11 9100 2
         kill "$listener" 2>/dev/null || true
         i=$((i + 1))
     done
@@ -163,17 +185,16 @@ scenario_path_broke() {
     # The whole point of the recorder in one scenario: two machines that were
     # connecting fine, a change on the path, and then they cannot. Both halves
     # are observable, so the chain can be drawn between them.
-    ip netns exec "$H2" busybox nc -l -p 9200 >/dev/null 2>&1 &
-    listener=$!
+    listener=$(nc_listen "$H2" 9200)
     sleep 1
-    echo hello | inlab busybox nc -w 2 10.99.1.11 9200 >/dev/null 2>&1 || true
+    echo hello | nc_connect 10.99.1.11 9200 2
     sleep 1
 
     # Point the neighbour entry at hardware that is not there. Packets now go
     # into the void, so the handshake times out rather than being refused.
     inlab ip neigh replace 10.99.1.11 lladdr 02:00:00:00:00:de dev nrlab1 nud permanent
     sleep 1
-    inlab busybox nc -w 3 10.99.1.11 9200 </dev/null >/dev/null 2>&1 || true
+    nc_connect 10.99.1.11 9200 3 </dev/null
 
     kill "$listener" 2>/dev/null || true
     inlab ip neigh del 10.99.1.11 dev nrlab1 2>/dev/null || true
@@ -186,10 +207,9 @@ scenario_policy_broke_a_path() {
         return 0
     fi
 
-    ip netns exec "$H1" busybox nc -l -p 9300 >/dev/null 2>&1 &
-    listener=$!
+    listener=$(nc_listen "$H1" 9300)
     sleep 1
-    echo hello | inlab busybox nc -w 2 10.99.0.11 9300 >/dev/null 2>&1 || true
+    echo hello | nc_connect 10.99.0.11 9300 2
     sleep 1
 
     # nftables is per network namespace, so this cannot escape the lab.
@@ -204,7 +224,7 @@ scenario_policy_broke_a_path() {
 
     # Dropped rather than refused, so the handshake times out instead of being
     # answered. That is what a filtering change looks like from the client.
-    inlab busybox nc -w 3 10.99.0.11 9300 </dev/null >/dev/null 2>&1 || true
+    nc_connect 10.99.0.11 9300 3 </dev/null
 
     kill "$listener" 2>/dev/null || true
     inlab nft delete table inet nrlab 2>/dev/null || true
