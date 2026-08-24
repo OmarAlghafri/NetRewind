@@ -1,0 +1,192 @@
+# Running the recorder
+
+How to deploy NetRewind, where to put it, what to watch, and what to do with it
+when something breaks.
+
+> This is a lab project. It has been proven against network namespaces and is
+> intended for a GNS3 lab. Nothing here has been deployed to production
+> hardware, and this document describes how it is meant to be operated, not a
+> record of it having been.
+
+## What it needs
+
+| | |
+|---|---|
+| Kernel | 5.15+ for the netlink collectors. eBPF flow observation additionally needs BTF (`/sys/kernel/btf/vmlinux`) and the `sock/inet_sock_set_state` tracepoint |
+| Capabilities | `CAP_NET_ADMIN` to read netlink; `CAP_BPF` and `CAP_PERFMON` to load the eBPF program. Nothing else — it never writes to the network |
+| CPU / RAM | 2 cores, 512 MB is comfortable for a single segment |
+| Disk | An event store grows with *change*, not traffic. A quiet segment is tens of megabytes a week; a flapping one, a few hundred. Size for the retention you want and check `netrewind_stored_events` |
+| Userspace | `nft` if you want the filtering collector. Everything else is in the binary |
+
+Check the kernel before installing:
+
+```bash
+sudo lab/check-kernel.sh
+```
+
+It reports BTF, clang, each tracepoint, and whether nftables and conntrack are
+usable. A missing capability found now costs minutes; found after a collector is
+written against it, weeks.
+
+## Installing
+
+```bash
+make linux
+sudo install -m 0755 build/netrewindd-linux-amd64 /usr/local/bin/netrewindd
+sudo install -m 0755 build/netrewind-linux-amd64  /usr/local/bin/netrewind
+sudo install -d -m 0750 /etc/netrewind/rules
+sudo cp rules/*.yaml /etc/netrewind/rules/
+sudo cp deploy/systemd/netrewindd.service /etc/systemd/system/
+sudo systemctl enable --now netrewindd
+```
+
+The unit grants only the four capabilities above, runs with `ProtectSystem=strict`
+and a private `/tmp`, and is exempted from the OOM killer's usual attention —
+the recorder has to survive the conditions it exists to record.
+
+## Where to put it
+
+This is the decision that determines what the record is worth, and it deserves
+more thought than the install.
+
+The recorder sees what reaches it. That is the whole limitation, and pretending
+otherwise is how observability tools end up trusted for answers they cannot
+give.
+
+**At the gateway, inline.** The best single position. Every conversation between
+the segment and the outside world passes through it, and it sees ARP for the
+whole broadcast domain, its own routing table, and every connection crossing the
+boundary. This is where an appliance belongs.
+
+**On a mirrored port.** Sees the traffic but not the gateway's own routing table
+or filtering decisions. Layer 2 and connection observation still work; `l3.*`
+and `policy.*` describe the recorder's own stack rather than the network's.
+
+**As a host on the segment.** The cheapest to try, and enough to catch ARP
+changes, a rogue DHCP server and a contested address — the faults that hit a
+whole broadcast domain. It will not see conversations that do not involve it.
+
+Whichever you pick, write it down beside the store. Six months later, "why is
+there nothing about the server VLAN in here" has a boring answer, and it will
+not be remembered.
+
+## Watching the recorder
+
+Turn the endpoint on:
+
+```bash
+netrewindd --metrics-addr 127.0.0.1:9464
+```
+
+Bind it to localhost or a management address. It has no authentication, and the
+recorder should not be reachable from the network it is watching.
+
+The metrics worth alerting on are not the ones counting what was seen:
+
+| Metric | Alert when | Because |
+|---|---|---|
+| `netrewind_recorder_blind_seconds_total` | it increases at all | The record has a hole in it. Anything concluded about that window is worthless |
+| `netrewind_dropped_events_total` | it increases | Events arrived faster than they could be read. The record is incomplete and does not say where |
+| `netrewind_collector_up` | any drops to 0 | A whole source is missing. The timeline will look calm because it has gone deaf |
+| `netrewind_clock_steps_total` | it increases | The wall clock jumped. Timestamps either side of it are not comparable |
+| `netrewind_stored_events` | growth changes shape | Either the network became unstable or retention needs revisiting |
+
+Everything else — `netrewind_events_total`, `netrewind_incidents_total` — is for
+dashboards and capacity, not for paging anyone.
+
+## Using it during an incident
+
+The workflow is three commands, in this order.
+
+**1. Was the recorder even watching?**
+
+```bash
+netrewind events --last 24h --family system
+```
+
+If there is a `system.gap` covering the outage, stop. Nothing else the record
+says about that window can be relied on, and it is better to know that in the
+first minute than the twentieth.
+
+**2. What did it conclude?**
+
+```bash
+netrewind incidents --last 24h --min-severity warn
+```
+
+Read the relation between the links, not just the links. `which caused` is a
+claim about mechanism. `and at the same time` is co-occurrence and nothing more —
+the engine is telling you it does not know, and treating that as a cause is how
+the wrong cable gets replaced.
+
+**3. What happened to the thing that broke?**
+
+```bash
+netrewind what-happened --host 192.168.20.10 --at 15:00 --window 10m
+```
+
+The identity table means this follows a machine across an address change, and
+does *not* drag in whatever other machine holds that address today.
+
+If the answer is "nothing was recorded", that is an answer — but check step 1
+again before believing it.
+
+## Retention and pruning
+
+`--retention` (default 7 days) prunes events hourly. Incidents are kept far
+longer: they are the conclusion, they are small, and they are what someone comes
+back to months later. Their links will eventually point at events that have been
+pruned, which is why every link carries its own description — the account
+survives its evidence.
+
+To keep raw events longer, raise `--retention` and watch
+`netrewind_stored_events`. The store is one SQLite file; back it up by copying it
+while the recorder is stopped, or use `sqlite3 .backup` while it runs.
+
+## Privacy
+
+The recorder stores **no packet payloads**, ever. It records that a connection
+was attempted, not what was said over it.
+
+DNS query names are the one piece of content-adjacent data it can hold, and
+there are networks where recording them is not permitted. That collector is not
+yet implemented; when it is, it will be behind a switch that can be turned off
+entirely rather than a setting that has to be remembered.
+
+If you need to demonstrate what is in the store to someone who will ask:
+
+```bash
+netrewind events --last 7d -o json | head -50
+```
+
+Every field is a state change, an address, a port, a timestamp, or a rule the
+recorder itself applied.
+
+## Troubleshooting
+
+**`flow: attach tracepoint (is tracefs mounted in this mount namespace?)`**
+Entering a network namespace gets a fresh mount namespace with `/sys` remounted,
+which hides tracefs. Mount it inside the same namespace that runs the recorder:
+
+```bash
+ip netns exec nrlab sh -c 'mount -t tracefs tracefs /sys/kernel/tracing; exec netrewindd ...'
+```
+
+**`flow: verifier rejected the program`**
+The kernel refused the eBPF program. The verifier's own message is passed
+through unchanged — read it rather than the wrapper. Usually a missing BTF or a
+kernel older than the tracepoint.
+
+**`policy: cannot read the nftables ruleset`**
+`nft` is missing, or the process lacks the capability. Not a failure of the
+recorder: the other collectors carry on, and the log says so once rather than
+every interval.
+
+**A collector failed but the daemon kept running.** Deliberate. One source
+failing is a smaller loss than all of them, and `netrewind_collector_up` reports
+which one went.
+
+**The timeline looks suspiciously quiet.** Check `--family system` first, then
+`netrewind_collector_up`. A recorder that has gone deaf and a network that has
+gone quiet look identical from the outside, which is the entire reason the
+`system.*` family exists.

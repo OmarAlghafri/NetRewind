@@ -124,6 +124,23 @@ same time` is only co-occurrence. The engine never blurs the two, because a tool
 that does teaches its operator to distrust it — and an operator who distrusts
 the timeline is back to guessing.
 
+- Exports **how much it did not see**, so the recorder's own reliability is
+  something you can alert on rather than something you discover during the
+  incident review
+
+```
+$ netrewind events --last 1h --family system      # was it even watching?
+$ curl -s localhost:9464/metrics | grep blind
+
+# HELP netrewind_recorder_blind_seconds_total Seconds the recorder was not
+#      watching. Any increase means the record has a hole in it.
+netrewind_recorder_blind_seconds_total 0
+```
+
+Every observability tool exports counts of what it saw. This one starts those
+two counters at zero and expects you to page on them, because a recorder that
+has gone deaf and a network that has gone quiet look identical from the outside.
+
 Planned next: conntrack for connection lifetimes and resets, then a web timeline
 and an appliance image.
 
@@ -196,12 +213,14 @@ sudo make lab
 | M2c | conntrack: connection lifetimes, resets, `flow.timeout_no_close` | |
 | **M3** | Isnad correlation engine with backward cause matching, twelve-rule library | done |
 | M4 | GNS3 lab, documentation, public release | |
-| M5 | web timeline, appliance image, Prometheus/OTel export | |
+| **M5a** | Prometheus export, operating runbook | done |
+| M5b | web timeline, appliance image, OpenTelemetry export | |
 
 ## Documentation
 
 - [The event schema](docs/schema.md) — the contract everything else depends on
 - [Writing a rule](docs/rules.md) — how correlation recognises a failure, and how to teach it a new one
+- [Running the recorder](docs/runbook.md) — where to put it, what to alert on, and the three commands to use during an incident
 - [Development environment](docs/dev-environment.md) — kernel requirements, the synthetic lab, GNS3 wiring
 
 ## Licence
