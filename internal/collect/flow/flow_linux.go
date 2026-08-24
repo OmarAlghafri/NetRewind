@@ -37,8 +37,15 @@ import (
 //go:embed bpf/flow.bpf.o
 var flowProgram []byte
 
-// eventSize must match struct flow_event in the C.
-const eventSize = 24
+// eventSize must match struct flow_event in the C, and evState/evReset must
+// match the EV_ constants there. A mismatch here reads the wrong bytes and
+// reports confident nonsense, so there is a test that checks the size against
+// the compiled object.
+const (
+	eventSize = 28
+	evState   = 0
+	evReset   = 1
+)
 
 // Collector attaches the eBPF program and feeds what it reports to a Tracker.
 type Collector struct {
@@ -80,18 +87,29 @@ func (c *Collector) Run(ctx context.Context, out chan<- *event.Event) error {
 	}
 	defer coll.Close()
 
-	prog, ok := coll.Programs["trace_inet_sock_set_state"]
-	if !ok {
-		return errors.New("flow: compiled object has no trace_inet_sock_set_state program")
+	// Two tracepoints. The state one carries the connection's life; the reset
+	// one is the only thing that distinguishes a peer refusing from a path
+	// disappearing, since both end ESTABLISHED -> CLOSE.
+	attachments := []struct{ group, name, prog string }{
+		{"sock", "inet_sock_set_state", "trace_inet_sock_set_state"},
+		{"tcp", "tcp_receive_reset", "trace_tcp_receive_reset"},
 	}
-	tp, err := link.Tracepoint("sock", "inet_sock_set_state", prog, nil)
-	if err != nil {
-		// Entering a network namespace gets a fresh mount namespace with /sys
-		// remounted, which hides tracefs. Say so, because the bare error does
-		// not suggest the fix.
-		return fmt.Errorf("flow: attach tracepoint (is tracefs mounted in this mount namespace?): %w", err)
+	for _, a := range attachments {
+		prog, ok := coll.Programs[a.prog]
+		if !ok {
+			return fmt.Errorf("flow: compiled object has no %s program", a.prog)
+		}
+		tp, err := link.Tracepoint(a.group, a.name, prog, nil)
+		if err != nil {
+			// Entering a network namespace gets a fresh mount namespace with
+			// /sys remounted, which hides tracefs. Say so, because the bare
+			// error does not suggest the fix.
+			return fmt.Errorf(
+				"flow: attach %s/%s (is tracefs mounted in this mount namespace?): %w",
+				a.group, a.name, err)
+		}
+		defer tp.Close()
 	}
-	defer tp.Close()
 
 	events, ok := coll.Maps["events"]
 	if !ok {
@@ -150,14 +168,20 @@ func (c *Collector) Run(ctx context.Context, out chan<- *event.Event) error {
 			continue
 		}
 		raw := record.RawSample
-		e := c.tracker.Observe(
-			binary.LittleEndian.Uint32(raw[8:12]),  // saddr
-			binary.LittleEndian.Uint32(raw[12:16]), // daddr
-			binary.LittleEndian.Uint16(raw[16:18]), // sport
-			binary.LittleEndian.Uint16(raw[18:20]), // dport
-			raw[20],                                // oldstate
-			raw[21],                                // newstate
+		var (
+			saddr = binary.LittleEndian.Uint32(raw[8:12])
+			daddr = binary.LittleEndian.Uint32(raw[12:16])
+			sport = binary.LittleEndian.Uint16(raw[16:18])
+			dport = binary.LittleEndian.Uint16(raw[18:20])
 		)
+
+		// raw[24] is the kind: which hook produced this.
+		if raw[24] == evReset {
+			c.tracker.Reset(saddr, daddr, sport, dport)
+			continue
+		}
+
+		e := c.tracker.Observe(saddr, daddr, sport, dport, raw[20], raw[21])
 		if e != nil && !collect.Emit(ctx, out, e) {
 			<-done
 			return nil

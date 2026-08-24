@@ -21,6 +21,8 @@ ACTION="${1:-all}"
 mkdir -p "$DEST/build"
 cp "$SRC/build/netrewindd-linux-amd64" "$DEST/build/netrewindd"
 cp "$SRC/build/netrewind-linux-amd64" "$DEST/build/netrewind"
+# The frame injector, for the DHCP and DNS scenarios.
+[ -f "$SRC/build/nrinject" ] && cp "$SRC/build/nrinject" "$DEST/build/nrinject"
 rm -rf "$DEST/rules"
 cp -r "$SRC/rules" "$DEST/rules"
 

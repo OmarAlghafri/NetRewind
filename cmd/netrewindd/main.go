@@ -26,6 +26,8 @@ import (
 	"github.com/OmarAlghafri/netrewind/internal/collect/flow"
 	"github.com/OmarAlghafri/netrewind/internal/collect/netlink"
 	"github.com/OmarAlghafri/netrewind/internal/collect/policy"
+	"github.com/OmarAlghafri/netrewind/internal/collect/probe"
+	"github.com/OmarAlghafri/netrewind/internal/collect/wire"
 	"github.com/OmarAlghafri/netrewind/internal/correlate"
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/identity"
@@ -57,25 +59,31 @@ const (
 
 func main() {
 	var (
-		dbPath      = flag.String("db", store.DefaultPath(), "path to the event store")
-		observerID  = flag.String("observer-id", defaultObserverID(), "identity of this recorder")
-		logLevel    = flag.String("log-level", "info", "debug, info, warn or error")
-		retention   = flag.Duration("retention", 7*24*time.Hour, "how much history to keep")
-		gapAfter    = flag.Duration("gap-threshold", defaultGapThreshold, "absence longer than this is recorded as a gap in the record")
-		rulesDir    = flag.String("rules", "rules", "directory of correlation rules; empty disables correlation")
-		metricsAddr = flag.String("metrics-addr", "", "serve Prometheus metrics on this address, e.g. 127.0.0.1:9464; empty disables it")
+		dbPath         = flag.String("db", store.DefaultPath(), "path to the event store")
+		observerID     = flag.String("observer-id", defaultObserverID(), "identity of this recorder")
+		logLevel       = flag.String("log-level", "info", "debug, info, warn or error")
+		retention      = flag.Duration("retention", 7*24*time.Hour, "how much history to keep")
+		gapAfter       = flag.Duration("gap-threshold", defaultGapThreshold, "absence longer than this is recorded as a gap in the record")
+		rulesDir       = flag.String("rules", "rules", "directory of correlation rules; empty disables correlation")
+		metricsAddr    = flag.String("metrics-addr", "", "serve Prometheus metrics on this address, e.g. 127.0.0.1:9464; empty disables it")
+		wireIface      = flag.String("wire-iface", "", "capture DHCP, DNS and ICMP on this interface; empty means all")
+		recordDNSNames = flag.Bool("record-dns-names", false, "store the names looked up. Off by default: there are networks where recording them is not permitted")
+		probeTargets   = flag.String("probe", "", "addresses to measure reachability to; empty follows the default gateway")
 	)
 	flag.Parse()
 
 	log := newLogger(*logLevel)
 
 	cfg := config{
-		dbPath:      *dbPath,
-		observerID:  *observerID,
-		retention:   *retention,
-		gapAfter:    *gapAfter,
-		rulesDir:    *rulesDir,
-		metricsAddr: *metricsAddr,
+		dbPath:         *dbPath,
+		observerID:     *observerID,
+		retention:      *retention,
+		gapAfter:       *gapAfter,
+		rulesDir:       *rulesDir,
+		metricsAddr:    *metricsAddr,
+		wireIface:      *wireIface,
+		recordDNSNames: *recordDNSNames,
+		probeTargets:   *probeTargets,
 	}
 	if err := run(log, cfg); err != nil {
 		log.Error("netrewindd stopped", "err", err)
@@ -84,12 +92,15 @@ func main() {
 }
 
 type config struct {
-	dbPath      string
-	observerID  string
-	rulesDir    string
-	metricsAddr string
-	retention   time.Duration
-	gapAfter    time.Duration
+	dbPath         string
+	observerID     string
+	rulesDir       string
+	metricsAddr    string
+	wireIface      string
+	recordDNSNames bool
+	probeTargets   string
+	retention      time.Duration
+	gapAfter       time.Duration
 }
 
 func run(log *slog.Logger, cfg config) error {
@@ -181,6 +192,8 @@ func run(log *slog.Logger, cfg config) error {
 		netlink.NewAddrCollector(builder, log),
 		flow.NewCollector(builder, log),
 		policy.NewCollector(builder, log),
+		wire.NewCollector(builder, log, cfg.wireIface, cfg.recordDNSNames),
+		probe.NewCollector(builder, log, cfg.probeTargets),
 	}
 	for _, c := range collectors {
 		wg.Add(1)

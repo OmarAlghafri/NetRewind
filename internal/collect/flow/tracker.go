@@ -36,6 +36,10 @@ const (
 	// worked yesterday and fails today is worth reporting; one that last worked
 	// a month ago is not evidence of anything having changed.
 	pairMemory = 24 * time.Hour
+	// resetMemory is how long a reset waits for its state change. The two
+	// arrive microseconds apart; anything older is a reset whose close was
+	// missed.
+	resetMemory = 5 * time.Second
 )
 
 // flowKey identifies one connection.
@@ -83,8 +87,11 @@ type Tracker struct {
 	mu          sync.Mutex
 	established map[flowKey]time.Time
 	worked      map[pairKey]pairState
-	stats       rollup
-	untracked   uint64
+	// resets holds connections a reset arrived for, awaiting the state change
+	// that turns it into an event.
+	resets    map[flowKey]time.Time
+	stats     rollup
+	untracked uint64
 }
 
 // NewTracker returns a tracker. A nil clock means time.Now.
@@ -97,6 +104,7 @@ func NewTracker(b *event.Builder, now func() time.Time) *Tracker {
 		now:         now,
 		established: make(map[flowKey]time.Time),
 		worked:      make(map[pairKey]pairState),
+		resets:      make(map[flowKey]time.Time),
 	}
 	t.stats.reset()
 	return t
@@ -141,8 +149,10 @@ func (t *Tracker) Observe(saddr, daddr uint32, sport, dport uint16, oldstate, ne
 		return t.failure(pk, saddr, daddr, sport, dport, now)
 
 	case newstate == tcpClose:
+		var lifetime time.Duration
 		if openedAt, ok := t.established[key]; ok {
-			t.stats.totalDur += now.Sub(openedAt)
+			lifetime = now.Sub(openedAt)
+			t.stats.totalDur += lifetime
 			delete(t.established, key)
 		}
 		if oldstate == tcpSynRecv {
@@ -150,9 +160,66 @@ func (t *Tracker) Observe(saddr, daddr uint32, sport, dport uint16, oldstate, ne
 			t.stats.abandoned++
 		}
 		t.stats.closed++
+
+		// A connection going from ESTABLISHED straight to CLOSE did not shut
+		// down: it was killed. Either the peer sent a reset or the stack gave
+		// up retransmitting, and those are different faults - "they refused"
+		// against "the path disappeared". The reset tracepoint is what tells
+		// them apart; without a matching reset, it timed out.
+		if oldstate == tcpEstablished {
+			if _, reset := t.resets[key]; reset {
+				delete(t.resets, key)
+				return t.abortive(event.KindFlowReset, event.SevNotice,
+					saddr, daddr, sport, dport, lifetime, "a reset arrived")
+			}
+			return t.abortive(event.KindFlowTimeoutNoClose, event.SevWarn,
+				saddr, daddr, sport, dport, lifetime,
+				"no reset and no orderly shutdown: the stack gave up")
+		}
 		return nil
 	}
 	return nil
+}
+
+// Reset records that a reset arrived for a connection. The state change that
+// follows is what turns it into an event; on its own a reset says nothing that
+// the close does not say better.
+func (t *Tracker) Reset(saddr, daddr uint32, sport, dport uint16) {
+	key := flowKey{saddr: saddr, daddr: daddr, sport: sport, dport: dport}
+	now := t.now()
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if len(t.resets) >= maxTracked {
+		// Rather than grow without bound, forget the oldest pending resets.
+		// The consequence is a reset reported as a timeout, which is a wrong
+		// label on one event - better than a map that eats the machine.
+		for k, at := range t.resets {
+			if now.Sub(at) > resetMemory {
+				delete(t.resets, k)
+			}
+		}
+		if len(t.resets) >= maxTracked {
+			return
+		}
+	}
+	t.resets[key] = now
+}
+
+func (t *Tracker) abortive(kind event.Kind, sev event.Severity,
+	saddr, daddr uint32, sport, dport uint16, lifetime time.Duration, why string) *event.Event {
+	src, dst := ipString(saddr), ipString(daddr)
+	e := t.b.New(event.SourceEBPF, kind, sev, event.Host(dst, "")).
+		WithAttr("src", src).
+		WithAttr("dst", dst).
+		WithAttr("dport", int(dport)).
+		WithDedup(fmt.Sprintf("%s|%s|%d", kind, dst, dport)).
+		WithEvidence("reason", why)
+	if lifetime > 0 {
+		e.WithAttr("lifetime_ms", lifetime.Milliseconds())
+	}
+	return e
 }
 
 // remember records that a pair completed a handshake, and re-arms it so a

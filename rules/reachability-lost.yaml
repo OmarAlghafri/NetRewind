@@ -1,0 +1,30 @@
+id: reachability-lost
+title: A measured path stopped answering
+severity: error
+confidence: 90
+window: 300s
+correlate_on: [subject]
+root_cause: cause
+advice: >-
+  This is measured, not reported: the recorder sent probes and they did not come
+  back. If the change named above was intended, the loss is a side effect nobody
+  planned. If there is no change above it, the fault is beyond what this
+  recorder can see from where it sits.
+match:
+  - as: cause
+    kinds: [l2.arp_binding_changed, l3.default_route_changed, l3.route_removed, link.down, link.flap, policy.rule_changed]
+    optional: true
+    why: This is the last thing that changed before the path stopped answering.
+  - as: loss
+    kinds: [metric.anomaly]
+    where:
+      min_severity: warn
+    relation: causes
+    why: >-
+      Probes to this address began going unanswered. Packet loss announces
+      itself to nobody; it has to be measured, and it was.
+  - as: recovery
+    kinds: [metric.anomaly]
+    optional: true
+    relation: precedes
+    why: It later answered again, which bounds how long the outage lasted.

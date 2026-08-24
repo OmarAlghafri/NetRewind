@@ -1,0 +1,23 @@
+id: link-degrading
+title: A link is failing rather than having failed
+severity: error
+confidence: 90
+window: 600s
+correlate_on: [subject]
+root_cause: symptom
+advice: >-
+  Replace the transceiver or the cable before touching anything else, and check
+  for a duplex mismatch on the far end. Restarting the interface will clear the
+  counters and hide it for another week; it will not fix a marginal link.
+match:
+  - as: symptom
+    kinds: [link.flap, link.error_rate_high]
+    why: >-
+      This interface is not down. It is up, passing traffic, and quietly
+      corrupting or dropping part of it - which is why nothing has alerted and
+      why the application team has spent a fortnight blaming something else.
+  - as: fallout
+    kinds: [metric.anomaly, flow.timeout_no_close, flow.first_failure_for_pair, l2.neighbor_failed]
+    optional: true
+    relation: causes
+    why: Connections across it began failing or slowing.

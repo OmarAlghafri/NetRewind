@@ -76,11 +76,14 @@ const (
 	KindMTUBlackhole        Kind = "l3.mtu_blackhole"
 )
 
-// flow.* - layer 4. Sourced from conntrack and eBPF. Only anomalous flows are
-// recorded individually; everything else is rolled up.
+// flow.* - layer 4, from eBPF.
+//
+// There is deliberately no flow.open or flow.close. Individual connections are
+// not events: a busy segment opens thousands a second, and recording each would
+// fill the store in a day while telling an operator nothing a counter could
+// not. Ordinary activity becomes a flow.rollup; only the outcomes below earn a
+// row of their own.
 const (
-	KindFlowOpen            Kind = "flow.open"
-	KindFlowClose           Kind = "flow.close"
 	KindFlowReset           Kind = "flow.reset"
 	KindFlowTimeoutNoClose  Kind = "flow.timeout_no_close"
 	KindFlowRetransmitSpike Kind = "flow.retransmit_spike"
@@ -105,11 +108,16 @@ const (
 	KindDNSLatencySpike    Kind = "dns.latency_spike"
 )
 
-// policy.* - filtering decisions.
+// policy.* - the filtering rules in force.
+//
+// The *consequence* of a filtering change lives in flow.first_failure_for_pair,
+// not here. A pair that stopped connecting is observable whatever did the
+// blocking - a rule on this box, an ACL on a switch, a firewall three hops away
+// - and an event that could only ever see the first of those would be the
+// narrowest of the three dressed as the general case.
 const (
-	KindPolicyDropBurst        Kind = "policy.drop_burst"
-	KindPolicyRuleChanged      Kind = "policy.rule_changed"
-	KindPolicyFirstDropForPair Kind = "policy.first_drop_for_pair"
+	KindPolicyDropBurst   Kind = "policy.drop_burst"
+	KindPolicyRuleChanged Kind = "policy.rule_changed"
 )
 
 // metric.* - measured series cross a threshold or depart from baseline.

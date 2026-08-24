@@ -42,9 +42,17 @@ struct inet_sock_set_state_args {
 	__u8 daddr_v6[16];
 };
 
-// flow_event is one TCP state transition. It carries no payload and no
-// hostname: the recorder observes that a connection was attempted, not what was
-// said over it.
+// Which hook produced an event. Two are needed because the state tracepoint
+// alone cannot tell a reset from a timeout: a connection killed by a received
+// RST and one that simply gave up retransmitting both go from ESTABLISHED
+// straight to CLOSE, and "the peer refused" and "the path disappeared" are
+// completely different faults to be told apart at three in the morning.
+#define EV_STATE 0
+#define EV_RESET 1
+
+// flow_event is one observation about a connection. It carries no payload and
+// no hostname: the recorder observes that a connection was attempted, not what
+// was said over it.
 struct flow_event {
 	__u64 ts_ns;
 	__u32 saddr;
@@ -54,6 +62,27 @@ struct flow_event {
 	__u8 oldstate;
 	__u8 newstate;
 	__u16 family;
+	__u8 kind;
+	__u8 pad[3];
+};
+
+// The tcp_receive_reset argument layout, checked against
+// /sys/kernel/tracing/events/tcp/tcp_receive_reset/format.
+struct tcp_receive_reset_args {
+	unsigned short common_type;
+	unsigned char common_flags;
+	unsigned char common_preempt_count;
+	int common_pid;
+
+	const void *skaddr;
+	__u16 sport;
+	__u16 dport;
+	__u16 family;
+	__u8 saddr[4];
+	__u8 daddr[4];
+	__u8 saddr_v6[16];
+	__u8 daddr_v6[16];
+	__u64 sock_cookie;
 };
 
 // events carries transitions to userspace. One mebibyte absorbs a burst; when
@@ -97,11 +126,49 @@ int trace_inet_sock_set_state(struct inet_sock_set_state_args *ctx)
 	}
 
 	e->ts_ns = bpf_ktime_get_ns();
+	e->kind = EV_STATE;
 	e->oldstate = (__u8)ctx->oldstate;
 	e->newstate = (__u8)ctx->newstate;
 	e->sport = ctx->sport;
 	e->dport = ctx->dport;
 	e->family = ctx->family;
+	e->pad[0] = 0;
+	e->pad[1] = 0;
+	e->pad[2] = 0;
+	__builtin_memcpy(&e->saddr, ctx->saddr, 4);
+	__builtin_memcpy(&e->daddr, ctx->daddr, 4);
+
+	bpf_ringbuf_submit(e, 0);
+	return 0;
+}
+
+// A reset arriving is the difference between "they refused" and "it went
+// quiet", and userspace pairs it with the state change that follows.
+SEC("tracepoint/tcp/tcp_receive_reset")
+int trace_tcp_receive_reset(struct tcp_receive_reset_args *ctx)
+{
+	if (ctx->family != AF_INET)
+		return 0;
+
+	struct flow_event *e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
+	if (!e) {
+		__u32 key = 0;
+		__u64 *n = bpf_map_lookup_elem(&dropped, &key);
+		if (n)
+			__sync_fetch_and_add(n, 1);
+		return 0;
+	}
+
+	e->ts_ns = bpf_ktime_get_ns();
+	e->kind = EV_RESET;
+	e->oldstate = 0;
+	e->newstate = 0;
+	e->sport = ctx->sport;
+	e->dport = ctx->dport;
+	e->family = ctx->family;
+	e->pad[0] = 0;
+	e->pad[1] = 0;
+	e->pad[2] = 0;
 	__builtin_memcpy(&e->saddr, ctx->saddr, 4);
 	__builtin_memcpy(&e->daddr, ctx->daddr, 4);
 

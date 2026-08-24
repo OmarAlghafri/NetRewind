@@ -1,0 +1,31 @@
+id: rogue-dhcp-server
+title: A second DHCP server is answering on this segment
+severity: error
+confidence: 92
+window: 300s
+root_cause: rogue
+advice: >-
+  Find the switch port the new server's hardware address is learned on and shut
+  it. Almost always a consumer router plugged in the wrong way round, with its
+  LAN side facing the network. Until it is off, clients will keep taking its
+  addresses and its gateway at random.
+match:
+  - as: rogue
+    kinds: [dhcp.server_seen]
+    where:
+      min_severity: error
+    why: >-
+      A DHCP server answered on a segment that already had one. Every client
+      that renews from here on gets whichever of them replies first.
+  - as: fallout
+    kinds: [dhcp.lease_changed, l2.arp_binding_changed, l3.default_route_changed, dns.resolver_changed]
+    optional: true
+    relation: causes
+    why: >-
+      Clients began taking different addresses, gateways or resolvers, which is
+      the second server's configuration arriving.
+  - as: breakage
+    kinds: [flow.first_failure_for_pair, l2.duplicate_ip]
+    optional: true
+    relation: causes
+    why: And connections that had been working stopped.

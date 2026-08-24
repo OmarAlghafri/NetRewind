@@ -34,12 +34,45 @@ type LinkCollector struct {
 	state map[int]linkState
 }
 
+const (
+	// flapWindow is how long a run of transitions is examined over.
+	flapWindow = 5 * time.Minute
+	// flapTransitions is how many it takes before a link is flapping rather
+	// than having had an outage. One down is an event; a run of them is a
+	// fault in the link itself, and no amount of restarting the interface
+	// fixes a marginal cable.
+	flapTransitions = 3
+	// statsInterval is how often interface counters are read.
+	statsInterval = 30 * time.Second
+	// errorRateThreshold is the fraction of packets in error that stops being
+	// ordinary. Well below this is normal on any copper link.
+	errorRateThreshold = 0.01
+	// minPacketsForRate avoids reporting "50% errors" from one bad packet out
+	// of two on an idle interface.
+	minPacketsForRate = 1000
+)
+
 type linkState struct {
 	name     string
 	adminUp  bool
 	oper     nl.LinkOperState
 	mtu      int
 	lastDown time.Time
+	// downs is when this interface last went down, trimmed to flapWindow.
+	downs []time.Time
+	// flapped keeps one flapping interface from producing a finding on every
+	// further transition. Cleared once it settles.
+	flapped bool
+	stats   linkCounters
+}
+
+// linkCounters is the subset of interface statistics worth watching: errors
+// and drops against the traffic that produced them.
+type linkCounters struct {
+	rxPackets, txPackets uint64
+	rxErrors, txErrors   uint64
+	rxDropped, txDropped uint64
+	at                   time.Time
 }
 
 // NewLinkCollector returns a collector for interface state.
@@ -78,10 +111,23 @@ func (c *LinkCollector) Run(ctx context.Context, out chan<- *event.Event) error 
 
 	c.log.Info("watching interface state", "collector", c.Name(), "seeded", len(c.state))
 
+	// Counters are polled rather than pushed: the kernel does not notify on a
+	// statistic changing, and a link degrading is a slope rather than an
+	// instant. Same goroutine, so the state map needs no lock.
+	statsTicker := time.NewTicker(statsInterval)
+	defer statsTicker.Stop()
+	c.readStats(time.Now())
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+		case now := <-statsTicker.C:
+			for _, e := range c.compareStats(now) {
+				if !collect.Emit(ctx, out, e) {
+					return nil
+				}
+			}
 		case u, ok := <-updates:
 			if !ok {
 				return fmt.Errorf("netlink: link update channel closed")
@@ -167,7 +213,8 @@ func (c *LinkCollector) diff(u nl.LinkUpdate) []*event.Event {
 
 	switch {
 	case (prev.adminUp || prevOperUp) && !cur.adminUp && !curOperUp:
-		cur.lastDown = time.Now()
+		now := time.Now()
+		cur.lastDown = now
 		cause := "carrier"
 		if prev.adminUp && !cur.adminUp {
 			cause = "administrative"
@@ -182,7 +229,31 @@ func (c *LinkCollector) diff(u nl.LinkUpdate) []*event.Event {
 				WithEvidence("oper_state_before", prev.oper.String()).
 				WithEvidence("raw_flags", a.RawFlags))
 
+		// A run of outages is a different finding from one outage, and an
+		// administrative shutdown is somebody working rather than a link
+		// failing - counting those as flapping would blame the cable for the
+		// engineer.
+		if cause == "carrier" {
+			cur.downs = trimBefore(append(cur.downs, now), now.Add(-flapWindow))
+			if len(cur.downs) >= flapTransitions && !cur.flapped {
+				cur.flapped = true
+				events = append(events,
+					c.b.New(event.SourceNetlink, event.KindLinkFlap, event.SevError, subject).
+						WithAttr("ifname", a.Name).
+						WithAttr("transitions", len(cur.downs)).
+						WithAttr("window_seconds", int(flapWindow.Seconds())).
+						WithDedup("link.flap|"+a.Name).
+						WithEvidence("first_in_window", cur.downs[0].UTC().Format(time.RFC3339)))
+			}
+		}
+
 	case !prevOperUp && curOperUp:
+		// It settled. If it flaps again after this, that is a fresh finding.
+		if cur.flapped && len(cur.downs) > 0 &&
+			time.Since(cur.downs[len(cur.downs)-1]) > flapWindow {
+			cur.flapped = false
+			cur.downs = nil
+		}
 		e := c.b.New(event.SourceNetlink, event.KindLinkUp, event.SevNotice, subject).
 			WithAttr("ifname", a.Name).
 			WithAttr("oper_state", cur.oper.String()).

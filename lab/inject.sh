@@ -230,7 +230,49 @@ scenario_policy_broke_a_path() {
     inlab nft delete table inet nrlab 2>/dev/null || true
 }
 
-SCENARIOS="link_flap arp_change gateway_hijack duplicate_ip route_change default_route_moved default_route_lost service_unreachable normal_traffic path_broke policy_broke_a_path"
+INJECT="$BUILD/nrinject"
+
+scenario_rogue_dhcp() {
+    echo "-- injecting: a second DHCP server answers on the segment"
+    if [ ! -x "$INJECT" ]; then
+        echo "   (skipped: $INJECT not built - run 'make build')"
+        return 0
+    fi
+    # The fault the whole project opens with. Both servers are sent as real
+    # broadcast frames from inside the lab, so the recorder sees them the way it
+    # would on a real segment: on the wire, addressed to somebody else.
+    inlab "$INJECT" dhcp -iface nrlab0 -server 10.99.0.1 \
+        -mac 02:00:00:00:00:01 -gw 10.99.0.1 -type ack
+    sleep 2
+    inlab "$INJECT" dhcp -iface nrlab0 -server 10.99.0.99 \
+        -mac 02:00:00:00:00:99 -gw 10.99.0.99 -offer 10.99.0.77
+}
+
+scenario_measured_loss() {
+    echo "-- injecting: a probed target stops answering"
+    # Loss announces itself to nobody. The recorder is probing 10.99.0.11 every
+    # ten seconds; taking its interface down makes the probes stop coming back,
+    # which is the only way an absence becomes an event.
+    echo "   waiting for a baseline"
+    sleep 12
+    ip netns exec "$H1" ip link set nrp0 down
+    sleep 14
+    ip netns exec "$H1" ip link set nrp0 up
+    sleep 12
+}
+
+scenario_resolver_change() {
+    echo "-- injecting: a client's resolver changes under it"
+    if [ ! -x "$INJECT" ]; then
+        echo "   (skipped: $INJECT not built)"
+        return 0
+    fi
+    inlab "$INJECT" dns -iface nrlab0 -client 10.99.0.11 -resolver 10.99.0.1 -name intranet.lab -id 1
+    sleep 1
+    inlab "$INJECT" dns -iface nrlab0 -client 10.99.0.11 -resolver 10.99.0.99 -name intranet.lab -id 2
+}
+
+SCENARIOS="link_flap arp_change gateway_hijack duplicate_ip route_change default_route_moved default_route_lost service_unreachable normal_traffic path_broke policy_broke_a_path rogue_dhcp resolver_change measured_loss"
 
 run_one() {
     name=$(echo "$1" | tr '-' '_')
@@ -258,6 +300,7 @@ all() {
     # /sys remounted, and eBPF tracepoints cannot be attached without it.
     inlab sh -c "mount -t tracefs tracefs /sys/kernel/tracing 2>/dev/null || true
                  exec '$DAEMON' --db '$DB' --rules '$RULES' --log-level info \
+                     --probe 10.99.0.11 \
                      --metrics-addr '$METRICS_ADDR'" >"$LOG" 2>&1 &
     pid=$!
     sleep 2
@@ -312,6 +355,7 @@ assert_expected() {
     for kind in link.down link.up l2.arp_binding_changed l2.duplicate_ip \
                 l3.route_added l3.default_route_changed l3.route_removed \
                 flow.handshake_fail flow.rollup flow.first_failure_for_pair \
+                dhcp.server_seen dns.resolver_changed metric.anomaly \
                 policy.rule_changed; do
         n=$("$CLI" events --db "$DB" --last 10m --kind "$kind" -o json | grep -c '"event_id"' || true)
         if [ "$n" -ge 1 ]; then
@@ -325,7 +369,8 @@ assert_expected() {
     # Correlation has to reach the right conclusion, not merely have the
     # evidence available to reach it.
     for rule in gateway-hijack contested-address default-route-moved \
-                default-route-lost service-unreachable change-broke-a-path; do
+                default-route-lost service-unreachable change-broke-a-path \
+                rogue-dhcp-server resolver-hijacked; do
         n=$("$CLI" incidents --db "$DB" --last 10m --rule "$rule" -o json | grep -c '"incident_id"' || true)
         if [ "$n" -ge 1 ]; then
             printf '  ok    %-28s concluded\n' "$rule"

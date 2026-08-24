@@ -33,6 +33,43 @@ func Describe(e *Event) string {
 		}
 		return fmt.Sprintf("%s came up", e.Subject.Label)
 
+	case KindLinkFlap:
+		n, _ := Int(e, "transitions")
+		return fmt.Sprintf("%s has gone down %d times - the link itself is failing", e.Subject.Label, n)
+
+	case KindLinkErrorRate:
+		return fmt.Sprintf("%s is losing %v%% of its packets to errors", e.Subject.Label,
+			Str(e, "error_rate_percent"))
+
+	case KindFlowReset:
+		return fmt.Sprintf("%s reset the connection from %s on port %s",
+			Str(e, "dst"), Str(e, "src"), Str(e, "dport"))
+
+	case KindFlowTimeoutNoClose:
+		s := fmt.Sprintf("the connection from %s to %s port %s died without being closed",
+			Str(e, "src"), Str(e, "dst"), Str(e, "dport"))
+		if ms, ok := Int(e, "lifetime_ms"); ok {
+			s += fmt.Sprintf(" after %s", (time.Duration(ms) * time.Millisecond).Round(time.Second))
+		}
+		return s
+
+	case KindMetricAnomaly:
+		target := Str(e, "target")
+		switch Str(e, "metric") {
+		case "unreachable":
+			return fmt.Sprintf("%s stopped answering entirely", target)
+		case "packet_loss":
+			return fmt.Sprintf("%v%% of probes to %s went unanswered", Str(e, "loss_percent"), target)
+		case "latency":
+			ms, _ := Int(e, "rtt_ms")
+			base, _ := Int(e, "baseline_ms")
+			return fmt.Sprintf("the round trip to %s rose from %dms to %dms", target, base, ms)
+		case "recovered":
+			return fmt.Sprintf("%s is answering again", target)
+		default:
+			return fmt.Sprintf("%s changed measurably", target)
+		}
+
 	case KindLinkMTUChanged:
 		old, _ := Int(e, "mtu_old")
 		nw, _ := Int(e, "mtu_new")
@@ -101,6 +138,54 @@ func Describe(e *Event) string {
 		closed, _ := Int(e, "closed")
 		failed, _ := Int(e, "handshake_failures")
 		return fmt.Sprintf("%d connections opened, %d closed, %d unanswered", opened, closed, failed)
+
+	case KindDHCPServerSeen:
+		s := fmt.Sprintf("a DHCP server answered from %s", Str(e, "server"))
+		if n, ok := Int(e, "other_servers"); ok && n > 0 {
+			s = fmt.Sprintf("a second DHCP server appeared on %s", Str(e, "server"))
+			if gw := Str(e, "offers_gateway"); gw != "" {
+				s += fmt.Sprintf(", handing out %s as the gateway", gw)
+			}
+		}
+		return s
+
+	case KindDHCPOffer:
+		return fmt.Sprintf("%s was offered to %s", Str(e, "address"), Str(e, "client_mac"))
+
+	case KindDHCPAck:
+		return fmt.Sprintf("%s was confirmed to %s", Str(e, "address"), Str(e, "client_mac"))
+
+	case KindDHCPNak:
+		return fmt.Sprintf("%s was refused the address it asked for", Str(e, "client_mac"))
+
+	case KindDHCPLeaseChanged:
+		return fmt.Sprintf("%s moved from %s to %s",
+			Str(e, "client_mac"), Str(e, "address_old"), Str(e, "address_new"))
+
+	case KindDNSResolverChanged:
+		return fmt.Sprintf("%s started asking %s instead of %s",
+			Str(e, "client"), Str(e, "resolver_new"), Str(e, "resolver_old"))
+
+	case KindDNSQueryFail:
+		if name := Str(e, "name"); name != "" {
+			return fmt.Sprintf("%s returned %s for %s", Str(e, "resolver"), Str(e, "rcode"), name)
+		}
+		return fmt.Sprintf("%s returned %s", Str(e, "resolver"), Str(e, "rcode"))
+
+	case KindDNSLatencySpike:
+		if ms, ok := Int(e, "took_ms"); ok {
+			return fmt.Sprintf("%s took %s to answer", Str(e, "resolver"),
+				(time.Duration(ms) * time.Millisecond).Round(time.Millisecond))
+		}
+		return fmt.Sprintf("%s was slow to answer", Str(e, "resolver"))
+
+	case KindICMPUnreachable:
+		return fmt.Sprintf("%s reported %s for %s",
+			Str(e, "reported_by"), Str(e, "reason"), Str(e, "destination"))
+
+	case KindMTUBlackhole:
+		return fmt.Sprintf("the path to %s needs fragmentation at %s bytes - ping works, large transfers do not",
+			Str(e, "destination"), Str(e, "next_hop_mtu"))
 
 	case KindPolicyRuleChanged:
 		added, _ := Int(e, "added")

@@ -197,3 +197,76 @@ func TestConnectionDurationIsMeasured(t *testing.T) {
 		t.Errorf("mean_duration_ms = %d, want 250", got)
 	}
 }
+
+// A connection killed by a reset and one that timed out both end
+// ESTABLISHED -> CLOSE. "They refused" and "the path disappeared" are entirely
+// different faults, and the reset tracepoint is the only thing that tells them
+// apart.
+func TestAbortiveCloseDistinguishesResetFromTimeout(t *testing.T) {
+	t.Run("with a reset", func(t *testing.T) {
+		tr, _ := newTestTracker(t)
+		tr.Observe(ip("10.0.0.5"), ip("10.0.0.9"), 40000, 443, tcpSynSent, tcpEstablished)
+		tr.Reset(ip("10.0.0.5"), ip("10.0.0.9"), 40000, 443)
+
+		e := tr.Observe(ip("10.0.0.5"), ip("10.0.0.9"), 40000, 443, tcpEstablished, tcpClose)
+		if e == nil || e.Kind != event.KindFlowReset {
+			t.Fatalf("kind = %v, want flow.reset", e)
+		}
+	})
+
+	t.Run("without a reset", func(t *testing.T) {
+		tr, _ := newTestTracker(t)
+		tr.Observe(ip("10.0.0.5"), ip("10.0.0.9"), 40000, 443, tcpSynSent, tcpEstablished)
+
+		e := tr.Observe(ip("10.0.0.5"), ip("10.0.0.9"), 40000, 443, tcpEstablished, tcpClose)
+		if e == nil || e.Kind != event.KindFlowTimeoutNoClose {
+			t.Fatalf("kind = %v, want flow.timeout_no_close", e)
+		}
+		if e.Severity != event.SevWarn {
+			t.Errorf("a connection the stack gave up on is severity %s, want warn", e.Severity)
+		}
+	})
+}
+
+// An orderly shutdown passes through the FIN states, and is nobody's fault.
+func TestAGracefulCloseIsNotAnEvent(t *testing.T) {
+	tr, _ := newTestTracker(t)
+	tr.Observe(ip("10.0.0.5"), ip("10.0.0.9"), 40000, 443, tcpSynSent, tcpEstablished)
+
+	const finWait2, timeWait = 5, 6
+	if e := tr.Observe(ip("10.0.0.5"), ip("10.0.0.9"), 40000, 443, tcpEstablished, finWait2); e != nil {
+		t.Errorf("entering FIN_WAIT produced an event: %s", e.Kind)
+	}
+	if e := tr.Observe(ip("10.0.0.5"), ip("10.0.0.9"), 40000, 443, timeWait, tcpClose); e != nil {
+		t.Errorf("an orderly close produced an event: %s", e.Kind)
+	}
+}
+
+// A reset is consumed by the close it belongs to, so the next connection on the
+// same four-tuple is not mislabelled.
+func TestAResetIsConsumedByItsClose(t *testing.T) {
+	tr, _ := newTestTracker(t)
+	connect := func() *event.Event {
+		tr.Observe(ip("10.0.0.5"), ip("10.0.0.9"), 40000, 443, tcpSynSent, tcpEstablished)
+		return tr.Observe(ip("10.0.0.5"), ip("10.0.0.9"), 40000, 443, tcpEstablished, tcpClose)
+	}
+
+	tr.Reset(ip("10.0.0.5"), ip("10.0.0.9"), 40000, 443)
+	if e := connect(); e.Kind != event.KindFlowReset {
+		t.Fatalf("first close = %s, want flow.reset", e.Kind)
+	}
+	if e := connect(); e.Kind != event.KindFlowTimeoutNoClose {
+		t.Errorf("second close = %s: the reset was counted twice", e.Kind)
+	}
+}
+
+func TestLifetimeIsRecordedOnAnAbortiveClose(t *testing.T) {
+	tr, clk := newTestTracker(t)
+	tr.Observe(ip("10.0.0.5"), ip("10.0.0.9"), 40000, 443, tcpSynSent, tcpEstablished)
+	clk.advance(4 * time.Second)
+
+	e := tr.Observe(ip("10.0.0.5"), ip("10.0.0.9"), 40000, 443, tcpEstablished, tcpClose)
+	if ms, _ := event.Int(e, "lifetime_ms"); ms != 4000 {
+		t.Errorf("lifetime_ms = %d, want 4000", ms)
+	}
+}

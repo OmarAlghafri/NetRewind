@@ -21,6 +21,9 @@ all: fmt vet test build
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BUILD)/netrewindd ./cmd/netrewindd
 	go build -ldflags "$(LDFLAGS)" -o $(BUILD)/netrewind  ./cmd/netrewind
+	# The lab's frame injector. Never shipped in a release: it sends DHCP
+	# offers, which is the fault this project exists to catch.
+	GOOS=linux go build -o $(BUILD)/nrinject ./lab/inject
 
 .PHONY: linux
 linux:

@@ -1,0 +1,22 @@
+id: path-mtu-blackhole
+title: A path is silently dropping large packets
+severity: error
+confidence: 90
+window: 600s
+root_cause: blackhole
+advice: >-
+  Ping will keep working and every small request will succeed, which is why
+  this survives for weeks. Check for a tunnel, a VPN or a PPPoE link on the
+  path, and whether something is filtering the ICMP that would otherwise have
+  told the sender to send smaller packets.
+match:
+  - as: blackhole
+    kinds: [l3.mtu_blackhole]
+    why: >-
+      A device on the path reported that packets are too large for its next
+      hop. Small requests succeed and large transfers hang.
+  - as: fallout
+    kinds: [flow.first_failure_for_pair, flow.handshake_fail, dns.latency_spike]
+    optional: true
+    relation: correlates
+    why: Connections through that path began failing or stalling.
