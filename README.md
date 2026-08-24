@@ -248,6 +248,8 @@ sudo make lab
 - [Writing a rule](docs/rules.md) — how correlation recognises a failure, and how to teach it a new one
 - [Running the recorder](docs/runbook.md) — where to put it, what to alert on, and the three commands to use during an incident
 - [Development environment](docs/dev-environment.md) — kernel requirements, the synthetic lab, GNS3 wiring
+- [Contributing](CONTRIBUTING.md) — the most valuable thing you can add is a rule, and it needs no Go
+- [Changelog](CHANGELOG.md) — what this version does, and what it does not
 
 ## Licence
 

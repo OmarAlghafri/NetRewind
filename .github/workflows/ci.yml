@@ -3,6 +3,7 @@ name: ci
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -94,3 +95,40 @@ jobs:
       - name: recorder log on failure
         if: failure()
         run: cat /tmp/netrewind-lab/recorder.log || true
+
+  release:
+    name: release artefacts
+    # Only on a tag. Building release tarballs on every push would be noise, and
+    # a checksum file that changes on every commit is a checksum file nobody
+    # checks.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [check, bpf, lab]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: build
+        run: make release VERSION=${GITHUB_REF_NAME#v}
+
+      - name: publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          body: |
+            Built for linux/amd64 and linux/arm64. The same eBPF object serves
+            both: the program is architecture-neutral bytecode.
+
+            Verify before installing:
+
+                sha256sum -c SHA256SUMS
+
+            Then unpack and run `sudo ./install.sh`. See `docs/runbook.md` for
+            where to place the recorder and what each position costs you.
