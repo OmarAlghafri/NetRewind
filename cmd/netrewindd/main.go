@@ -13,6 +13,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -29,8 +30,12 @@ import (
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/identity"
 	"github.com/OmarAlghafri/netrewind/internal/incident"
+	"github.com/OmarAlghafri/netrewind/internal/metrics"
 	"github.com/OmarAlghafri/netrewind/internal/store"
 )
+
+// version is stamped at build time with -ldflags "-X main.version=...".
+var version = "dev"
 
 const (
 	// flushInterval bounds how long an event can sit in memory before it is
@@ -52,23 +57,25 @@ const (
 
 func main() {
 	var (
-		dbPath     = flag.String("db", store.DefaultPath(), "path to the event store")
-		observerID = flag.String("observer-id", defaultObserverID(), "identity of this recorder")
-		logLevel   = flag.String("log-level", "info", "debug, info, warn or error")
-		retention  = flag.Duration("retention", 7*24*time.Hour, "how much history to keep")
-		gapAfter   = flag.Duration("gap-threshold", defaultGapThreshold, "absence longer than this is recorded as a gap in the record")
-		rulesDir   = flag.String("rules", "rules", "directory of correlation rules; empty disables correlation")
+		dbPath      = flag.String("db", store.DefaultPath(), "path to the event store")
+		observerID  = flag.String("observer-id", defaultObserverID(), "identity of this recorder")
+		logLevel    = flag.String("log-level", "info", "debug, info, warn or error")
+		retention   = flag.Duration("retention", 7*24*time.Hour, "how much history to keep")
+		gapAfter    = flag.Duration("gap-threshold", defaultGapThreshold, "absence longer than this is recorded as a gap in the record")
+		rulesDir    = flag.String("rules", "rules", "directory of correlation rules; empty disables correlation")
+		metricsAddr = flag.String("metrics-addr", "", "serve Prometheus metrics on this address, e.g. 127.0.0.1:9464; empty disables it")
 	)
 	flag.Parse()
 
 	log := newLogger(*logLevel)
 
 	cfg := config{
-		dbPath:     *dbPath,
-		observerID: *observerID,
-		retention:  *retention,
-		gapAfter:   *gapAfter,
-		rulesDir:   *rulesDir,
+		dbPath:      *dbPath,
+		observerID:  *observerID,
+		retention:   *retention,
+		gapAfter:    *gapAfter,
+		rulesDir:    *rulesDir,
+		metricsAddr: *metricsAddr,
 	}
 	if err := run(log, cfg); err != nil {
 		log.Error("netrewindd stopped", "err", err)
@@ -77,11 +84,12 @@ func main() {
 }
 
 type config struct {
-	dbPath     string
-	observerID string
-	rulesDir   string
-	retention  time.Duration
-	gapAfter   time.Duration
+	dbPath      string
+	observerID  string
+	rulesDir    string
+	metricsAddr string
+	retention   time.Duration
+	gapAfter    time.Duration
 }
 
 func run(log *slog.Logger, cfg config) error {
@@ -113,8 +121,30 @@ func run(log *slog.Logger, cfg config) error {
 		}
 	}
 
+	// Metrics exist whether or not anyone is scraping them, so the CLI and the
+	// logs can report the same numbers as a dashboard would.
+	meter := metrics.NewRecorder(version, observerID)
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	if cfg.metricsAddr != "" {
+		srv, err := meter.Serve(cfg.metricsAddr)
+		if err != nil {
+			return err
+		}
+		go func() {
+			log.Info("serving metrics", "addr", cfg.metricsAddr, "path", "/metrics")
+			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Error("metrics endpoint stopped", "err", err)
+			}
+		}()
+		defer func() {
+			shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			srv.Shutdown(shutdown)
+		}()
+	}
 
 	log.Info("netrewind recorder starting", "db", dbPath, "observer", observerID, "retention", retention)
 
@@ -128,7 +158,7 @@ func run(log *slog.Logger, cfg config) error {
 	writerDone := make(chan struct{})
 	go func() {
 		defer close(writerDone)
-		writer(context.WithoutCancel(ctx), st, engine, queue, log)
+		writer(context.WithoutCancel(ctx), st, engine, meter, queue, log)
 	}()
 
 	for _, e := range startupEvents {
@@ -154,8 +184,12 @@ func run(log *slog.Logger, cfg config) error {
 	}
 	for _, c := range collectors {
 		wg.Add(1)
+		meter.SetCollector(c.Name(), true)
 		go func(c collect.Collector) {
 			defer wg.Done()
+			// A collector that stops is a source the record no longer has, so
+			// it is marked down whether it failed or was simply asked to stop.
+			defer meter.SetCollector(c.Name(), false)
 			if err := c.Run(ctx, queue); err != nil && !errors.Is(err, context.Canceled) {
 				log.Error("collector failed", "collector", c.Name(), "err", err)
 			}
@@ -188,7 +222,7 @@ func run(log *slog.Logger, cfg config) error {
 // daemon: on shutdown the collectors stop first, then the writer flushes what
 // they already produced. Dropping buffered events at exit would put an
 // unexplained hole at the end of every recording.
-func writer(ctx context.Context, st store.Store, engine *correlate.Engine, queue <-chan *event.Event, log *slog.Logger) {
+func writer(ctx context.Context, st store.Store, engine *correlate.Engine, meter *metrics.Recorder, queue <-chan *event.Event, log *slog.Logger) {
 	ticker := time.NewTicker(flushInterval)
 	defer ticker.Stop()
 
@@ -207,6 +241,11 @@ func writer(ctx context.Context, st store.Store, engine *correlate.Engine, queue
 			batch = batch[:0]
 			return
 		}
+		// Metrics are taken after the write, so a scrape never counts an event
+		// the store does not hold.
+		for _, e := range batch {
+			meter.Observe(e)
+		}
 		if engine != nil {
 			var incidents []*incident.Incident
 			for _, e := range batch {
@@ -217,6 +256,7 @@ func writer(ctx context.Context, st store.Store, engine *correlate.Engine, queue
 					log.Error("could not store incidents", "err", err)
 				}
 				for _, inc := range incidents {
+					meter.ObserveIncident(inc)
 					log.Warn("incident", "title", inc.Title, "rule", inc.RuleID,
 						"severity", inc.Severity, "confidence", inc.Confidence, "links", len(inc.Chain))
 				}

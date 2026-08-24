@@ -102,3 +102,8 @@ bpf:
 .PHONY: kernel-check
 kernel-check:
 	sudo lab/check-kernel.sh
+
+# Metrics, for checking the exporter by hand.
+.PHONY: metrics
+metrics:
+	curl -s http://127.0.0.1:9464/metrics

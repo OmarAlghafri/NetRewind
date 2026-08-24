@@ -23,6 +23,7 @@ DAEMON="$BUILD/netrewindd"
 CLI="$BUILD/netrewind"
 DB="${NETREWIND_DB:-/tmp/netrewind-lab/events.db}"
 RULES="${RULES:-./rules}"
+METRICS_ADDR="${METRICS_ADDR:-127.0.0.1:9464}"
 LOG=/tmp/netrewind-lab/recorder.log
 
 LAB=nrlab
@@ -236,7 +237,8 @@ all() {
     # recorder: entering a network namespace gets a fresh mount namespace with
     # /sys remounted, and eBPF tracepoints cannot be attached without it.
     inlab sh -c "mount -t tracefs tracefs /sys/kernel/tracing 2>/dev/null || true
-                 exec '$DAEMON' --db '$DB' --rules '$RULES' --log-level info" >"$LOG" 2>&1 &
+                 exec '$DAEMON' --db '$DB' --rules '$RULES' --log-level info \
+                     --metrics-addr '$METRICS_ADDR'" >"$LOG" 2>&1 &
     pid=$!
     sleep 2
     kill -0 "$pid" 2>/dev/null || { echo "recorder died:" >&2; cat "$LOG" >&2; teardown; exit 1; }
@@ -252,6 +254,19 @@ all() {
     # connection, so the run has to outlast one rollup interval to see it.
     echo "-- waiting for a connection rollup"
     sleep 12
+
+    # Scrape before stopping: the interesting metrics are the ones that say
+    # what the recorder missed, and they are only reachable while it runs.
+    echo
+    echo "================ metrics the recorder exports =================="
+    METRICS=$(inlab busybox wget -qO- "http://$METRICS_ADDR/metrics" 2>/dev/null || true)
+    if [ -n "$METRICS" ]; then
+        echo "$METRICS" | grep -E "^netrewind_(build_info|recorder_blind|dropped|clock_steps|collector_up)" || true
+        echo "$METRICS" | grep -E "^netrewind_(events|incidents)_total" | head -12 || true
+    else
+        echo "  (metrics endpoint did not answer)"
+    fi
+
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
     sleep 1
