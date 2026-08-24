@@ -40,12 +40,14 @@ cd netrewind-0.8.0-linux-arm64
 sudo ./install.sh
 ```
 
-The installer will not overwrite a rule you have edited: the library is meant to
-be added to, and an upgrade that silently reverted someone's rule would teach
-them not to write any. `--uninstall` removes the binaries, the unit and the
-stock rules, and deliberately leaves the event store alone — that is the record,
-and a script that deleted evidence as a side effect of removing a program would
-be indefensible.
+The installer will not overwrite a rule you have edited, or a configuration you
+have tuned: the rule library is meant to be added to, and an upgrade that
+silently reverted someone's work would teach them not to do any. A newer sample
+configuration is left beside yours as `netrewindd.yaml.sample`. `--uninstall`
+removes the binaries, the unit and the stock rules, and deliberately leaves both
+the configuration and the event store alone — the store is the record, and a
+script that deleted evidence as a side effect of removing a program would be
+indefensible.
 
 From source:
 
@@ -55,6 +57,7 @@ sudo install -m 0755 build/netrewindd-linux-amd64 /usr/local/bin/netrewindd
 sudo install -m 0755 build/netrewind-linux-amd64  /usr/local/bin/netrewind
 sudo install -d -m 0750 /etc/netrewind/rules
 sudo cp rules/*.yaml /etc/netrewind/rules/
+sudo cp deploy/netrewindd.yaml /etc/netrewind/
 sudo cp deploy/systemd/netrewindd.service /etc/systemd/system/
 sudo systemctl enable --now netrewindd
 ```
@@ -68,6 +71,31 @@ happens on. It would run, report nothing, and look like a quiet network.
 The unit grants only the four capabilities above, runs with `ProtectSystem=strict`
 and a private `/tmp`, and is exempted from the OOM killer's usual attention —
 the recorder has to survive the conditions it exists to record.
+
+## Configuring it
+
+Everything lives in `/etc/netrewind/netrewindd.yaml`, which the recorder reads
+on its own. Every key is optional and the defaults are a working recorder; the
+[sample](../deploy/netrewindd.yaml) documents each one. Command-line flags
+override the file, which is how to try a setting once without editing anything.
+
+Two behaviours are deliberate and worth knowing:
+
+**An unknown key is an error, not a warning.** A misspelled setting that
+silently does nothing is the quietest failure a configuration file has — you
+would believe a thing was turned on for as long as it took to need it.
+
+**A configuration that would leave the recorder useless is refused.** Setting
+`retention: 0s` would have the hourly prune delete the entire record, including
+the incident being investigated. Every problem is reported at once, so fixing a
+file takes one pass rather than one restart per mistake:
+
+```bash
+netrewindd --check-config
+```
+
+That is what the unit runs before starting, so a bad edit stops the service
+rather than starting a recorder that is not recording what you asked for.
 
 ## Where to put it
 
@@ -169,13 +197,13 @@ again before believing it.
 
 ## Retention and pruning
 
-`--retention` (default 7 days) prunes events hourly. Incidents are kept far
+`retention` (default 7 days, or `--retention`) prunes events hourly. Incidents are kept far
 longer: they are the conclusion, they are small, and they are what someone comes
 back to months later. Their links will eventually point at events that have been
 pruned, which is why every link carries its own description — the account
 survives its evidence.
 
-To keep raw events longer, raise `--retention` and watch
+To keep raw events longer, raise `retention` and watch
 `netrewind_stored_events`. The store is one SQLite file; back it up by copying it
 while the recorder is stopped, or use `sqlite3 .backup` while it runs.
 
@@ -226,3 +254,11 @@ which one went.
 `netrewind_collector_up`. A recorder that has gone deaf and a network that has
 gone quiet look identical from the outside, which is the entire reason the
 `system.*` family exists.
+
+The three things to look for there are `system.gap` (the recorder was not
+running), `system.drop` (it was running and could not keep up), and
+`system.collector_down` (it was running, the timeline is unbroken, and one
+source stopped feeding it). The last is the one that reads as a healthy record:
+the usual cause is a kernel without BTF, which stops the connection collector
+loading, so the record shows no connection failures on a host where connections
+were never being watched. The event carries the reason.

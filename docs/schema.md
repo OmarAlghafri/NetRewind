@@ -201,14 +201,88 @@ the family that lets the timeline answer *what were we doing when it broke*.
 
 ### `system.*` — the recorder reporting on itself
 
-`gap` · `drop` · `clock_step` · `start` · `stop`
+`gap` · `drop` · `clock_step` · `start` · `stop` · `collector_down`
 
-Never remove these. `system.gap` records exactly how long the recorder was
-blind, measured against a heartbeat written every ten seconds. `system.drop`
-records how many events the kernel had to throw away when the eBPF ring buffer
-overflowed. A recorder that silently omits what it missed is not evidence of
-anything: the record would show a quiet network, and a quiet network is what an
-operator concludes when nothing is wrong.
+Never remove these. A recorder that silently omits what it missed is not
+evidence of anything: the record would show a quiet network, and a quiet
+network is what an operator concludes when nothing is wrong.
+
+There are three distinct ways to miss something, and they are separate kinds
+because they need separate answers.
+
+`system.gap` is the recorder not running, measured against a heartbeat written
+every ten seconds. Nothing at all was recorded for that period.
+
+`system.drop` is the recorder running but unable to keep up. Every source that
+can lose data reports through it: an eBPF ring buffer that filled, a netlink
+socket the kernel overran, or a packet socket whose buffer overflowed. Each
+says which source and how much, because losing a tenth of the frames on one
+interface is a different problem from losing three netlink messages.
+
+`system.collector_down` is the dangerous one. The recorder is running, the
+timeline is unbroken, and one source stopped feeding it — so a whole family of
+events is missing with nothing to mark the absence. Unlike a gap there is no
+interruption to notice. This is what a kernel without BTF, or a missing
+capability, produces, and without it the record would show no connection
+failures on a host where connections were never being watched.
+
+
+## Every kind, in one place
+
+The prose above explains why each family exists. This is the list, and a test
+fails if it and `internal/event/kinds.go` ever disagree. Nine of them are
+declared but not yet produced, and are marked *reserved*: a schema that
+promises what the code does not do is the failure this project is built
+against, so the gap is written down rather than glossed over.
+
+| Kind | Source | What it means |
+|---|---|---|
+| `link.up` | netlink | An interface started carrying |
+| `link.down` | netlink | An interface stopped carrying, or was taken down |
+| `link.flap` | netlink | Three carrier losses inside five minutes: the link itself is faulty |
+| `link.mtu_changed` | netlink | The MTU changed, which breaks large transfers while leaving ping working |
+| `link.error_rate_high` | netlink | Interface counters show over 1% of packets in error |
+| `l2.arp_binding_new` | netlink | An address answered at layer 2 for the first time |
+| `l2.arp_binding_changed` ⭐ | netlink | A different machine now answers for an address |
+| `l2.mac_moved` | netlink | The same hardware address is now behind a different interface |
+| `l2.duplicate_ip` | netlink | One address is being claimed by two machines |
+| `l2.neighbor_failed` | netlink | An address stopped answering at layer 2 entirely |
+| `l2.lldp_neighbor_changed` | lldp | *Reserved:* needs LLDP, which needs switches |
+| `l2.vlan_seen` | wire | *Reserved:* needs a trunk carrying more than one VLAN |
+| `l3.route_added` | netlink | A new route won for a destination |
+| `l3.route_removed` | netlink | The last route to a destination went away |
+| `l3.route_changed` | netlink | Traffic for a destination now takes a different path |
+| `l3.default_route_changed` ⭐ | netlink | Everything beyond the local segment now goes somewhere else |
+| `l3.addr_added` | netlink | An interface gained an address |
+| `l3.addr_removed` | netlink | An interface lost an address |
+| `l3.icmp_unreachable` | wire | Something on the path said it could not deliver |
+| `l3.mtu_blackhole` | wire | Fragmentation was needed and forbidden: large packets vanish, ping works |
+| `flow.reset` | ebpf | A connection was refused or torn down by a reset |
+| `flow.timeout_no_close` | ebpf | An established connection ended without either side closing it |
+| `flow.retransmit_spike` | ebpf | *Reserved:* needs the `tcp_retransmit_skb` tracepoint |
+| `flow.handshake_fail` | ebpf | A connection attempt never completed its handshake |
+| `flow.first_failure_for_pair` ⭐ | ebpf | Two machines that had been connecting no longer can |
+| `flow.rollup` | ebpf | A summary of ordinary connection activity over ten seconds |
+| `dhcp.offer` | wire | A DHCP server offered a lease |
+| `dhcp.ack` | wire | A lease was granted |
+| `dhcp.nak` | wire | A lease request was refused |
+| `dhcp.server_seen` ⭐ | wire | A second DHCP server is answering on this segment |
+| `dhcp.lease_changed` | wire | A client's address, gateway or resolver changed |
+| `dns.query_fail` | wire | A resolver did not answer, or answered with a failure |
+| `dns.resolver_changed` ⭐ | wire | A client began using a different resolver |
+| `dns.latency_spike` | wire | Resolution became slow enough to be felt |
+| `policy.drop_burst` | nftables | *Reserved:* needs rule counters, not the ruleset |
+| `policy.rule_changed` | nftables | The filtering rules in force changed |
+| `metric.anomaly` | probe | A measured series left its baseline: loss or latency |
+| `change.config_applied` | config | *Reserved:* needs config diffing, which is not wired up |
+| `change.device_reboot` | snmp | *Reserved:* needs SNMP or a device saying so |
+| `change.admin_action` | config | *Reserved:* needs device authentication logs |
+| `system.gap` | internal | The recorder was not watching, and for exactly how long |
+| `system.drop` | internal | Events were lost: a netlink overrun, a full ring buffer, or a full packet socket |
+| `system.clock_step` | internal | The wall clock jumped relative to the monotonic clock |
+| `system.start` | internal | The recorder started |
+| `system.stop` | internal | The recorder stopped deliberately, which is how a later gap is explained |
+| `system.collector_down` | internal | A source stopped feeding the record while the recorder kept running |
 
 ## The incident
 
