@@ -1,0 +1,20 @@
+{{template "head" .}}
+
+<h1>Timeline</h1>
+{{if .Events}}
+  <p class="dim">{{plural (len .Events) "event" "events"}}, oldest first. The second column is the time since the previous one.</p>
+  <ul class="bare timeline">
+    {{$prev := int64 0}}
+    {{range .Events}}
+      {{template "eventrow" (row . $prev)}}
+      {{$prev = .TSWall}}
+    {{end}}
+  </ul>
+{{else}}
+  <p class="dim narrow">
+    Nothing was recorded in this window. No record is not the same as nothing
+    happening &mdash; check for holes before concluding the network was quiet.
+  </p>
+{{end}}
+
+{{template "foot" .}}

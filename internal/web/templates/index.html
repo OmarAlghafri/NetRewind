@@ -1,0 +1,35 @@
+{{template "head" .}}
+
+{{if .Incidents}}
+  <h1>What went wrong</h1>
+  <p class="dim">{{plural (len .Incidents) "incident" "incidents"}} in this window, newest first.</p>
+  {{range .Incidents}}
+    {{template "incidentcard" .}}
+  {{end}}
+{{else}}
+  <h1>Nothing was concluded</h1>
+  <p class="dim narrow">
+    Correlation only reports shapes it has a rule for. No incident is not the same
+    as no problem &mdash; read the timeline as well.
+  </p>
+{{end}}
+
+{{if .Events}}
+  <h2 class="split">The last of it</h2>
+  <ul class="bare timeline">
+    {{$prev := int64 0}}
+    {{range .Events}}
+      {{template "eventrow" (row . $prev)}}
+      {{$prev = .TSWall}}
+    {{end}}
+  </ul>
+  <p class="dim small"><a href="/timeline?window={{qwindow .Window}}">the whole window &rarr;</a></p>
+{{else}}
+  <h2 class="split">Nothing was recorded</h2>
+  <p class="dim narrow">
+    No record is not the same as nothing happening. Check the holes above before
+    concluding the network was quiet.
+  </p>
+{{end}}
+
+{{template "foot" .}}

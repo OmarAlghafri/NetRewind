@@ -1,0 +1,196 @@
+/*
+ * NetRewind's own interface.
+ *
+ * The same visual language as the CLI, because they show the same record: the
+ * severity markers (!! ! -), monospace timestamps in tabular figures, hairline
+ * rules instead of boxes. Someone who has read one should not have to learn the
+ * other.
+ *
+ * No web fonts. This is served by the recorder, from an appliance that may sit
+ * on a segment with no route to the internet, and a page that waits on a font
+ * CDN before it renders is a page that does not render during an outage.
+ */
+
+:root {
+  --ground: #1a1917;
+  --surface: #211f1d;
+  --ink: #e8e4dd;
+  --dim: #98918a;
+  --rule: #35322e;
+  --rule-strong: #4c4741;
+  --error: #f0785e;
+  --warn: #e8b055;
+  --notice: #7fb6c9;
+  --accent: #7fb6c9;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --ground: #f8f6f1;
+    --surface: #ffffff;
+    --ink: #23211e;
+    --dim: #6b655f;
+    --rule: #ddd8d0;
+    --rule-strong: #bab4ab;
+    --error: #b03a22;
+    --warn: #8a5f11;
+    --notice: #2c6a80;
+    --accent: #2c6a80;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+}
+
+.mono,
+.mk, .t, .gap, .kind, .attrs, .n, .meta, .mark, .chip, .range, input[type="search"] {
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.wrap { max-width: 74rem; margin: 0 auto; padding: 0 1.25rem; }
+.dim { color: var(--dim); }
+.small { font-size: 0.8125rem; }
+.narrow { max-width: 60ch; }
+.bare { list-style: none; margin: 0; padding: 0; }
+
+a { color: inherit; text-decoration-color: var(--rule-strong); text-underline-offset: 3px; }
+a:hover { text-decoration-color: currentColor; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+h1 { font-size: 1.5rem; font-weight: 500; letter-spacing: -0.015em; margin: 2rem 0 0.4rem; }
+h2 { font-size: 1.125rem; font-weight: 500; margin: 2.5rem 0 0.4rem; }
+h2.split { border-top: 1px solid var(--rule); padding-top: 1.75rem; }
+
+/* ---- Bars ------------------------------------------------------------ */
+
+.bar { border-bottom: 1px solid var(--rule); background: var(--ground); }
+.bar.foot { border-bottom: 0; border-top: 1px solid var(--rule); margin-top: 3rem; padding: 1.25rem 0; }
+.bar-inner { display: flex; align-items: center; gap: 1.5rem; height: 3rem; }
+.mark { font-size: 0.875rem; }
+.bar nav { display: flex; gap: 1.25rem; flex: 1; }
+.bar nav a {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--dim); text-decoration: none;
+}
+.bar nav a:hover { color: var(--ink); }
+.bar nav a.on { color: var(--ink); }
+.obs { font-size: 0.75rem; }
+
+/* ---- Controls -------------------------------------------------------- */
+
+.controls {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;
+  padding: 1rem 0; border-bottom: 1px solid var(--rule);
+  font-size: 0.75rem;
+}
+.chip {
+  background: transparent; color: var(--dim);
+  border: 1px solid var(--rule); border-radius: 2px;
+  padding: 0.2rem 0.55rem; font-size: 0.75rem; cursor: pointer;
+}
+.chip:hover { color: var(--ink); border-color: var(--rule-strong); }
+.chip.on { color: var(--ink); border-color: var(--warn); }
+input[type="search"] {
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: 2px;
+  padding: 0.2rem 0.5rem; font-size: 0.75rem; min-width: 16rem;
+}
+.range { margin-left: auto; font-size: 0.75rem; }
+
+/* ---- The blind-spot banner ------------------------------------------- */
+
+.gapbox {
+  border: 1px solid var(--warn); border-radius: 2px;
+  background: var(--surface); padding: 0.9rem 1rem; margin: 1.5rem 0;
+}
+.gaptitle { margin: 0 0 0.5rem; font-size: 0.9375rem; }
+.gapbox ul { font-size: 0.875rem; }
+.gapbox li { padding: 0.15rem 0; }
+.gapbox p:last-child { margin: 0.6rem 0 0; }
+
+.notice { margin: 1.5rem 0; }
+
+/* ---- Timeline -------------------------------------------------------- */
+
+.timeline { margin-top: 1rem; }
+.row {
+  display: grid;
+  grid-template-columns: 1.6rem 6.2rem 4.6rem minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--rule);
+  align-items: baseline;
+  font-size: 0.875rem;
+}
+.mk { font-size: 0.8125rem; }
+.t, .gap, .kind, .attrs { font-size: 0.75rem; }
+.say { min-width: 0; }
+.kind, .attrs { display: inline-block; margin-left: 0.6rem; }
+.attrs { word-break: break-word; }
+
+/* On a phone the four columns become two lines rather than four squeezed
+   columns, because the sentence is the part worth reading. */
+@media (max-width: 46rem) {
+  .row { grid-template-columns: 1.4rem minmax(0, 1fr); }
+  .t { grid-column: 2; }
+  .gap { display: none; }
+  .say { grid-column: 2; }
+}
+
+/* ---- Incidents ------------------------------------------------------- */
+
+.card {
+  border: 1px solid var(--rule); border-radius: 2px;
+  background: var(--surface); margin: 1.25rem 0;
+}
+.card > header { padding: 0.9rem 1rem; border-bottom: 1px solid var(--rule); }
+.card > footer { padding: 0.9rem 1rem; border-top: 1px solid var(--rule); }
+.ititle { margin: 0; font-size: 0.9375rem; }
+.ititle .mk { margin-right: 0.35rem; }
+.meta { margin: 0.45rem 0 0; font-size: 0.75rem; }
+
+.chain { list-style: none; margin: 0; padding: 0.9rem 1rem; }
+.link { display: grid; grid-template-columns: 1.4rem minmax(0, 1fr); gap: 0.6rem; }
+.link p { margin: 0; }
+.why { margin-top: 0.4rem !important; font-size: 0.875rem; max-width: 66ch; color: var(--ink); }
+.n { font-size: 0.75rem; }
+
+/*
+ * The connector between two links carries the claim, and the three claims are
+ * given three different lines on purpose. A reader who sees the same connector
+ * everywhere assumes causation everywhere, and two of the three assert nothing
+ * of the kind.
+ */
+.rel {
+  margin: 0.55rem 0 0.55rem 0.55rem;
+  padding: 0.35rem 0 0.35rem 1.1rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+}
+.rel-causes      { border-left: 1px solid var(--warn); color: var(--warn); }
+.rel-correlates  { border-left: 1px dashed var(--rule-strong); color: var(--dim); }
+.rel-precedes    { border-left: 1px dotted var(--rule); color: var(--dim); }
+
+.advice { margin: 0.55rem 0 0; font-size: 0.875rem; max-width: 66ch; color: var(--dim); }
+
+/* ---- Severity -------------------------------------------------------- */
+
+.sev-error  { color: var(--error); }
+.sev-warn   { color: var(--warn); }
+.sev-notice { color: var(--notice); }
+.sev-info   { color: var(--dim); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

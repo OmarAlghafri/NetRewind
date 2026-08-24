@@ -1,0 +1,32 @@
+{{template "head" .}}
+
+{{if .Host}}
+  <h1 class="mono">{{.Host}}</h1>
+  {{if .Events}}
+    <p class="dim narrow">
+      Everything recorded about this machine in the window &mdash; including
+      events recorded while it answered to a different address.
+    </p>
+    <ul class="bare timeline">
+      {{$prev := int64 0}}
+      {{range .Events}}
+        {{template "eventrow" (row . $prev)}}
+        {{$prev = .TSWall}}
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="dim narrow">
+      Nothing was recorded about this machine in the window. That is an answer,
+      but check the holes above before believing it.
+    </p>
+  {{end}}
+{{else}}
+  <h1>Follow one machine</h1>
+  <p class="dim narrow">
+    Give an address or a hardware address. The identity table means this finds
+    events recorded while the machine was on a different address, and does not
+    drag in whichever other machine holds that address now.
+  </p>
+{{end}}
+
+{{template "foot" .}}

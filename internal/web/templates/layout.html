@@ -1,0 +1,128 @@
+{{define "head"}}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{{.Observer}} — NetRewind</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap bar-inner">
+    <span class="mark">net<span class="dim">rewind</span></span>
+    <nav>
+      <a href="/?window={{qwindow .Window}}"          class="{{if eq .Nav "overview"}}on{{end}}">overview</a>
+      <a href="/incidents?window={{qwindow .Window}}" class="{{if eq .Nav "incidents"}}on{{end}}">incidents</a>
+      <a href="/timeline?window={{qwindow .Window}}"  class="{{if eq .Nav "timeline"}}on{{end}}">timeline</a>
+      <a href="/host?window={{qwindow .Window}}"      class="{{if eq .Nav "host"}}on{{end}}">host</a>
+    </nav>
+    <span class="obs dim">{{.Observer}}</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <form class="controls" method="get" action="{{if eq .Nav "host"}}/host{{else if eq .Nav "incidents"}}/incidents{{else if eq .Nav "timeline"}}/timeline{{else}}/{{end}}">
+    <span class="dim">window</span>
+    {{range .Windows}}
+      <button type="submit" name="window" value="{{.Value}}" class="chip {{if .Selected}}on{{end}}">{{.Label}}</button>
+    {{end}}
+    {{if eq .Nav "host"}}
+      <input type="search" name="q" value="{{.Host}}" placeholder="address or hardware address" aria-label="Machine to follow">
+      <button type="submit" class="chip">follow</button>
+    {{end}}
+    <span class="range dim">{{hhmm .From}} &rarr; {{hhmm .To}}</span>
+  </form>
+
+  {{if .Error}}
+    <p class="notice sev-error">could not read the store: {{.Error}}</p>
+  {{end}}
+
+  {{/*
+    The blind-spot banner is on every page, above everything else.
+
+    An empty window means nothing if the recorder was not watching for it. Making
+    the reader remember to check would guarantee that one day nobody does, and
+    the whole record would be believed anyway.
+  */}}
+  {{if .Gaps}}
+    <section class="gapbox">
+      <p class="gaptitle sev-warn">The record has {{plural (len .Gaps) "hole" "holes"}} in this window</p>
+      <ul class="bare">
+        {{range .Gaps}}
+          <li><span class="dim mono">{{clock .TSWall}}</span> {{describe .}}</li>
+        {{end}}
+      </ul>
+      <p class="dim small">Nothing can be concluded about these periods from this recorder.</p>
+    </section>
+  {{end}}
+{{end}}
+
+{{define "foot"}}
+</div>
+
+<footer class="bar foot">
+  <div class="wrap dim small">
+    Read-only. NetRewind never modifies the store from here.
+    &nbsp;·&nbsp; A lab project on GNS3 and network namespaces; not deployed to production hardware.
+  </div>
+</footer>
+
+</body>
+</html>
+{{end}}
+
+
+{{/* One event, as a row of the timeline. Used by three pages. */}}
+{{define "eventrow"}}
+<li class="row">
+  <span class="mk {{sevClass .E.Severity}}">{{marker .E.Severity}}</span>
+  <span class="t mono dim">{{clock .E.TSWall}}</span>
+  <span class="gap mono dim">{{.Since}}</span>
+  <span class="say">
+    {{describe .E}}{{if gt .E.Count 1}} <span class="dim">(x{{.E.Count}})</span>{{end}}
+    <span class="kind mono dim">{{.E.Kind}}</span>
+    {{with attrs .E}}<span class="attrs mono dim">{{.}}</span>{{end}}
+  </span>
+</li>
+{{end}}
+
+
+{{/* One incident, with its chain. The relations are the point. */}}
+{{define "incidentcard"}}
+<article class="card">
+  <header>
+    <p class="ititle {{sevClass .Severity}}"><span class="mk">{{marker .Severity}}</span> {{.Title}}</p>
+    <p class="meta mono dim">
+      {{datetime .OpenedAt}}
+      {{if .ClosedAt}}&nbsp;·&nbsp;{{duration .Duration}}{{end}}
+      &nbsp;·&nbsp;rule {{.RuleID}}
+      &nbsp;·&nbsp;confidence {{.Confidence}}%
+      {{if .Victims}}&nbsp;·&nbsp;affected {{range $i, $v := .Victims}}{{if $i}}, {{end}}{{$v}}{{end}}{{end}}
+    </p>
+  </header>
+
+  <ol class="chain">
+    {{range $i, $l := .Chain}}
+      {{if $l.Relation}}
+        <li class="rel {{relationClass $l.Relation}}"><span>{{relationWords $l.Relation}}</span></li>
+      {{end}}
+      <li class="link">
+        <span class="n mono dim">{{add $i 1}}</span>
+        <div>
+          <p class="mono small"><span class="dim">{{clock $l.At}}</span> {{$l.Kind}} <span class="dim">{{$l.Subject}}</span></p>
+          <p class="why">{{$l.Why}}</p>
+        </div>
+      </li>
+    {{end}}
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> {{.RootCause.Kind}} on {{.RootCause.Entity}} <span class="dim">({{.RootCause.Confidence}}%)</span></p>
+    {{if .Advice}}<p class="advice"><span class="mono dim small">next:</span> {{.Advice}}</p>{{end}}
+  </footer>
+</article>
+{{end}}

@@ -1,0 +1,16 @@
+{{template "head" .}}
+
+<h1>Incidents</h1>
+{{if .Incidents}}
+  <p class="dim">{{plural (len .Incidents) "incident" "incidents"}}, newest first. Every link names the event it rests on.</p>
+  {{range .Incidents}}
+    {{template "incidentcard" .}}
+  {{end}}
+{{else}}
+  <p class="dim narrow">
+    Nothing was concluded in this window. Correlation only reports shapes it has a
+    rule for, so no incident is not the same as no problem.
+  </p>
+{{end}}
+
+{{template "foot" .}}
