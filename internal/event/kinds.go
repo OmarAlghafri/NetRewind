@@ -141,4 +141,11 @@ const (
 	KindSystemClockStep Kind = "system.clock_step"
 	KindSystemStart     Kind = "system.start"
 	KindSystemStop      Kind = "system.stop"
+
+	// KindCollectorDown says a source stopped feeding the record while the
+	// recorder itself kept running. Without it, a collector that failed to
+	// start leaves a timeline with a whole family of events missing and
+	// nothing to say they were never being watched for - which reads exactly
+	// like a network on which nothing of that kind happened.
+	KindCollectorDown Kind = "system.collector_down"
 )

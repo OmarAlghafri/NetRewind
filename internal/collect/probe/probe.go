@@ -14,6 +14,7 @@ package probe
 import (
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -213,3 +214,19 @@ func medianOf(in []time.Duration) time.Duration {
 }
 
 func round1(v float64) float64 { return math.Round(v*10) / 10 }
+
+// ParseTargets splits the comma-separated address list the daemon is given.
+//
+// Empty entries are ignored so a trailing comma is not a reason to refuse to
+// start. It lives here rather than in each platform's collector because the
+// daemon validates the same list before either of them is constructed, and
+// three copies of one split is three chances for them to disagree.
+func ParseTargets(s string) []string {
+	var out []string
+	for _, t := range strings.Split(s, ",") {
+		if t = strings.TrimSpace(t); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}

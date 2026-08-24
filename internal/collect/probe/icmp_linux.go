@@ -35,13 +35,7 @@ type Collector struct {
 // NewCollector returns a probe collector. targets is a comma-separated list;
 // empty means follow the default gateway.
 func NewCollector(b *event.Builder, log *slog.Logger, targets string) *Collector {
-	var list []string
-	for _, t := range strings.Split(targets, ",") {
-		if t = strings.TrimSpace(t); t != "" {
-			list = append(list, t)
-		}
-	}
-	return &Collector{log: log, analyser: NewAnalyser(b, nil), Targets: list}
+	return &Collector{log: log, analyser: NewAnalyser(b, nil), Targets: ParseTargets(targets)}
 }
 
 // Name implements collect.Collector.

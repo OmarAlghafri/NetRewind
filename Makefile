@@ -34,6 +34,13 @@ linux:
 test:
 	go test ./...
 
+# The load tests measure sustained throughput, so they run alone. Under
+# `go test ./...` the packages run concurrently and the number measures the
+# contention between them rather than the store.
+.PHONY: load
+load:
+	NETREWIND_LOAD_TEST=1 go test ./internal/store/ -run "Burst|Storm|Prune" -v -count=1
+
 .PHONY: vet
 vet:
 	go vet ./...
@@ -142,6 +149,7 @@ release: test
 	  cp rules/*.yaml $$stage/rules/; \
 	  cp docs/*.md $$stage/docs/; \
 	  cp deploy/systemd/*.service $$stage/deploy/systemd/; \
+	  cp deploy/netrewindd.yaml $$stage/deploy/; \
 	  cp LICENSE NOTICE README.md $$stage/; \
 	  cp deploy/install.sh $$stage/; \
 	  tar -czf $(DIST)/$$name.tar.gz -C $(DIST) $$name; \

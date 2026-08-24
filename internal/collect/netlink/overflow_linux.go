@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"os"
+	"strings"
 	"sync/atomic"
 
 	"github.com/OmarAlghafri/netrewind/internal/collect"
@@ -51,6 +53,13 @@ func (r *overflowReporter) bind(ctx context.Context, out chan<- *event.Event) {
 // callback is what netlink subscriptions are given.
 func (r *overflowReporter) callback(err error) {
 	if !isOverflow(err) {
+		// Closing the socket on shutdown makes the pending read fail, and
+		// every collector would report that as a problem on every clean stop.
+		// Four warnings that always appear are four warnings nobody reads, and
+		// they would sit alongside the ones that matter.
+		if r.stopping(err) {
+			return
+		}
 		// Any other error is a fault in the socket rather than a hole in the
 		// record. Logged, and left to the read loop to fail on if it is fatal.
 		r.log.Warn("netlink subscription error", "collector", r.name, "err", err)
@@ -77,6 +86,52 @@ func (r *overflowReporter) callback(err error) {
 }
 
 // isOverflow reports whether an error means the kernel threw messages away.
+//
+// The string comparison is not paranoia. vishvananda/netlink reports receive
+// failures for the link, address and route subscriptions as
+// fmt.Errorf("Receive failed: %v", err) - %v, not %w - which discards the
+// wrapped errno and makes errors.Is blind. Only the neighbour subscription
+// passes the error through intact. Relying on errors.Is alone would mean this
+// detected overruns on one collector out of four and silently missed the rest,
+// which is the failure it exists to prevent.
+//
+// The comparison is against the errno's own text rather than the library's
+// message, so it does not depend on a wording this project does not control.
 func isOverflow(err error) bool {
-	return errors.Is(err, unix.ENOBUFS) || errors.Is(err, unix.ENOMEM)
+	return matchesErrno(err, unix.ENOBUFS, unix.ENOMEM)
+}
+
+// matchesErrno reports whether err is one of these errnos, whether it was
+// wrapped properly or flattened into a string.
+func matchesErrno(err error, errnos ...unix.Errno) bool {
+	if err == nil {
+		return false
+	}
+	for _, e := range errnos {
+		if errors.Is(err, e) {
+			return true
+		}
+	}
+	msg := err.Error()
+	for _, e := range errnos {
+		if strings.Contains(msg, e.Error()) {
+			return true
+		}
+	}
+	return false
+}
+
+// stopping reports whether an error is only the consequence of shutting down.
+//
+// The netlink library closes the socket when the done channel is closed, and
+// the read already blocked on it fails with EAGAIN or a closed-file error. Both
+// are expected, and only when the context has actually been cancelled: the same
+// errors arriving while the recorder is meant to be running are real.
+func (r *overflowReporter) stopping(err error) bool {
+	if r.ctx == nil || r.ctx.Err() == nil {
+		return false
+	}
+	return matchesErrno(err, unix.EAGAIN, unix.EBADF) ||
+		errors.Is(err, os.ErrClosed) ||
+		errors.Is(err, context.Canceled)
 }

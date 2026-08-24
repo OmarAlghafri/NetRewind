@@ -221,6 +221,12 @@ func Describe(e *Event) string {
 		}
 		return "the clock jumped"
 
+	case KindCollectorDown:
+		if name, ok := e.Attrs["collector"].(string); ok {
+			return fmt.Sprintf("the %s source stopped feeding the record; nothing of what it watches was seen after this", name)
+		}
+		return "a source stopped feeding the record"
+
 	case KindSystemStart:
 		return "the recorder started"
 

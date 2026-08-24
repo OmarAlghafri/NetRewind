@@ -21,12 +21,7 @@ import (
 const burstRate = 5000
 
 func TestStoreSurvivesABurst(t *testing.T) {
-	if testing.Short() {
-		t.Skip("load test")
-	}
-	if raceEnabled {
-		t.Skip("throughput under the race detector measures the detector, not the store")
-	}
+	requireLoadTest(t)
 	st := openTestStore(t)
 	ctx := context.Background()
 	b := event.NewBuilder("obs-1", nil)
@@ -125,12 +120,7 @@ func TestStoreSurvivesABurst(t *testing.T) {
 
 // Folding is what keeps a storm from becoming a store the size of the disk.
 func TestAStormFoldsRatherThanGrowing(t *testing.T) {
-	if testing.Short() {
-		t.Skip("load test")
-	}
-	if raceEnabled {
-		t.Skip("throughput under the race detector measures the detector, not the store")
-	}
+	requireLoadTest(t)
 	st := openTestStore(t)
 	ctx := context.Background()
 	b := event.NewBuilder("obs-1", nil)
@@ -165,12 +155,7 @@ func TestAStormFoldsRatherThanGrowing(t *testing.T) {
 }
 
 func TestPruneKeepsUpWithALargeStore(t *testing.T) {
-	if testing.Short() {
-		t.Skip("load test")
-	}
-	if raceEnabled {
-		t.Skip("throughput under the race detector measures the detector, not the store")
-	}
+	requireLoadTest(t)
 	st := openTestStore(t)
 	ctx := context.Background()
 	b := event.NewBuilder("obs-1", nil)
@@ -299,4 +284,29 @@ func containsAny(s string, subs ...string) bool {
 		}
 	}
 	return false
+}
+
+// requireLoadTest skips unless the load tests were asked for explicitly.
+//
+// These measure sustained throughput, and `go test ./...` runs packages
+// concurrently: the store would be competing with ten other packages for the
+// same cores, and the figure would describe that competition rather than the
+// store. Measured on one machine, the same burst ran at 4,500 events a second
+// inside the full suite and 22,000 alone.
+//
+// They are not optional. `make load` runs them, and CI runs them as their own
+// job so nothing else is on the machine.
+func requireLoadTest(t *testing.T) {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("load test")
+	}
+	if raceEnabled {
+		// The detector instruments every memory access, and modernc's SQLite is
+		// C translated into Go. Throughput under -race measures the detector.
+		t.Skip("throughput under the race detector measures the detector, not the store")
+	}
+	if os.Getenv("NETREWIND_LOAD_TEST") == "" {
+		t.Skip("set NETREWIND_LOAD_TEST=1, or run `make load`, to measure throughput")
+	}
 }

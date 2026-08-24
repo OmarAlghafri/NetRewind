@@ -6,7 +6,15 @@ Wants=network-pre.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/netrewindd --db /var/lib/netrewind/events.db
+ExecStart=/usr/local/bin/netrewindd
+
+# Everything is configured in /etc/netrewind/netrewindd.yaml, which the
+# recorder reads on its own. Changing a setting is editing that file and
+# restarting, not editing this unit.
+
+# A configuration this unit cannot parse stops the service rather than starting
+# a recorder that is not recording what was asked for.
+ExecStartPre=/usr/local/bin/netrewindd --check-config
 Restart=always
 RestartSec=2s
 
@@ -21,6 +29,7 @@ NoNewPrivileges=yes
 StateDirectory=netrewind
 StateDirectoryMode=0750
 ProtectSystem=strict
+ReadOnlyPaths=/etc/netrewind
 ProtectHome=yes
 PrivateTmp=yes
 ProtectKernelModules=yes

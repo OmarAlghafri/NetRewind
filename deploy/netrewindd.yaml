@@ -1,0 +1,54 @@
+# NetRewind recorder configuration.
+#
+# Install at /etc/netrewind/netrewindd.yaml, which is read automatically. Every
+# key is optional: what is here is the default, and a file with nothing but
+# comments is a valid, working recorder.
+#
+# Command-line flags override this file, so a flag is the way to try a setting
+# once without editing anything. An unknown key is an error rather than being
+# ignored, because a misspelled setting that silently does nothing is the worst
+# kind of configuration bug.
+
+# Where the record is kept. The systemd unit points this at its StateDirectory.
+db: /var/lib/netrewind/events.db
+
+# What events say produced them. Defaults to the hostname. Set it when several
+# recorders write to one place, or when the hostname is not meaningful.
+# observer_id: recorder-floor-2
+
+# How much history to keep. Pruning runs hourly, so anything under an hour is
+# refused. A week of a quiet segment is a few megabytes.
+retention: 168h
+
+# How long the recorder must have been absent before the silence is recorded as
+# a hole in the record. Below the ten second heartbeat, every ordinary restart
+# would look like a gap.
+gap_threshold: 30s
+
+# Where the correlation rules live. Set to an empty string to record without
+# drawing any conclusions.
+rules: /etc/netrewind/rules
+
+# debug, info, warn or error.
+log_level: info
+
+# Serve Prometheus metrics here. Empty means no listener at all, which is the
+# default: an appliance should not open a port nobody asked for.
+# metrics_addr: 127.0.0.1:9464
+
+# Capture DHCP, DNS and ICMP metadata on this interface. Empty means every
+# interface, which is what a single-segment appliance wants.
+# wire_iface: eth0
+
+# Store the names that were looked up, not only that a lookup happened.
+#
+# Off by default and deliberately so. Query names are a record of what people
+# on the segment were doing, and there are networks where keeping that is not
+# permitted. Turning it on makes the DNS events considerably more useful for
+# diagnosis; it is your decision to make, not this file's.
+record_dns_names: false
+
+# Addresses to measure reachability to, comma separated. Empty follows the
+# current default gateway, which is usually the right thing. These are pinged,
+# so they must be addresses, not names.
+# probe: 10.0.0.1,10.0.0.53

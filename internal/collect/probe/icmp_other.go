@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"strings"
 
 	"github.com/OmarAlghafri/netrewind/internal/collect"
 	"github.com/OmarAlghafri/netrewind/internal/event"
@@ -22,13 +21,7 @@ type Collector struct{ Targets []string }
 
 // NewCollector returns a collector that will refuse to run on this platform.
 func NewCollector(_ *event.Builder, _ *slog.Logger, targets string) *Collector {
-	var list []string
-	for _, t := range strings.Split(targets, ",") {
-		if t = strings.TrimSpace(t); t != "" {
-			list = append(list, t)
-		}
-	}
-	return &Collector{Targets: list}
+	return &Collector{Targets: ParseTargets(targets)}
 }
 
 // Name implements collect.Collector.

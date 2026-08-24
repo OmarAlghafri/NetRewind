@@ -29,6 +29,11 @@ uninstall() {
     systemctl daemon-reload 2>/dev/null || true
     rm -f "$PREFIX/netrewindd" "$PREFIX/netrewind"
     rm -rf "$CONFDIR/rules"
+    rm -f "$CONFDIR/netrewindd.yaml.sample"
+    # The configuration is left: it is the operator's, not this script's.
+    if [ -e "$CONFDIR/netrewindd.yaml" ]; then
+        echo "keeping $CONFDIR/netrewindd.yaml"
+    fi
     echo
     echo "removed. The event store under $STATEDIR was left alone:"
     echo "  that is the record, and this script does not delete evidence."
@@ -68,16 +73,49 @@ for f in "$HERE"/rules/*.yaml; do
     fi
 done
 
+echo "==> configuration into $CONFDIR"
+install -d -m 0750 "$CONFDIR"
+if [ -e "$CONFDIR/netrewindd.yaml" ]; then
+    # An upgrade must never overwrite a configuration somebody tuned. The new
+    # sample is left alongside so its comments can still be read.
+    install -m 0640 "$HERE/deploy/netrewindd.yaml" "$CONFDIR/netrewindd.yaml.sample"
+    echo "    keeping existing netrewindd.yaml (new sample at netrewindd.yaml.sample)"
+else
+    install -m 0640 "$HERE/deploy/netrewindd.yaml" "$CONFDIR/netrewindd.yaml"
+fi
+
+# Point the configuration at this host's paths, which may have been moved with
+# PREFIX, CONFDIR or STATEDIR. Done before anything is started, and before the
+# systemd check, so a host without systemd gets a correct file too.
+sed -i "s|^db: .*|db: $STATEDIR/events.db|; s|^rules: .*|rules: $CONFDIR/rules|" \
+    "$CONFDIR/netrewindd.yaml"
+
 echo "==> state directory $STATEDIR"
 install -d -m 0750 "$STATEDIR"
 
+if [ ! -d "$UNITDIR" ]; then
+    # Alpine, Void and Devuan are Linux hosts without systemd. The recorder
+    # itself runs fine there; only the unit has nowhere to go, and saying so is
+    # more use than a failed install command.
+    echo
+    echo "$UNITDIR does not exist, so there is no systemd to install a unit into."
+    echo "The binaries and /etc/netrewind are in place. Run the recorder under"
+    echo "whatever supervisor this host uses:"
+    echo
+    echo "    $PREFIX/netrewindd"
+    echo
+    "$PREFIX/netrewindd" --check-config
+    exit 0
+fi
+
 echo "==> unit into $UNITDIR"
 install -m 0644 "$HERE/deploy/systemd/$UNIT" "$UNITDIR/$UNIT"
-# The packaged unit points at the repository layout; a host install reads its
-# rules from /etc.
-sed -i "s|--db /var/lib/netrewind/events.db|--db $STATEDIR/events.db --rules $CONFDIR/rules|" \
-    "$UNITDIR/$UNIT"
+# The unit needs no rewriting: it runs the recorder with no arguments and lets
+# the recorder read /etc/netrewind. One file to look at rather than two.
 systemctl daemon-reload
+
+# Fail here rather than in a restart loop nobody is watching.
+"$PREFIX/netrewindd" --check-config || die "the installed configuration is not usable"
 
 if [ "$start" = yes ]; then
     echo "==> starting"

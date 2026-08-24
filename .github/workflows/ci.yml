@@ -44,6 +44,22 @@ jobs:
       - name: build static binaries
         run: CGO_ENABLED=0 make linux
 
+  load:
+    name: sustained write rate
+    # Its own job on purpose. These measure throughput, and running them
+    # alongside the rest of the suite measures how many packages were competing
+    # for the runner rather than how fast the store is.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: absorb a burst, fold a storm, prune a large store
+        run: make load
+
   bpf:
     name: eBPF object matches its source
     runs-on: ubuntu-24.04

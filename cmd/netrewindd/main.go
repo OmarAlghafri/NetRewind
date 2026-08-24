@@ -58,62 +58,40 @@ const (
 )
 
 func main() {
-	var (
-		dbPath         = flag.String("db", store.DefaultPath(), "path to the event store")
-		observerID     = flag.String("observer-id", defaultObserverID(), "identity of this recorder")
-		logLevel       = flag.String("log-level", "info", "debug, info, warn or error")
-		retention      = flag.Duration("retention", 7*24*time.Hour, "how much history to keep")
-		gapAfter       = flag.Duration("gap-threshold", defaultGapThreshold, "absence longer than this is recorded as a gap in the record")
-		rulesDir       = flag.String("rules", "rules", "directory of correlation rules; empty disables correlation")
-		metricsAddr    = flag.String("metrics-addr", "", "serve Prometheus metrics on this address, e.g. 127.0.0.1:9464; empty disables it")
-		wireIface      = flag.String("wire-iface", "", "capture DHCP, DNS and ICMP on this interface; empty means all")
-		recordDNSNames = flag.Bool("record-dns-names", false, "store the names looked up. Off by default: there are networks where recording them is not permitted")
-		probeTargets   = flag.String("probe", "", "addresses to measure reachability to; empty follows the default gateway")
-	)
-	flag.Parse()
-
-	log := newLogger(*logLevel)
-
-	cfg := config{
-		dbPath:         *dbPath,
-		observerID:     *observerID,
-		retention:      *retention,
-		gapAfter:       *gapAfter,
-		rulesDir:       *rulesDir,
-		metricsAddr:    *metricsAddr,
-		wireIface:      *wireIface,
-		recordDNSNames: *recordDNSNames,
-		probeTargets:   *probeTargets,
+	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	cfg, err := loadConfig(fs, os.Args[1:])
+	if err != nil {
+		// Configuration errors go to stderr rather than through the logger:
+		// the log level is one of the things that might be wrong.
+		fmt.Fprintf(os.Stderr, "netrewindd: %v\n", err)
+		os.Exit(2)
 	}
+
+	if cfg.CheckOnly {
+		fmt.Printf("configuration is usable: store %s, %s of history, observer %s\n",
+			cfg.DBPath, cfg.Retention, cfg.ObserverID)
+		return
+	}
+
+	log := newLogger(cfg.LogLevel)
 	if err := run(log, cfg); err != nil {
 		log.Error("netrewindd stopped", "err", err)
 		os.Exit(1)
 	}
 }
 
-type config struct {
-	dbPath         string
-	observerID     string
-	rulesDir       string
-	metricsAddr    string
-	wireIface      string
-	recordDNSNames bool
-	probeTargets   string
-	retention      time.Duration
-	gapAfter       time.Duration
-}
-
 func run(log *slog.Logger, cfg config) error {
-	if err := os.MkdirAll(filepath.Dir(cfg.dbPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cfg.DBPath), 0o755); err != nil {
 		return fmt.Errorf("create store directory: %w", err)
 	}
-	st, err := store.OpenSQLite(cfg.dbPath)
+	st, err := store.OpenSQLite(cfg.DBPath)
 	if err != nil {
 		return err
 	}
 	defer st.Close()
 
-	dbPath, observerID, retention, gapAfter := cfg.dbPath, cfg.observerID, cfg.retention, cfg.gapAfter
+	dbPath, observerID := cfg.DBPath, cfg.ObserverID
+	retention, gapAfter := time.Duration(cfg.Retention), time.Duration(cfg.GapAfter)
 	clock := event.NewClock()
 	builder := event.NewBuilder(observerID, clock)
 
@@ -122,13 +100,13 @@ func run(log *slog.Logger, cfg config) error {
 	// rules still records everything, and the rules can be replayed over stored
 	// history later.
 	var engine *correlate.Engine
-	if cfg.rulesDir != "" {
-		rules, err := correlate.LoadRules(cfg.rulesDir)
+	if cfg.RulesDir != "" {
+		rules, err := correlate.LoadRules(cfg.RulesDir)
 		if err != nil {
 			log.Warn("correlation disabled", "err", err)
 		} else {
 			engine = correlate.NewEngine(rules, log)
-			log.Info("correlation enabled", "rules", len(rules), "from", cfg.rulesDir)
+			log.Info("correlation enabled", "rules", len(rules), "from", cfg.RulesDir)
 		}
 	}
 
@@ -139,13 +117,13 @@ func run(log *slog.Logger, cfg config) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if cfg.metricsAddr != "" {
-		srv, err := meter.Serve(cfg.metricsAddr)
+	if cfg.MetricsAddr != "" {
+		srv, err := meter.Serve(cfg.MetricsAddr)
 		if err != nil {
 			return err
 		}
 		go func() {
-			log.Info("serving metrics", "addr", cfg.metricsAddr, "path", "/metrics")
+			log.Info("serving metrics", "addr", cfg.MetricsAddr, "path", "/metrics")
 			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				log.Error("metrics endpoint stopped", "err", err)
 			}
@@ -192,8 +170,8 @@ func run(log *slog.Logger, cfg config) error {
 		netlink.NewAddrCollector(builder, log),
 		flow.NewCollector(builder, log),
 		policy.NewCollector(builder, log),
-		wire.NewCollector(builder, log, cfg.wireIface, cfg.recordDNSNames),
-		probe.NewCollector(builder, log, cfg.probeTargets),
+		wire.NewCollector(builder, log, cfg.WireIface, cfg.RecordDNSNames),
+		probe.NewCollector(builder, log, cfg.ProbeTargets),
 	}
 	for _, c := range collectors {
 		wg.Add(1)
@@ -205,6 +183,17 @@ func run(log *slog.Logger, cfg config) error {
 			defer meter.SetCollector(c.Name(), false)
 			if err := c.Run(ctx, queue); err != nil && !errors.Is(err, context.Canceled) {
 				log.Error("collector failed", "collector", c.Name(), "err", err)
+				// The log is not the record. A source that never started, or
+				// that died, leaves a whole family of events missing from the
+				// timeline, and someone reading it later would see the absence
+				// and conclude nothing of that kind happened. The record has to
+				// say it was not looking.
+				collect.Emit(ctx, queue, builder.New(
+					event.SourceInternal, event.KindCollectorDown, event.SevError,
+					event.Observer(observerID)).
+					WithAttr("collector", c.Name()).
+					WithAttr("reason", err.Error()).
+					WithDedup("system.collector_down|"+c.Name()))
 			}
 		}(c)
 	}
@@ -338,7 +327,11 @@ func heartbeat(ctx context.Context, st store.Store, b *event.Builder, queue chan
 	defer prune.Stop()
 
 	mark := func() {
-		if err := st.SetMeta(ctx, store.MetaLastHeartbeat, strconv.FormatInt(time.Now().UnixNano(), 10)); err != nil {
+		err := st.SetMeta(ctx, store.MetaLastHeartbeat, strconv.FormatInt(time.Now().UnixNano(), 10))
+		// A heartbeat that fails because the recorder is stopping is the
+		// shutdown working, not a fault. Reporting it would put a warning on
+		// every clean stop and teach whoever reads the log to ignore them.
+		if err != nil && ctx.Err() == nil {
 			log.Warn("heartbeat failed", "err", err)
 		}
 	}
