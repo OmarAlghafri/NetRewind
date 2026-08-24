@@ -141,8 +141,14 @@ Every observability tool exports counts of what it saw. This one starts those
 two counters at zero and expects you to page on them, because a recorder that
 has gone deaf and a network that has gone quiet look identical from the outside.
 
-Planned next: conntrack for connection lifetimes and resets, then a web timeline
-and an appliance image.
+- Shows the same record in a browser, from the same binary. `netrewind serve`
+  is server-rendered, needs no JavaScript, and is read-only — the store is
+  evidence, and the thing that displays evidence has no business modifying it.
+  The blind-spot banner is on every page rather than a panel someone has to
+  think to open
+
+Planned next: conntrack for connection lifetimes and resets, an OpenTelemetry
+exporter, and a bootable appliance image.
 
 ## How it is different
 
@@ -192,7 +198,26 @@ Building and testing work on any platform. Observing requires Linux — see
 make all                                          # fmt, vet, test, build
 sudo ./build/netrewindd --db ./var/events.db      # record
 ./build/netrewind timeline --last 15m             # read it back
+./build/netrewind serve                           # or read it in a browser
 ```
+
+`serve` renders the same record as pages — server-rendered, no JavaScript, and
+read-only. The templates are embedded, so it runs from the same single static
+binary as everything else, and it binds to loopback because it has no
+authentication.
+
+Or install a release:
+
+```bash
+tar -xzf netrewind-0.8.0-linux-arm64.tar.gz
+cd netrewind-0.8.0-linux-arm64 && sudo ./install.sh
+```
+
+Built for `linux/amd64` and `linux/arm64` — the same eBPF object serves both,
+because the program is architecture-neutral bytecode and the cheapest hardware
+this is meant to run on is a Raspberry Pi. There is a
+[Dockerfile](deploy/Dockerfile) too, for watching a segment for an afternoon
+without installing anything.
 
 To see the whole thing work without a network to break, run the synthetic lab.
 It builds a topology in network namespaces, records it, injects seven faults and
@@ -212,9 +237,10 @@ sudo make lab
 | **M2b** | nftables rule changes | done |
 | M2c | conntrack: connection lifetimes, resets, `flow.timeout_no_close` | |
 | **M3** | Isnad correlation engine with backward cause matching, twelve-rule library | done |
-| M4 | GNS3 lab, documentation, public release | |
+| M4 | GNS3 lab wiring, public release | needs GNS3 |
 | **M5a** | Prometheus export, operating runbook | done |
-| M5b | web timeline, appliance image, OpenTelemetry export | |
+| **M5b** | web interface, release packaging for amd64 and arm64, container image | done |
+| M5c | OpenTelemetry export, bootable appliance image | |
 
 ## Documentation
 

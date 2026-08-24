@@ -93,10 +93,15 @@ lab-down:
 BPF_SRC := internal/collect/flow/bpf/flow.bpf.c
 BPF_OBJ := internal/collect/flow/bpf/flow.bpf.o
 
+#
+# No __TARGET_ARCH define: the program hooks a tracepoint and reads its argument
+# struct directly, so it uses none of the PT_REGS macros that would make it
+# architecture-specific. BPF bytecode is portable, which is what lets one
+# committed object serve amd64 and arm64 alike - and arm64 is not incidental,
+# since a Raspberry Pi is the cheapest thing this is meant to run on.
 .PHONY: bpf
 bpf:
-	clang -O2 -g -target bpf -D__TARGET_ARCH_x86 \
-	    -Wall -Werror -c $(BPF_SRC) -o $(BPF_OBJ)
+	clang -O2 -g -target bpf -Wall -Werror -c $(BPF_SRC) -o $(BPF_OBJ)
 	@echo "built $(BPF_OBJ)"
 
 .PHONY: kernel-check
@@ -107,3 +112,38 @@ kernel-check:
 .PHONY: metrics
 metrics:
 	curl -s http://127.0.0.1:9464/metrics
+
+# ---------------------------------------------------------------------------
+# Release
+# ---------------------------------------------------------------------------
+#
+# Two architectures, because the cheapest hardware this is meant to run on is a
+# Raspberry Pi and the most common is an amd64 mini PC. One committed eBPF
+# object serves both: the program is architecture-neutral bytecode.
+PLATFORMS := linux/amd64 linux/arm64
+DIST      := dist
+
+.PHONY: release
+release: test
+	rm -rf $(DIST) && mkdir -p $(DIST)
+	@for p in $(PLATFORMS); do \
+	  os=$${p%/*}; arch=$${p#*/}; \
+	  name=netrewind-$(VERSION)-$$os-$$arch; \
+	  echo "==> $$name"; \
+	  stage=$(DIST)/$$name; \
+	  mkdir -p $$stage/rules $$stage/docs $$stage/deploy/systemd; \
+	  GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags "-s -w $(LDFLAGS)" \
+	      -o $$stage/netrewindd ./cmd/netrewindd || exit 1; \
+	  GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags "-s -w $(LDFLAGS)" \
+	      -o $$stage/netrewind  ./cmd/netrewind  || exit 1; \
+	  cp rules/*.yaml $$stage/rules/; \
+	  cp docs/*.md $$stage/docs/; \
+	  cp deploy/systemd/*.service $$stage/deploy/systemd/; \
+	  cp LICENSE NOTICE README.md $$stage/; \
+	  cp deploy/install.sh $$stage/; \
+	  tar -czf $(DIST)/$$name.tar.gz -C $(DIST) $$name; \
+	  rm -rf $$stage; \
+	done
+	@cd $(DIST) && sha256sum *.tar.gz > SHA256SUMS && cat SHA256SUMS
+	@echo
+	@ls -lh $(DIST)/*.tar.gz

@@ -30,6 +30,25 @@ written against it, weeks.
 
 ## Installing
 
+From a release tarball — `linux/amd64` and `linux/arm64` are both built, and the
+same eBPF object serves both because the program is architecture-neutral
+bytecode:
+
+```bash
+tar -xzf netrewind-0.8.0-linux-arm64.tar.gz
+cd netrewind-0.8.0-linux-arm64
+sudo ./install.sh
+```
+
+The installer will not overwrite a rule you have edited: the library is meant to
+be added to, and an upgrade that silently reverted someone's rule would teach
+them not to write any. `--uninstall` removes the binaries, the unit and the
+stock rules, and deliberately leaves the event store alone — that is the record,
+and a script that deleted evidence as a side effect of removing a program would
+be indefensible.
+
+From source:
+
 ```bash
 make linux
 sudo install -m 0755 build/netrewindd-linux-amd64 /usr/local/bin/netrewindd
@@ -39,6 +58,12 @@ sudo cp rules/*.yaml /etc/netrewind/rules/
 sudo cp deploy/systemd/netrewindd.service /etc/systemd/system/
 sudo systemctl enable --now netrewindd
 ```
+
+Or as a container, for watching a segment for an afternoon without installing
+anything — see [deploy/Dockerfile](../deploy/Dockerfile). `--network host` is
+not optional there: without it the recorder watches the container's own
+namespace, which is a network of one interface that nothing interesting ever
+happens on. It would run, report nothing, and look like a quiet network.
 
 The unit grants only the four capabilities above, runs with `ProtectSystem=strict`
 and a private `/tmp`, and is exempted from the OOM killer's usual attention —
@@ -124,6 +149,17 @@ the wrong cable gets replaced.
 ```bash
 netrewind what-happened --host 192.168.20.10 --at 15:00 --window 10m
 ```
+
+All three are also pages, if a browser suits the moment better:
+
+```bash
+netrewind serve      # http://127.0.0.1:8464
+```
+
+It shows the same record, narrated by the same code, so a screenshot of the
+terminal and a screenshot of the browser cannot disagree about what an event
+meant. It is read-only, has no authentication, and binds to loopback — bind it
+wider only behind something that does authenticate.
 
 The identity table means this follows a machine across an address change, and
 does *not* drag in whatever other machine holds that address today.
