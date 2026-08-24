@@ -281,7 +281,9 @@ func parseAt(s string) (time.Time, error) {
 	if strings.HasPrefix(s, "-") || strings.HasPrefix(s, "+") {
 		d, err := time.ParseDuration(s)
 		if err != nil {
-			return time.Time{}, fmt.Errorf("--at %q: %w", s, err)
+			// The parser's own complaint ("unknown unit") does not tell anyone
+			// what would work, and this gets typed under pressure.
+			return time.Time{}, fmt.Errorf("--at %q: %w; %s", s, err, atFormats)
 		}
 		return time.Now().Add(d), nil
 	}
@@ -299,5 +301,9 @@ func parseAt(s string) (time.Time, error) {
 				t.Hour(), t.Minute(), t.Second(), 0, time.Local), nil
 		}
 	}
-	return time.Time{}, fmt.Errorf("--at %q: expected RFC3339, YYYY-MM-DD HH:MM, HH:MM, -2h, or now", s)
+	return time.Time{}, fmt.Errorf("--at %q: %s", s, atFormats)
 }
+
+// atFormats is the one place the accepted forms are written down, so an error
+// message and the flag's help can never drift apart.
+const atFormats = "expected RFC3339, YYYY-MM-DD HH:MM, HH:MM, -2h, or now"
