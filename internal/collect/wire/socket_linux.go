@@ -20,8 +20,6 @@ const (
 	// DHCP options that matter and a DNS question - and deliberately not
 	// enough to capture anything anyone would object to being captured.
 	snapLen = 1024
-	// sweepInterval prunes the pending-query and resolver tables.
-	sweepInterval = 30 * time.Second
 )
 
 // Collector reads DHCP, DNS and ICMP metadata from a raw socket.
@@ -32,6 +30,7 @@ const (
 // the segment - which is the point, and why this does not need a mirror port to
 // be useful.
 type Collector struct {
+	b    *event.Builder
 	log  *slog.Logger
 	dhcp *DHCPWatcher
 	dns  *DNSWatcher
@@ -45,6 +44,7 @@ type Collector struct {
 // queried names are stored at all.
 func NewCollector(b *event.Builder, log *slog.Logger, iface string, recordDNSNames bool) *Collector {
 	return &Collector{
+		b:     b,
 		log:   log,
 		dhcp:  NewDHCPWatcher(b, nil),
 		dns:   NewDNSWatcher(b, nil, recordDNSNames),
@@ -74,9 +74,19 @@ func (c *Collector) Run(ctx context.Context, out chan<- *event.Event) error {
 	if err := unix.SetsockoptTimeval(fd, unix.SOL_SOCKET, unix.SO_RCVTIMEO, &tv); err != nil {
 		return fmt.Errorf("wire: set read timeout: %w", err)
 	}
+	if err := setRcvBuf(fd); err != nil {
+		c.log.Warn("could not enlarge the capture buffer; frames may be dropped under load",
+			"collector", c.Name(), "err", err)
+	}
 
 	sweep := time.NewTicker(sweepInterval)
 	defer sweep.Stop()
+
+	// Whatever the kernel dropped before this process saw it is drained on the
+	// same tick, so a hole in the record never outlives the window it is in.
+	if _, _, err := drainStats(fd); err != nil {
+		return err // counters unreadable means losses would be invisible
+	}
 
 	buf := make([]byte, snapLen)
 	for {
@@ -85,6 +95,13 @@ func (c *Collector) Run(ctx context.Context, out chan<- *event.Event) error {
 			return nil
 		case <-sweep.C:
 			c.dns.Sweep()
+			received, dropped, err := drainStats(fd)
+			if err != nil {
+				return err
+			}
+			if dropped > 0 && !collect.Emit(ctx, out, dropEvent(c.b, c.Name(), c.Iface, received, dropped)) {
+				return nil
+			}
 		default:
 		}
 
@@ -188,12 +205,5 @@ func openSocket(iface string) (int, error) {
 }
 
 func htons(v uint16) uint16 { return v<<8 | v>>8 }
-
-func ifaceOrAll(name string) string {
-	if name == "" {
-		return "all"
-	}
-	return name
-}
 
 var _ collect.Collector = (*Collector)(nil)

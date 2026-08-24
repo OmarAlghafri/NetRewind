@@ -120,11 +120,10 @@ func (c *RouteCollector) Run(ctx context.Context, out chan<- *event.Event) error
 	done := make(chan struct{})
 	defer close(done)
 
-	opts := nl.RouteSubscribeOptions{
-		ErrorCallback: func(err error) {
-			c.log.Warn("netlink route subscription error", "err", err)
-		},
-	}
+	reporter := newOverflowReporter(c.b, c.log, c.Name())
+	reporter.bind(ctx, out)
+
+	opts := nl.RouteSubscribeOptions{ErrorCallback: reporter.callback}
 	if err := nl.RouteSubscribeWithOptions(updates, done, opts); err != nil {
 		return fmt.Errorf("netlink: subscribe to route updates: %w", err)
 	}
@@ -249,11 +248,10 @@ func (c *AddrCollector) Run(ctx context.Context, out chan<- *event.Event) error 
 	done := make(chan struct{})
 	defer close(done)
 
-	opts := nl.AddrSubscribeOptions{
-		ErrorCallback: func(err error) {
-			c.log.Warn("netlink address subscription error", "err", err)
-		},
-	}
+	reporter := newOverflowReporter(c.b, c.log, c.Name())
+	reporter.bind(ctx, out)
+
+	opts := nl.AddrSubscribeOptions{ErrorCallback: reporter.callback}
 	if err := nl.AddrSubscribeWithOptions(updates, done, opts); err != nil {
 		return fmt.Errorf("netlink: subscribe to address updates: %w", err)
 	}

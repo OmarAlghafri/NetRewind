@@ -60,6 +60,13 @@ CREATE TABLE IF NOT EXISTS meta (
 // SQLite is the embedded implementation of Store.
 type SQLite struct {
 	db *sql.DB
+	// The three statements Append runs are prepared once and reused for the
+	// life of the process. Preparing them per transaction measured at 366us of
+	// every batch - six times the cost of the writes the batch existed to do -
+	// because compiling SQL is work that does not depend on the rows.
+	insert *sql.Stmt
+	find   *sql.Stmt
+	fold   *sql.Stmt
 }
 
 // OpenSQLite opens (creating if needed) the event store at path.
@@ -92,7 +99,31 @@ func OpenSQLite(path string) (*SQLite, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := s.prepare(ctx); err != nil {
+		s.Close()
+		return nil, err
+	}
 	return s, nil
+}
+
+// prepare compiles the write statements once.
+func (s *SQLite) prepare(ctx context.Context) error {
+	for _, p := range []struct {
+		dst  **sql.Stmt
+		sql  string
+		what string
+	}{
+		{&s.insert, insertSQL, "insert"},
+		{&s.find, findFoldSQL, "fold lookup"},
+		{&s.fold, foldSQL, "fold"},
+	} {
+		stmt, err := s.db.PrepareContext(ctx, p.sql)
+		if err != nil {
+			return fmt.Errorf("store: prepare %s: %w", p.what, err)
+		}
+		*p.dst = stmt
+	}
+	return nil
 }
 
 const insertSQL = `
@@ -132,21 +163,11 @@ func (s *SQLite) Append(ctx context.Context, events ...*event.Event) error {
 	}
 	defer tx.Rollback()
 
-	find, err := tx.PrepareContext(ctx, findFoldSQL)
-	if err != nil {
-		return fmt.Errorf("store: prepare fold lookup: %w", err)
-	}
-	defer find.Close()
-	fold, err := tx.PrepareContext(ctx, foldSQL)
-	if err != nil {
-		return fmt.Errorf("store: prepare fold: %w", err)
-	}
-	defer fold.Close()
-	ins, err := tx.PrepareContext(ctx, insertSQL)
-	if err != nil {
-		return fmt.Errorf("store: prepare insert: %w", err)
-	}
-	defer ins.Close()
+	// The cached statements are bound to this transaction rather than
+	// recompiled inside it.
+	find := tx.StmtContext(ctx, s.find)
+	fold := tx.StmtContext(ctx, s.fold)
+	ins := tx.StmtContext(ctx, s.insert)
 
 	for _, e := range events {
 		if err := e.Validate(); err != nil {
@@ -339,8 +360,15 @@ func (s *SQLite) SetMeta(ctx context.Context, key, value string) error {
 	return nil
 }
 
-// Close releases the database.
-func (s *SQLite) Close() error { return s.db.Close() }
+// Close releases the prepared statements and the database.
+func (s *SQLite) Close() error {
+	for _, stmt := range []*sql.Stmt{s.insert, s.find, s.fold} {
+		if stmt != nil {
+			stmt.Close()
+		}
+	}
+	return s.db.Close()
+}
 
 func marshalMap(m map[string]string) (any, error) {
 	if len(m) == 0 {

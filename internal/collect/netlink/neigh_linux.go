@@ -84,11 +84,13 @@ func (c *NeighCollector) Run(ctx context.Context, out chan<- *event.Event) error
 	done := make(chan struct{})
 	defer close(done)
 
-	opts := nl.NeighSubscribeOptions{
-		ErrorCallback: func(err error) {
-			c.log.Warn("netlink neighbour subscription error", "err", err)
-		},
-	}
+	// An overrun here is the kernel throwing away neighbour changes - the
+	// exact moment worth recording is when a storm of them is most likely to
+	// outrun the socket.
+	reporter := newOverflowReporter(c.b, c.log, c.Name())
+	reporter.bind(ctx, out)
+
+	opts := nl.NeighSubscribeOptions{ErrorCallback: reporter.callback}
 	if err := nl.NeighSubscribeWithOptions(updates, done, opts); err != nil {
 		return fmt.Errorf("netlink: subscribe to neighbour updates: %w", err)
 	}

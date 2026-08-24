@@ -97,14 +97,12 @@ func (c *LinkCollector) Run(ctx context.Context, out chan<- *event.Event) error 
 	done := make(chan struct{})
 	defer close(done)
 
-	opts := nl.LinkSubscribeOptions{
-		ErrorCallback: func(err error) {
-			// A netlink read error is a hole in the record, not a fatal
-			// condition. It is logged here and turned into system.drop by the
-			// health collector once that exists.
-			c.log.Warn("netlink link subscription error", "err", err)
-		},
-	}
+	// An overrun here is the kernel throwing away changes, which is a hole in
+	// the record and has to be recorded as one.
+	reporter := newOverflowReporter(c.b, c.log, c.Name())
+	reporter.bind(ctx, out)
+
+	opts := nl.LinkSubscribeOptions{ErrorCallback: reporter.callback}
 	if err := nl.LinkSubscribeWithOptions(updates, done, opts); err != nil {
 		return fmt.Errorf("netlink: subscribe to link updates: %w", err)
 	}
