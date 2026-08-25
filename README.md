@@ -241,7 +241,7 @@ sudo make lab
 | **M1** | neighbours, routes, addresses; temporal identity; narrative queries; fault-injection lab | done |
 | **M2** | eBPF connection observation, rollups, `system.drop` | done |
 | **M2b** | nftables rule changes | done |
-| M2c | conntrack: connection lifetimes, resets, `flow.timeout_no_close` | |
+| **M2c** | resets and `flow.timeout_no_close` — reached through a second eBPF tracepoint rather than conntrack | done |
 | **M3** | Isnad correlation engine with backward cause matching, eighteen-rule library | done |
 | M4 | GNS3 lab wiring, public release | needs GNS3 |
 | **M5a** | Prometheus export, operating runbook | done |

@@ -148,7 +148,11 @@ secrets and personal paths before any of it becomes public.
 
 ### Not done
 
-- conntrack, for connection lifetimes beyond what the tracepoint gives
+- conntrack. The `sock/inet_sock_set_state` tracepoint sees sockets on *this*
+  host, so a recorder placed at the gateway watches its own connections and not
+  the ones it merely forwards between other machines. Connection observation is
+  therefore host-local today. conntrack is what would extend it to forwarded
+  traffic, and to UDP, which has no sockets to watch.
 - LLDP topology, and SNMP for switch state
 - An OpenTelemetry exporter and a bootable appliance image
 - Multiple recorders on one network
