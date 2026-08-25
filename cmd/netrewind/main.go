@@ -84,6 +84,9 @@ func newEventsCmd() *cobra.Command {
 			for _, k := range kinds {
 				f.Kinds = append(f.Kinds, event.Kind(k))
 			}
+			if err := checkFamilies(families); err != nil {
+				return err
+			}
 			f.Families = families
 
 			var err error
@@ -92,7 +95,7 @@ func newEventsCmd() *cobra.Command {
 			}
 
 			dbPath, _ := cmd.Flags().GetString("db")
-			st, err := store.OpenSQLite(dbPath)
+			st, err := store.OpenSQLiteRead(dbPath)
 			if err != nil {
 				return err
 			}
@@ -193,4 +196,20 @@ func summarise(attrs map[string]any) string {
 		parts = append(parts, fmt.Sprintf("%s=%v", k, attrs[k]))
 	}
 	return strings.Join(parts, " ")
+}
+
+// checkFamilies refuses a family this schema does not define.
+//
+// Accepting one and matching nothing would answer a misspelling with "no events
+// in this window" - the same words a genuinely quiet network produces. The
+// whole tool exists so that an absence of events means something, and it cannot
+// mean anything if a typo produces one.
+func checkFamilies(families []string) error {
+	for _, f := range families {
+		if !event.KnownFamily(f) {
+			return fmt.Errorf("%q is not an event family. Known families: %s",
+				f, strings.Join(event.Families, ", "))
+		}
+	}
+	return nil
 }

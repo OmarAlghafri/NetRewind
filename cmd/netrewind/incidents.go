@@ -34,7 +34,7 @@ func newIncidentsCmd() *cobra.Command {
 			"  netrewind incidents --rule gateway-hijack -o json",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			dbPath, _ := cmd.Flags().GetString("db")
-			st, err := store.OpenSQLite(dbPath)
+			st, err := store.OpenSQLiteRead(dbPath)
 			if err != nil {
 				return err
 			}

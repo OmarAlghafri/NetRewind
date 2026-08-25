@@ -149,3 +149,22 @@ const (
 	// like a network on which nothing of that kind happened.
 	KindCollectorDown Kind = "system.collector_down"
 )
+
+// Families are the nine layers an event can describe, in the order they are
+// documented. Enumerated rather than derived so a query tool can refuse a
+// misspelled one: --family l4 quietly matching nothing is indistinguishable
+// from a network on which nothing happened, which is the confusion this
+// project exists to remove.
+var Families = []string{
+	"link", "l2", "l3", "flow", "dhcp", "dns", "policy", "metric", "change", "system",
+}
+
+// KnownFamily reports whether a family is one this schema defines.
+func KnownFamily(name string) bool {
+	for _, f := range Families {
+		if f == name {
+			return true
+		}
+	}
+	return false
+}

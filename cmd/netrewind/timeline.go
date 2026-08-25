@@ -26,7 +26,7 @@ func newTimelineCmd() *cobra.Command {
 		Example: "  netrewind timeline --last 30m\n  netrewind timeline --last 2h --min-severity warn",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			dbPath, _ := cmd.Flags().GetString("db")
-			st, err := store.OpenSQLite(dbPath)
+			st, err := store.OpenSQLiteRead(dbPath)
 			if err != nil {
 				return err
 			}
@@ -72,7 +72,7 @@ func newWhatHappenedCmd() *cobra.Command {
 			from, to := centre.Add(-window), centre.Add(window)
 
 			dbPath, _ := cmd.Flags().GetString("db")
-			st, err := store.OpenSQLite(dbPath)
+			st, err := store.OpenSQLiteRead(dbPath)
 			if err != nil {
 				return err
 			}

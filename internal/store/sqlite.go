@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -156,6 +158,11 @@ const foldSQL = `UPDATE events SET count = count + ?, ts_last = ? WHERE event_id
 func (s *SQLite) Append(ctx context.Context, events ...*event.Event) error {
 	if len(events) == 0 {
 		return nil
+	}
+	if s.insert == nil {
+		// A store opened for reading. The query tool holds one of these, and
+		// the store is evidence: it must refuse rather than panic.
+		return errors.New("store: opened read-only; this store cannot be written to")
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -427,3 +434,52 @@ func quoteForLike(s string) string {
 
 // compile-time check
 var _ Store = (*SQLite)(nil)
+
+// OpenSQLiteRead opens an existing store for querying and refuses to create one.
+//
+// Two reasons, and both are about the same failure. The first is that a query
+// tool must not manufacture the thing it was asked to read: `netrewind events
+// --db /wrong/path.db` used to create an empty store and report "no events in
+// this window", which is indistinguishable from a network on which nothing
+// happened - exactly the confusion this project exists to remove. A mistyped
+// path now says so.
+//
+// The second is that the store is evidence. The tool that displays evidence has
+// no business modifying it, so the connection is put in query_only mode and the
+// schema is checked rather than applied.
+func OpenSQLiteRead(path string) (*SQLite, error) {
+	if _, err := os.Stat(path); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf(
+				"store: no event store at %s. Check the path, or start netrewindd to create one", path)
+		}
+		return nil, fmt.Errorf("store: %s: %w", path, err)
+	}
+
+	dsn := fmt.Sprintf(
+		"file:%s?_pragma=busy_timeout(5000)&_pragma=query_only(true)",
+		path,
+	)
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("store: open %s: %w", path, err)
+	}
+
+	// A file that exists but holds no events table is not an event store: a
+	// truncated copy, a wrong path that happens to name some other database, or
+	// something that was never one. Better to say so than to answer every
+	// question with silence.
+	var name string
+	err = db.QueryRow(
+		"SELECT name FROM sqlite_master WHERE type='table' AND name='events'").Scan(&name)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		db.Close()
+		return nil, fmt.Errorf("store: %s is a database, but not an event store: it has no events table", path)
+	case err != nil:
+		db.Close()
+		return nil, fmt.Errorf("store: %s cannot be read as an event store: %w", path, err)
+	}
+
+	return &SQLite{db: db}, nil
+}
