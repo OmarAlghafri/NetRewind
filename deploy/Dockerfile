@@ -18,12 +18,23 @@
 # own namespace, which is a network of one interface that nothing interesting
 # ever happens on - it would run, report nothing, and look like a quiet network.
 #
-# The tracing mount is what lets eBPF attach its tracepoint. Without it the flow
-# collector fails with a message saying exactly that, and the netlink collectors
-# carry on.
+# The tracing mount is what lets eBPF attach its tracepoint, and it only works
+# if the host actually has tracefs mounted there - check with
+# `mount | grep tracefs` before assuming it does. A bind mount of a path that
+# does not exist gives the container an empty directory rather than an error,
+# so this fails quietly if you skip that check.
+#
+# Docker Desktop on macOS and Windows runs containers inside a Linux VM that
+# does not mount tracefs at all, so connection observation is not available
+# there however the container is run. Everything netlink-based works.
+#
+# Either way the recorder says so rather than looking healthy: the flow
+# collector reports why it could not attach, and that becomes a
+# system.collector_down event in the record and an incident explaining that an
+# absence of connection failures proves nothing on this host.
 
 # ---- build ----------------------------------------------------------------
-FROM golang:1.24-alpine AS build
+FROM golang:1.26.6-alpine AS build
 
 WORKDIR /src
 
@@ -52,6 +63,7 @@ RUN apk add --no-cache nftables iproute2 ca-certificates && \
 COPY --from=build /out/netrewindd /usr/local/bin/netrewindd
 COPY --from=build /out/netrewind  /usr/local/bin/netrewind
 COPY rules/ /etc/netrewind/rules/
+COPY deploy/netrewindd.yaml /etc/netrewind/netrewindd.yaml
 
 # Runs as root by default because reading netlink and loading eBPF need
 # capabilities the container has to be granted anyway. The unprivileged user is
@@ -62,7 +74,16 @@ EXPOSE 8464 9464
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
     CMD netrewind events --db /var/lib/netrewind/events.db --last 1m --limit 1 >/dev/null || exit 1
 
+# No arguments: the image ships /etc/netrewind/netrewindd.yaml and the recorder
+# reads it on its own, so the container behaves like an installed one and there
+# is a single place to look. Override any of it with a flag, or mount your own
+# file over it.
+#
+# Metrics are deliberately not on by default. This image requires --network host
+# to see anything at all, and with it, binding metrics to 0.0.0.0 would publish
+# a description of the watched network to that same network. Turn them on when
+# you mean to:
+#
+#   docker run ... netrewind --metrics-addr 127.0.0.1:9464
+#
 ENTRYPOINT ["/usr/local/bin/netrewindd"]
-CMD ["--db", "/var/lib/netrewind/events.db", \
-     "--rules", "/etc/netrewind/rules", \
-     "--metrics-addr", "0.0.0.0:9464"]

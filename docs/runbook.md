@@ -68,6 +68,14 @@ not optional there: without it the recorder watches the container's own
 namespace, which is a network of one interface that nothing interesting ever
 happens on. It would run, report nothing, and look like a quiet network.
 
+Connection observation in a container needs the host to have tracefs mounted at
+`/sys/kernel/tracing`, bind-mounted in. Check with `mount | grep tracefs`
+first: bind-mounting a path the host does not have gives the container an empty
+directory rather than an error. Docker Desktop on macOS and Windows runs
+containers in a VM with no tracefs at all, so `flow.*` is unavailable there
+whatever you mount — the recorder records that fact rather than looking
+healthy.
+
 The unit grants only the four capabilities above, runs with `ProtectSystem=strict`
 and a private `/tmp`, and is exempted from the OOM killer's usual attention —
 the recorder has to survive the conditions it exists to record.
