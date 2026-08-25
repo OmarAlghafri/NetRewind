@@ -1,4 +1,5 @@
-# Running the recorder
+| `netrewind_store_writable` | it is 0 | The store is refusing writes and events are being lost right now. This is the one signal that still works when the store itself is what broke |
+| `netrewind_clock_steps_total` | it increases | The wall clock jumped. Timestamps either side of it are not comparable |# Running the recorder
 
 How to deploy NetRewind, where to put it, what to watch, and what to do with it
 when something breaks.

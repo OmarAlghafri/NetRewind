@@ -31,7 +31,6 @@ import (
 	"github.com/OmarAlghafri/netrewind/internal/correlate"
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/identity"
-	"github.com/OmarAlghafri/netrewind/internal/incident"
 	"github.com/OmarAlghafri/netrewind/internal/metrics"
 	"github.com/OmarAlghafri/netrewind/internal/store"
 )
@@ -147,7 +146,7 @@ func run(log *slog.Logger, cfg config) error {
 	writerDone := make(chan struct{})
 	go func() {
 		defer close(writerDone)
-		writer(context.WithoutCancel(ctx), st, engine, meter, queue, log)
+		writer(context.WithoutCancel(ctx), st, engine, meter, builder, queue, log)
 	}()
 
 	for _, e := range startupEvents {
@@ -216,73 +215,6 @@ func run(log *slog.Logger, cfg config) error {
 	close(queue)
 	<-writerDone
 	return nil
-}
-
-// writer drains the queue into the store in batches.
-//
-// It runs on a context that is deliberately not cancelled with the rest of the
-// daemon: on shutdown the collectors stop first, then the writer flushes what
-// they already produced. Dropping buffered events at exit would put an
-// unexplained hole at the end of every recording.
-func writer(ctx context.Context, st store.Store, engine *correlate.Engine, meter *metrics.Recorder, queue <-chan *event.Event, log *slog.Logger) {
-	ticker := time.NewTicker(flushInterval)
-	defer ticker.Stop()
-
-	batch := make([]*event.Event, 0, flushSize)
-
-	// Correlation runs over a batch only once that batch is durable, so an
-	// incident can never point at evidence that was never written. The cost is
-	// that an incident lags its last event by up to one flush interval, which
-	// is a better trade than a conclusion whose evidence is missing.
-	flush := func() {
-		if len(batch) == 0 {
-			return
-		}
-		if err := st.Append(ctx, batch...); err != nil {
-			log.Error("append failed", "events", len(batch), "err", err)
-			batch = batch[:0]
-			return
-		}
-		// Metrics are taken after the write, so a scrape never counts an event
-		// the store does not hold.
-		for _, e := range batch {
-			meter.Observe(e)
-		}
-		if engine != nil {
-			var incidents []*incident.Incident
-			for _, e := range batch {
-				incidents = append(incidents, engine.Offer(e)...)
-			}
-			if len(incidents) > 0 {
-				if err := st.AppendIncidents(ctx, incidents...); err != nil {
-					log.Error("could not store incidents", "err", err)
-				}
-				for _, inc := range incidents {
-					meter.ObserveIncident(inc)
-					log.Warn("incident", "title", inc.Title, "rule", inc.RuleID,
-						"severity", inc.Severity, "confidence", inc.Confidence, "links", len(inc.Chain))
-				}
-			}
-		}
-		batch = batch[:0]
-	}
-
-	for {
-		select {
-		case e, ok := <-queue:
-			if !ok {
-				flush()
-				return
-			}
-			log.Debug("event", "kind", e.Kind, "subject", e.Subject.Label)
-			batch = append(batch, e)
-			if len(batch) >= flushSize {
-				flush()
-			}
-		case <-ticker.C:
-			flush()
-		}
-	}
 }
 
 // checkGap compares the last recorded heartbeat with now and, if the recorder

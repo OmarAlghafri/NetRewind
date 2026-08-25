@@ -20,6 +20,7 @@ const (
 	ClockSteps     = "netrewind_clock_steps_total"
 	CollectorUp    = "netrewind_collector_up"
 	StoredEvents   = "netrewind_stored_events"
+	StoreWritable  = "netrewind_store_writable"
 	BuildInfo      = "netrewind_build_info"
 )
 
@@ -49,6 +50,8 @@ func NewRecorder(version, observerID string) *Recorder {
 		"Wall-clock jumps observed. Each one reorders the timeline for anyone reading it later.")
 	reg.Declare(CollectorUp, Gauge, "1 while a collector is running, 0 once it has stopped.")
 	reg.Declare(StoredEvents, Gauge, "Events currently held in the store.")
+	reg.Declare(StoreWritable, Gauge,
+		"1 while the event store accepts writes. 0 means events are being lost right now.")
 
 	reg.Set(BuildInfo, Labels{"version": version, "observer": observerID}, 1)
 
@@ -62,6 +65,12 @@ func NewRecorder(version, observerID string) *Recorder {
 	reg.Add(BlindSeconds, nil, 0)
 	reg.Add(ClockSteps, nil, 0)
 	reg.Add(DroppedTotal, Labels{"source": "ringbuf"}, 0)
+
+	// The store is assumed writable until a write fails. Starting at zero would
+	// make every recorder look broken for the first few hundred milliseconds of
+	// its life, and an alert that fires on every restart is an alert that gets
+	// silenced.
+	reg.Set(StoreWritable, nil, 1)
 
 	return &Recorder{reg: reg}
 }
@@ -110,6 +119,20 @@ func (r *Recorder) SetCollector(name string, up bool) {
 		v = 1
 	}
 	r.reg.Set(CollectorUp, Labels{"collector": name}, v)
+}
+
+// SetStoreWritable records whether the store is currently accepting writes.
+//
+// This is the one signal that still works when the store is the thing that
+// broke: a system.drop event cannot be written to a store that will not take
+// writes, so the counter describing the loss cannot move until it recovers.
+// This gauge can, and it goes to zero the moment events start being lost.
+func (r *Recorder) SetStoreWritable(ok bool) {
+	v := 0.0
+	if ok {
+		v = 1
+	}
+	r.reg.Set(StoreWritable, nil, v)
 }
 
 // SetStoredEvents records how much history is currently held.
