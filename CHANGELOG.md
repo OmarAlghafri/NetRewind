@@ -76,9 +76,14 @@ separate answers.
   connection collector, and the record would otherwise show no connection
   failures on a host where connections were never being watched. The reason is
   attached, and a rule states plainly what cannot be concluded from the quiet.
-- All three are exported as Prometheus counters, and all start at zero rather
-  than appearing on first failure — a series that springs into existence when
-  something breaks cannot be alerted on before it.
+- Events the store itself refuses — a full disk, most often — are counted while
+  it is broken and admitted in the first write that succeeds. The account
+  cannot be written to the thing that is broken, so it waits.
+- All of these are exported as Prometheus counters, and all start at zero
+  rather than appearing on first failure — a series that springs into existence
+  when something breaks cannot be alerted on before it. `netrewind_store_writable`
+  is the exception that has to be a gauge: it is the one signal that still works
+  when the store is what broke.
 - A folded event contributes its occurrence count to metrics, not one, so they
   do not under-report exactly when things are worst.
 
@@ -101,6 +106,12 @@ from the same principle as the rest of the project:
 `events`, `timeline`, `what-happened`, `incidents`, `rules`, and `serve` — a
 server-rendered web interface with no JavaScript, embedded in the same static
 binary, read-only, with the blind-spot banner on every page.
+
+Reading is read-only in SQLite's own terms, not by convention: the store is
+evidence and the tool that displays it cannot alter it. Nor can it invent it —
+querying a path with no store there says so instead of creating an empty one
+and reporting "no events in this window", which was indistinguishable from a
+quiet network. A misspelled `--family` is refused for the same reason.
 
 ### Delivery
 
@@ -125,7 +136,15 @@ by an ARP change and another broken by a filtering rule, a rogue DHCP server, a
 redirected resolver, and measured packet loss — and checks both that every one
 can be found in the record afterwards and that correlation named the cause. It
 runs in CI, alongside a load job that verifies the store absorbs five thousand
-events a second. 173 tests.
+events a second and a govulncheck job. 198 tests.
+
+Beyond the lab, each of these was run rather than assumed: the release tarball
+unpacked and installed onto a clean host; the container image built, started,
+recorded, and served its web interface; a fresh clone built, vetted and tested
+with an empty cache; both eBPF programs confirmed loaded and JIT-compiled in
+the kernel with bpftool; a recorder stopped and restarted to confirm the gap is
+measured and reported; and the whole history scanned for real addresses,
+secrets and personal paths before any of it becomes public.
 
 ### Not done
 
