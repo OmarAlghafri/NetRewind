@@ -257,6 +257,9 @@ sudo make lab
 - [Contributing](CONTRIBUTING.md) — the most valuable thing you can add is a rule, and it needs no Go
 - [Changelog](CHANGELOG.md) — what this version does, and what it does not
 
+There is also a [site](https://github.com/OmarAlghafri/NetRewind_website) that
+introduces the project, if you want the shape of it before the detail.
+
 ## Licence
 
 AGPL-3.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

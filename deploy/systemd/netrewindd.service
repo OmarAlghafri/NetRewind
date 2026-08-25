@@ -1,6 +1,6 @@
 [Unit]
 Description=NetRewind network black box recorder
-Documentation=https://github.com/OmarAlghafri/netrewind
+Documentation=https://github.com/OmarAlghafri/NetRewind
 After=network-pre.target
 Wants=network-pre.target
 
