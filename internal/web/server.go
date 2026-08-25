@@ -18,7 +18,6 @@ import (
 	"html/template"
 	"io/fs"
 	"log/slog"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -26,6 +25,7 @@ import (
 
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/incident"
+	"github.com/OmarAlghafri/netrewind/internal/listen"
 	"github.com/OmarAlghafri/netrewind/internal/store"
 )
 
@@ -77,16 +77,16 @@ func (s *Server) Handler() http.Handler {
 
 // Serve builds the HTTP server. The caller owns its lifetime.
 func (s *Server) Serve(addr string) *http.Server {
-	if host, _, err := net.SplitHostPort(addr); err == nil && !isLoopback(host) {
-		// Said once, loudly. Nobody should discover this from a scan.
-		s.log.Warn("the web interface is bound beyond loopback and has no authentication",
-			"addr", addr)
-	}
+	listen.WarnIfExposed(s.log, addr, "web interface")
 	return &http.Server{
 		Addr:              addr,
 		Handler:           s.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		// A client that reads a page one byte at a time would otherwise hold a
+		// connection for as long as it liked. Thirty seconds is far more than
+		// the largest page takes and far less than forever.
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 }
 
@@ -334,14 +334,6 @@ func unique(in []string) []string {
 		out = append(out, v)
 	}
 	return out
-}
-
-func isLoopback(host string) bool {
-	if host == "" || host == "localhost" {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
 }
 
 func cacheForever(h http.Handler) http.Handler {

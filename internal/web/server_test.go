@@ -262,19 +262,6 @@ func TestStaticAssetsAreServedFromTheBinary(t *testing.T) {
 	}
 }
 
-func TestLoopbackDetection(t *testing.T) {
-	for _, host := range []string{"127.0.0.1", "::1", "localhost", ""} {
-		if !isLoopback(host) {
-			t.Errorf("isLoopback(%q) = false", host)
-		}
-	}
-	for _, host := range []string{"0.0.0.0", "192.168.1.5", "10.0.0.1"} {
-		if isLoopback(host) {
-			t.Errorf("isLoopback(%q) = true", host)
-		}
-	}
-}
-
 func excerpt(s string) string {
 	if len(s) > 900 {
 		return s[:900] + "..."

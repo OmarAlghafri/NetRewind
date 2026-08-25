@@ -2,6 +2,8 @@ module github.com/OmarAlghafri/netrewind
 
 go 1.25.0
 
+toolchain go1.26.6
+
 require (
 	github.com/cilium/ebpf v0.22.0
 	github.com/oklog/ulid/v2 v2.1.2
@@ -26,3 +28,16 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
+
+// The toolchain line, rather than a raised go line, is deliberate.
+//
+// go1.26.6 is the first release carrying fixes for an escaper bypass in
+// html/template - which this project renders network-supplied strings through -
+// and for the header timeout on unencrypted HTTP/2. Builds and releases must
+// use it, and the toolchain directive is what makes that happen.
+//
+// Raising the go directive instead would have the same effect on a normal
+// machine and break every distro that sets GOTOOLCHAIN=local. Alpine does,
+// because upstream Go toolchains are linked against glibc and will not run on
+// musl, so its packaged Go cannot fetch a newer one. The go line therefore
+// stays at the language version actually required.

@@ -118,7 +118,7 @@ func run(log *slog.Logger, cfg config) error {
 	defer stop()
 
 	if cfg.MetricsAddr != "" {
-		srv, err := meter.Serve(cfg.MetricsAddr)
+		srv, err := meter.Serve(cfg.MetricsAddr, log)
 		if err != nil {
 			return err
 		}

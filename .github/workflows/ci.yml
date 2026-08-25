@@ -44,6 +44,15 @@ jobs:
       - name: build static binaries
         run: CGO_ENABLED=0 make linux
 
+      # A recorder is only as trustworthy as what it is built from, and the web
+      # interface renders strings the watched network supplies - hostnames, DNS
+      # names, nftables rule text - through html/template. A stdlib escaping bug
+      # is not somebody else's problem here.
+      - name: known vulnerabilities
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
   load:
     name: sustained write rate
     # Its own job on purpose. These measure throughput, and running them

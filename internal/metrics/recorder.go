@@ -2,11 +2,13 @@ package metrics
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/incident"
+	"github.com/OmarAlghafri/netrewind/internal/listen"
 )
 
 // Metric names. The prefix is fixed so a scrape can be attributed at a glance.
@@ -130,17 +132,24 @@ func (r *Recorder) Handler() http.Handler {
 // It listens on its own address rather than sharing one with anything else: the
 // recorder has no other network surface, and giving it one that could be
 // reached from the network it is watching would be a poor trade.
-func (r *Recorder) Serve(addr string) (*http.Server, error) {
+func (r *Recorder) Serve(addr string, log *slog.Logger) (*http.Server, error) {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", r.Handler())
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "ok")
 	})
 
+	// The endpoint says how much the recorder saw, of what kind, and which of
+	// its sources are alive. That is a description of the watched network, and
+	// there is no authentication on it.
+	listen.WarnIfExposed(log, addr, "metrics endpoint")
+
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 	return srv, nil
 }
