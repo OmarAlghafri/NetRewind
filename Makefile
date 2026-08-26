@@ -176,6 +176,47 @@ metrics:
 PLATFORMS := linux/amd64 linux/arm64
 DIST      := dist
 
+# ---------------------------------------------------------------------------
+# Signing
+# ---------------------------------------------------------------------------
+#
+# Checksums prove a download arrived as the server sent it. They do not prove
+# who built it: anyone who can publish a release can publish checksums for it.
+# A signature made with a key that never touches CI is what turns the update
+# channel from "trust whoever holds the repository" into something an operator
+# can reason about, and it is the difference that matters most on a recorder
+# that installs its own replacements.
+#
+# The key lives outside the repository and outside CI. That is the whole point:
+# a key CI can reach is a key a CI compromise can sign with.
+SIGNING_KEY ?= $(HOME)/.netrewind/signing.key
+
+.PHONY: signing-key
+signing-key:
+	@test ! -f $(SIGNING_KEY) || { \
+	  echo "$(SIGNING_KEY) already exists. Refusing to overwrite it:"; \
+	  echo "every release signed with the old key would stop verifying."; exit 1; }
+	@mkdir -p $(dir $(SIGNING_KEY))
+	@openssl genpkey -algorithm ed25519 -out $(SIGNING_KEY)
+	@chmod 600 $(SIGNING_KEY)
+	@echo "wrote $(SIGNING_KEY)"
+	@echo
+	@echo "Back this up somewhere offline now. Losing it means every recorder"
+	@echo "configured with the matching public key stops accepting updates, and"
+	@echo "there is no way to recover it. Never commit it and never put it in CI."
+	@echo
+	@$(MAKE) --no-print-directory signing-pubkey
+
+# The public half, in the form netrewindd.yaml wants. The raw ed25519 key is
+# the last 32 bytes of the DER encoding; crypto/ed25519 takes nothing else.
+.PHONY: signing-pubkey
+signing-pubkey:
+	@test -f $(SIGNING_KEY) || { echo "no key at $(SIGNING_KEY); run 'make signing-key'"; exit 1; }
+	@echo "put this in /etc/netrewind/netrewindd.yaml:"
+	@echo
+	@echo "update:"
+	@echo "  public_key: \"$$(openssl pkey -in $(SIGNING_KEY) -pubout -outform DER | tail -c 32 | base64 | tr -d '\n')\""
+
 .PHONY: release
 release: test
 	rm -rf $(DIST) && mkdir -p $(DIST)
@@ -199,5 +240,33 @@ release: test
 	  rm -rf $$stage; \
 	done
 	@cd $(DIST) && sha256sum *.tar.gz > SHA256SUMS && cat SHA256SUMS
+	@$(MAKE) --no-print-directory sign
 	@echo
 	@ls -lh $(DIST)/*.tar.gz
+
+# Sign the checksums, and then verify the signature with the same code the
+# recorder uses to check it.
+#
+# Signing without verifying is how you publish a release that every updater
+# refuses: openssl's ed25519 needs -rawin, and without it the signature is over
+# a hash of the file rather than the file, which nothing accepts. Better to
+# find that here than to find it from the field.
+.PHONY: sign
+sign:
+	@test -f $(DIST)/SHA256SUMS || { echo "nothing to sign; run 'make release'"; exit 1; }
+	@# One shell block on purpose: make runs each recipe line in its own shell,
+	@# so an `exit 0` on the "no key" path would end that line and then carry
+	@# straight on into the signing below.
+	@if [ ! -f $(SIGNING_KEY) ]; then \
+	  echo; \
+	  echo "!! no signing key at $(SIGNING_KEY) - this release will be UNSIGNED."; \
+	  echo "   Any recorder configured with update.public_key will refuse it."; \
+	  echo "   Run 'make signing-key' to create one."; \
+	else \
+	  openssl pkeyutl -sign -inkey $(SIGNING_KEY) -rawin \
+	      -in $(DIST)/SHA256SUMS -out $(DIST)/SHA256SUMS.sig || exit 1; \
+	  go run ./internal/update/cmd/verifysig \
+	      "$$(openssl pkey -in $(SIGNING_KEY) -pubout -outform DER | tail -c 32 | base64 | tr -d '\n')" \
+	      $(DIST)/SHA256SUMS $(DIST)/SHA256SUMS.sig || exit 1; \
+	  echo "signed $(DIST)/SHA256SUMS -> SHA256SUMS.sig"; \
+	fi
