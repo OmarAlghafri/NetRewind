@@ -49,7 +49,7 @@ identity table quietly conflates an attacker with its victim.
 
 ### Correlation — the Isnad engine
 
-Eighteen rules, as YAML files rather than code. Every link in a chain names the
+Nineteen rules, as YAML files rather than code. Every link in a chain names the
 event it rests on and states whether it *caused* the next one, merely
 *correlated* with it, or only *preceded* it. Optional clauses placed before a
 rule's first required clause are searched **backwards** in time, nearest first,

@@ -261,11 +261,11 @@ sudo make lab
 | **M2** | eBPF connection observation, rollups, `system.drop` | done |
 | **M2b** | nftables rule changes | done |
 | **M2c** | resets and `flow.timeout_no_close` — reached through a second eBPF tracepoint rather than conntrack | done |
-| **M3** | Isnad correlation engine with backward cause matching, eighteen-rule library | done |
-| M4 | GNS3 lab wiring, public release | needs GNS3 |
+| **M3** | Isnad correlation engine with backward cause matching, nineteen-rule library | done |
+| **M4** | GNS3 lab: three routers in OSPF, two switches with real VLANs and a trunk, the recorder on an access port | done |
 | **M5a** | Prometheus export, operating runbook | done |
 | **M5b** | web interface, release packaging for amd64 and arm64, container image | done |
-| M5c | OpenTelemetry export | done |
+| **M5c** | OpenTelemetry export | done |
 | **M5d** | bootable appliance image, booted and verified in QEMU | done |
 
 ## Documentation
