@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.0 — unreleased
+## 0.8.0 — 2026-08-26
 
 The first version that does everything the project set out to do: record state
 changes, tie them to machines across address changes, notice when a working path
