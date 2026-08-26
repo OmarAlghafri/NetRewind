@@ -9,7 +9,10 @@
 package correlate
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -230,8 +233,18 @@ func LoadRule(path string) (*Rule, error) {
 	if err != nil {
 		return nil, fmt.Errorf("correlate: read %s: %w", path, err)
 	}
+	// Unknown keys are refused rather than ignored.
+	//
+	// A rule is the one part of this system people are meant to write, and a
+	// misspelled key is the quietest way to get it wrong: the rule loads, the
+	// engine reports it as active, and the clause the author thought they had
+	// written is simply not there. The rule then never fires, or fires far too
+	// often, and nothing anywhere says why. This was found by writing a rule
+	// with a key that does not exist and watching it load cleanly.
 	var r Rule
-	if err := yaml.Unmarshal(data, &r); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&r); err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("correlate: parse %s: %w", path, err)
 	}
 	if err := r.Validate(); err != nil {

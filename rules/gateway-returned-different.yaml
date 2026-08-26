@@ -1,0 +1,40 @@
+id: gateway-returned-different
+title: The gateway came back, but as a different machine
+severity: error
+confidence: 85
+window: 600s
+root_cause: returned
+advice: >-
+  Reachability was restored, so monitoring has gone quiet and the incident looks
+  closed. It is not: the address is the same and the machine behind it is not,
+  so every host on this segment is now sending its outbound traffic somewhere it
+  was not sending it before. Find the switch port the new hardware address is
+  learned on. If a router was rebooted or a failover ran, this is that, and it
+  can be closed. If nothing was scheduled, something took the address while the
+  real gateway was unreachable, and the outage was the cover rather than the
+  fault.
+match:
+  # Placed before the required clause on purpose: clauses above the anchor are
+  # searched backwards in time from it. The gateway stopping is what happened
+  # first, and finding it is the whole point.
+  - as: gap
+    kinds: [l2.neighbor_failed, metric.anomaly]
+    optional: true
+    why: >-
+      The gateway had stopped answering first. That is what let the binding be
+      replaced rather than changed, and it is why the substitution is easy to
+      miss: the outage takes all the attention, and the new machine arrives
+      with the recovery.
+  - as: returned
+    kinds: [l2.arp_binding_new]
+    relation: precedes
+    where:
+      attrs:
+        is_gateway: "true"
+        address_changed_hands: "true"
+    why: >-
+      The default gateway is answering again, from hardware that has not held
+      this address before. Recorded as a first sighting rather than a change
+      because the old binding failed before the new one arrived - which is
+      precisely what one router losing an address and another picking it up
+      looks like from the segment.
