@@ -112,10 +112,15 @@ different causes and completely different fixes.
 
 ### `flow.*` — layer 4, from eBPF and conntrack
 
-**`first_failure_for_pair`** ⭐⭐ · **`handshake_fail`** ⭐ · `rollup` —
-implemented. `open` · `close` · `reset` · `timeout_no_close` ·
-`retransmit_spike` — planned, and needing conntrack rather than the state
-tracepoint.
+**`first_failure_for_pair`** ⭐⭐ · **`handshake_fail`** ⭐ · `rollup` ·
+`reset` · `timeout_no_close` — all from two eBPF tracepoints.
+`retransmit_spike` is the one still outstanding; it needs
+`tcp_retransmit_skb`, which is not attached.
+
+There is no `open` or `close`. Recording that a connection began and ended
+would be recording traffic rather than change, which is the line this schema
+draws everywhere else, and a busy segment would bury everything worth keeping
+under it. What is kept is how connections *ended badly*.
 
 `first_failure_for_pair` is the strongest single signal in the system. An
 unanswered connection on its own is ordinary — closed ports are closed. An
@@ -242,7 +247,7 @@ against, so the gap is written down rather than glossed over.
 | `link.flap` | netlink | Three carrier losses inside five minutes: the link itself is faulty |
 | `link.mtu_changed` | netlink | The MTU changed, which breaks large transfers while leaving ping working |
 | `link.error_rate_high` | netlink | Interface counters show over 1% of packets in error |
-| `l2.arp_binding_new` | netlink | An address answered at layer 2 for the first time |
+| `l2.arp_binding_new` | netlink | An address answered at layer 2 for the first time. Carries `address_changed_hands` when the identity table has seen it before on other hardware, which is a substitution rather than an arrival |
 | `l2.arp_binding_changed` ⭐ | netlink | A different machine now answers for an address |
 | `l2.mac_moved` | netlink | The same hardware address is now behind a different interface |
 | `l2.duplicate_ip` | netlink | One address is being claimed by two machines |

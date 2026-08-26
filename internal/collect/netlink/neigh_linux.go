@@ -178,22 +178,11 @@ func (c *NeighCollector) diff(ctx context.Context, u nl.NeighUpdate) []*event.Ev
 			WithDedup("l2.arp_binding_new|" + ip)
 		c.stampIdentity(ctx, e, ip, mac)
 
-		// A first sighting is ordinary. An address the identity table has seen
-		// before, now answered by different hardware, is not - it only looks
-		// like a first sighting because the old entry failed before the new one
-		// arrived, which is exactly what a router losing an address and another
-		// picking it up produces.
-		//
-		// Reported at info, that reads as a machine appearing. On the default
-		// gateway it means every host on the segment is now sending its
-		// outbound traffic somewhere else, and severity has to say so or nobody
-		// filtering the record will ever see it.
-		if changed, _ := e.Attrs["address_changed_hands"].(bool); changed {
-			e.Severity = event.SevWarn
-			if gw {
-				e.Severity = event.SevError
-			}
-		}
+		// Severity is decided after the identity table has been consulted,
+		// because whether this address has been seen before on other hardware
+		// is the whole question. See firstSightingSeverity.
+		changed, _ := e.Attrs["address_changed_hands"].(bool)
+		e.Severity = firstSightingSeverity(changed, gw)
 		return []*event.Event{e}
 	}
 
