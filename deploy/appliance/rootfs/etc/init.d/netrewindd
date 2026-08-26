@@ -1,0 +1,36 @@
+#!/sbin/openrc-run
+
+name="netrewindd"
+description="NetRewind network black box recorder"
+
+command="/usr/local/bin/netrewindd"
+command_background="yes"
+pidfile="/run/netrewindd.pid"
+output_log="/var/log/netrewindd.log"
+error_log="/var/log/netrewindd.log"
+
+depend() {
+    need net
+    after firewall chronyd
+}
+
+start_pre() {
+    checkpath -d -m 0750 /var/lib/netrewind
+    checkpath -f -m 0640 /var/log/netrewindd.log
+
+    # Refuse to start on a configuration the recorder cannot use, rather than
+    # starting one that records the wrong thing. The same check the systemd
+    # unit runs, for the same reason.
+    if ! "$command" --check-config >/dev/null 2>&1; then
+        eerror "the configuration in /etc/netrewind is not usable:"
+        "$command" --check-config 2>&1 | while read -r line; do eerror "  $line"; done
+        return 1
+    fi
+}
+
+stop_post() {
+    # The recorder writes a stop marker on a clean shutdown, which is what
+    # tells a later gap check that the absence was deliberate rather than a
+    # crash. Give it a moment to finish.
+    sleep 1
+}

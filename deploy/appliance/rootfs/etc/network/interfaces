@@ -1,0 +1,12 @@
+# Every interface comes up on DHCP.
+#
+# An appliance is plugged into a segment somebody else runs, and asking them to
+# assign it an address before it can start recording is asking them to do work
+# during the incident that made them plug it in. It records whether or not it
+# gets a lease: the netlink and packet collectors need no address at all.
+
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp

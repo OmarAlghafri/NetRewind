@@ -1,0 +1,46 @@
+#!/sbin/openrc-run
+
+name="netrewind-firstboot"
+description="Prepare the appliance the first time it boots"
+
+depend() {
+    before netrewindd
+    after localmount
+}
+
+start() {
+    [ -f /var/lib/netrewind/.provisioned ] && return 0
+
+    ebegin "preparing the appliance"
+
+    # Grow the filesystem to the disk it was actually written to. The image is
+    # built small so it copies quickly; the disk underneath is usually far
+    # bigger, and an appliance that only ever used 1.5 GB of a 500 GB SSD would
+    # be keeping a week of history where it could keep years.
+    root_dev=$(findmnt -no SOURCE / 2>/dev/null)
+    case "$root_dev" in
+        /dev/*[0-9])
+            disk=$(echo "$root_dev" | sed 's/p\?[0-9]*$//')
+            part=$(echo "$root_dev" | grep -o '[0-9]*$')
+            if [ -b "$disk" ]; then
+                echo ",+" | sfdisk --no-reread --force -N "$part" "$disk" >/dev/null 2>&1
+                partx -u "$disk" >/dev/null 2>&1
+                resize2fs "$root_dev" >/dev/null 2>&1
+            fi
+            ;;
+    esac
+
+    # An observer id that is stable for this box and distinguishable from every
+    # other one. Events say which recorder produced them, and two appliances
+    # both calling themselves "netrewind" would make a shared store useless.
+    if ! grep -qE '^observer_id:' /etc/netrewind/netrewindd.yaml; then
+        suffix=$(cat /sys/class/net/*/address 2>/dev/null | grep -v '00:00:00:00:00:00' \
+            | head -1 | tr -d ':' | tail -c 7)
+        [ -n "$suffix" ] || suffix=$(head -c 3 /dev/urandom | od -An -tx1 | tr -d ' \n')
+        echo "observer_id: netrewind-$suffix" >> /etc/netrewind/netrewindd.yaml
+    fi
+
+    mkdir -p /var/lib/netrewind
+    touch /var/lib/netrewind/.provisioned
+    eend 0
+}

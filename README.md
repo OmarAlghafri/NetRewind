@@ -157,7 +157,7 @@ has gone deaf and a network that has gone quiet look identical from the outside.
   Prometheus client library
 
 Planned next: conntrack, so a recorder at the gateway sees the connections it
-forwards and not only its own, and a bootable appliance image.
+forwards and not only its own.
 
 ## How it is different
 
@@ -227,6 +227,16 @@ tar -xzf netrewind-0.8.0-linux-arm64.tar.gz
 cd netrewind-0.8.0-linux-arm64 && sudo ./install.sh
 ```
 
+Or write the **appliance image** to a USB stick and boot a spare machine into a
+recorder — nothing to install, nothing to configure, recording from first boot:
+
+```bash
+sudo make image
+qemu-system-x86_64 -m 512 -drive file=dist/netrewind-appliance.img,format=raw -nographic
+```
+
+178 MB compressed. See [deploy/appliance](deploy/appliance/README.md).
+
 Built for `linux/amd64` and `linux/arm64` — the same eBPF object serves both,
 because the program is architecture-neutral bytecode and the cheapest hardware
 this is meant to run on is a Raspberry Pi. There is a
@@ -256,7 +266,7 @@ sudo make lab
 | **M5a** | Prometheus export, operating runbook | done |
 | **M5b** | web interface, release packaging for amd64 and arm64, container image | done |
 | M5c | OpenTelemetry export | done |
-| M5d | bootable appliance image | |
+| **M5d** | bootable appliance image, booted and verified in QEMU | done |
 
 ## Documentation
 

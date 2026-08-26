@@ -114,6 +114,11 @@ bpf:
 	clang -O2 -g -target bpf -Wall -Werror -c $(BPF_SRC) -o $(BPF_OBJ)
 	@echo "built $(BPF_OBJ)"
 
+# The bootable appliance. Linux and root: it needs loop devices and mount.
+.PHONY: image
+image:
+	sudo deploy/appliance/build-image.sh --out $(DIST)/netrewind-appliance.img
+
 .PHONY: kernel-check
 kernel-check:
 	sudo lab/check-kernel.sh

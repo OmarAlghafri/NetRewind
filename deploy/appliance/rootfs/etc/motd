@@ -1,0 +1,17 @@
+
+  NetRewind appliance
+
+  This box is recording what changes on the segment it is plugged into.
+
+    netrewind timeline --last 15m       what happened, narrated
+    netrewind incidents --last 24h      what it concluded, and on what evidence
+    netrewind events --family system    whether it has had any blind spots
+    netrewind serve --addr 0.0.0.0:8464 read it in a browser
+
+  The record is at /var/lib/netrewind/events.db. Configuration is
+  /etc/netrewind/netrewindd.yaml; run `netrewindd --check-config` after
+  editing it, and `rc-service netrewindd restart` to apply it.
+
+  There is no sshd. The console is the only way in, which is deliberate for a
+  box whose job is to watch a network it does not trust.
+

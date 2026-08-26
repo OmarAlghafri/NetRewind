@@ -147,6 +147,20 @@ hardware, twice what the plan called for, and answers queries during the burst.
 Repeats fold, so ten thousand transitions of one flapping port become a handful
 of rows carrying an occurrence count rather than ten thousand rows.
 
+### The appliance
+
+A bootable disk image that comes up recording: write it to a USB stick, plug a
+spare machine into the segment, and there is nothing to install and nothing to
+configure before there is a record. Alpine, syslinux, OpenRC, 178 MB
+compressed. On first boot it grows the filesystem to whatever disk it was
+written to, takes an observer id from its own hardware address, and brings
+every interface up on DHCP - because an appliance is plugged into somebody
+else's segment, and needing an address assigned first is asking for work during
+the incident that caused it to be plugged in.
+
+There is no sshd. The console is the only way in, which is deliberate for a box
+whose job is to watch a network it has no reason to trust.
+
 ### Proven by
 
 A synthetic lab that builds a topology in network namespaces, injects fourteen
@@ -174,5 +188,4 @@ secrets and personal paths before any of it becomes public.
   therefore host-local today. conntrack is what would extend it to forwarded
   traffic, and to UDP, which has no sockets to watch.
 - LLDP topology, and SNMP for switch state
-- A bootable appliance image
 - Multiple recorders on one network
