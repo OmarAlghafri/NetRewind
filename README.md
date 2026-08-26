@@ -8,10 +8,13 @@ of an outage after it is over, when the evidence would normally be gone.
 > deployed to production hardware.
 
 **Status: layers 1–4 recorded, correlated, and proven end to end.** A synthetic
-lab injects eleven real faults — a flapping port, a hijacked gateway, a contested
-address, a re-pointed route, a vanished default, a path broken under a working
-connection — and checks both that every one is reconstructed from the record and
-that correlation names the cause. See [the roadmap](#roadmap).
+lab in network namespaces injects fourteen real faults — a flapping port, a
+hijacked gateway, a contested address, a re-pointed route, a vanished default, a
+rogue DHCP server, a path broken under a working connection — and checks both
+that every one is reconstructed from the record and that correlation names the
+cause. A GNS3 topology of Cisco routers and switches covers what namespaces
+cannot: real VLANs, real OSPF, and a gateway address moving between two physical
+routers. See [the roadmap](#roadmap).
 
 ## The problem
 
@@ -147,8 +150,14 @@ has gone deaf and a network that has gone quiet look identical from the outside.
   The blind-spot banner is on every page rather than a panel someone has to
   think to open
 
-Planned next: conntrack for connection lifetimes and resets, an OpenTelemetry
-exporter, and a bootable appliance image.
+- Copies the record to an **OpenTelemetry collector** if you run one, so network
+  change arrives in the same pipeline as everything else and an application
+  incident can be lined up against what the network did underneath it. OTLP over
+  HTTP, encoded by hand - there is no SDK here, for the same reason there is no
+  Prometheus client library
+
+Planned next: conntrack, so a recorder at the gateway sees the connections it
+forwards and not only its own, and a bootable appliance image.
 
 ## How it is different
 
@@ -246,7 +255,8 @@ sudo make lab
 | M4 | GNS3 lab wiring, public release | needs GNS3 |
 | **M5a** | Prometheus export, operating runbook | done |
 | **M5b** | web interface, release packaging for amd64 and arm64, container image | done |
-| M5c | OpenTelemetry export, bootable appliance image | |
+| M5c | OpenTelemetry export | done |
+| M5d | bootable appliance image | |
 
 ## Documentation
 

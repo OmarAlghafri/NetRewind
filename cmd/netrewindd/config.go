@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -30,14 +31,19 @@ const DefaultConfigPath = "/etc/netrewind/netrewindd.yaml"
 // operator debugging a running service expects when they add one flag to
 // override one line.
 type config struct {
-	DBPath         string `yaml:"db"`
-	ObserverID     string `yaml:"observer_id"`
-	RulesDir       string `yaml:"rules"`
-	MetricsAddr    string `yaml:"metrics_addr"`
-	WireIface      string `yaml:"wire_iface"`
-	ProbeTargets   string `yaml:"probe"`
-	LogLevel       string `yaml:"log_level"`
-	RecordDNSNames bool   `yaml:"record_dns_names"`
+	DBPath       string `yaml:"db"`
+	ObserverID   string `yaml:"observer_id"`
+	RulesDir     string `yaml:"rules"`
+	MetricsAddr  string `yaml:"metrics_addr"`
+	WireIface    string `yaml:"wire_iface"`
+	ProbeTargets string `yaml:"probe"`
+	// OTLPEndpoint is an OpenTelemetry collector to copy the record to, e.g.
+	// http://localhost:4318. Empty means no export, which is the default: an
+	// appliance should not talk to anything nobody asked it to talk to.
+	OTLPEndpoint   string            `yaml:"otlp_endpoint"`
+	OTLPHeaders    map[string]string `yaml:"otlp_headers"`
+	LogLevel       string            `yaml:"log_level"`
+	RecordDNSNames bool              `yaml:"record_dns_names"`
 
 	// CheckOnly comes from --check-config and never from the file. It is what
 	// the systemd unit runs before starting, so a configuration the recorder
@@ -100,6 +106,7 @@ func loadConfig(fs *flag.FlagSet, args []string) (config, error) {
 		wireIface      = fs.String("wire-iface", "", "capture DHCP, DNS and ICMP on this interface; empty means all")
 		recordDNSNames = fs.Bool("record-dns-names", false, "store the names looked up. Off by default: there are networks where recording them is not permitted")
 		probeTargets   = fs.String("probe", "", "addresses to measure reachability to; empty follows the default gateway")
+		otlpEndpoint   = fs.String("otlp-endpoint", "", "copy the record to this OpenTelemetry collector, e.g. http://localhost:4318; empty disables it")
 	)
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
@@ -138,6 +145,8 @@ func loadConfig(fs *flag.FlagSet, args []string) (config, error) {
 			cfg.RecordDNSNames = *recordDNSNames
 		case "probe":
 			cfg.ProbeTargets = *probeTargets
+		case "otlp-endpoint":
+			cfg.OTLPEndpoint = *otlpEndpoint
 		}
 	})
 
@@ -223,6 +232,20 @@ func (c *config) validate() error {
 			c.GapAfter, heartbeatInterval))
 	}
 
+	if c.OTLPEndpoint != "" {
+		// A malformed endpoint means the export silently never happens, and the
+		// operator believes the record is reaching their pipeline.
+		u, err := url.Parse(c.OTLPEndpoint)
+		switch {
+		case err != nil:
+			problems = append(problems, fmt.Sprintf("otlp_endpoint: %q is not a URL (%v)", c.OTLPEndpoint, err))
+		case u.Scheme != "http" && u.Scheme != "https":
+			problems = append(problems, fmt.Sprintf(
+				"otlp_endpoint: %q must start with http:// or https://. This is OTLP over HTTP; the gRPC port (4317) will not answer it - use 4318", c.OTLPEndpoint))
+		case u.Host == "":
+			problems = append(problems, fmt.Sprintf("otlp_endpoint: %q names no host", c.OTLPEndpoint))
+		}
+	}
 	if c.MetricsAddr != "" {
 		if _, _, err := net.SplitHostPort(c.MetricsAddr); err != nil {
 			problems = append(problems, fmt.Sprintf(

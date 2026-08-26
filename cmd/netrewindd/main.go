@@ -32,6 +32,7 @@ import (
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/identity"
 	"github.com/OmarAlghafri/netrewind/internal/metrics"
+	"github.com/OmarAlghafri/netrewind/internal/otel"
 	"github.com/OmarAlghafri/netrewind/internal/store"
 )
 
@@ -140,13 +141,23 @@ func run(log *slog.Logger, cfg config) error {
 	// A timeline that cannot show its own blind spots is not evidence.
 	startupEvents := checkGap(ctx, st, builder, log, gapAfter)
 
+	// Copying the record to somebody else's pipeline is off unless asked for.
+	// An appliance should not open a connection nobody requested.
+	var shipper *otel.Shipper
+	if cfg.OTLPEndpoint != "" {
+		exporter := otel.New(cfg.OTLPEndpoint, observerID, version, cfg.OTLPHeaders, log)
+		shipper = otel.NewShipper(exporter, log)
+		defer shipper.Close()
+		log.Info("copying the record to an OpenTelemetry collector", "endpoint", exporter.Endpoint())
+	}
+
 	queue := make(chan *event.Event, queueDepth)
 
 	var wg sync.WaitGroup
 	writerDone := make(chan struct{})
 	go func() {
 		defer close(writerDone)
-		writer(context.WithoutCancel(ctx), st, engine, meter, builder, queue, log)
+		writer(context.WithoutCancel(ctx), st, engine, meter, builder, shipper, queue, log)
 	}()
 
 	for _, e := range startupEvents {
@@ -200,7 +211,7 @@ func run(log *slog.Logger, cfg config) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		heartbeat(ctx, st, builder, queue, log, retention)
+		heartbeat(ctx, st, builder, meter, shipper, queue, log, retention)
 	}()
 
 	<-ctx.Done()
@@ -252,7 +263,7 @@ func checkGap(ctx context.Context, st store.Store, b *event.Builder, log *slog.L
 }
 
 // heartbeat records liveness and trims history on the same timer.
-func heartbeat(ctx context.Context, st store.Store, b *event.Builder, queue chan<- *event.Event, log *slog.Logger, retention time.Duration) {
+func heartbeat(ctx context.Context, st store.Store, b *event.Builder, meter *metrics.Recorder, ship *otel.Shipper, queue chan<- *event.Event, log *slog.Logger, retention time.Duration) {
 	beat := time.NewTicker(heartbeatInterval)
 	defer beat.Stop()
 	prune := time.NewTicker(time.Hour)
@@ -267,7 +278,22 @@ func heartbeat(ctx context.Context, st store.Store, b *event.Builder, queue chan
 			log.Warn("heartbeat failed", "err", err)
 		}
 	}
+	// The gauges an operator watches are refreshed on the same beat. Declaring
+	// netrewind_stored_events without ever setting it left it with no sample at
+	// all, so the series a scraper would alert on did not exist.
+	gauges := func() {
+		if n, err := st.CountEvents(ctx); err == nil {
+			meter.SetStoredEvents(n)
+		} else if ctx.Err() == nil {
+			log.Debug("could not count stored events", "err", err)
+		}
+		if ship != nil {
+			meter.SetOTLPDropped(ship.Dropped())
+		}
+	}
+
 	mark()
+	gauges()
 
 	for {
 		select {
@@ -276,6 +302,7 @@ func heartbeat(ctx context.Context, st store.Store, b *event.Builder, queue chan
 			return
 		case <-beat.C:
 			mark()
+			gauges()
 			// A wall-clock jump reorders the timeline for anyone reading it
 			// later, so it is recorded as an event in its own right.
 			if ns, stepped := b.Clock.TakeStep(); stepped {

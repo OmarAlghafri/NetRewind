@@ -1,4 +1,5 @@
 | `netrewind_store_writable` | it is 0 | The store is refusing writes and events are being lost right now. This is the one signal that still works when the store itself is what broke |
+| `netrewind_otlp_dropped_total` | it increases | The OpenTelemetry collector is not receiving the record. The store still has it, so this is a delivery problem and not a recording one |
 | `netrewind_clock_steps_total` | it increases | The wall clock jumped. Timestamps either side of it are not comparable |# Running the recorder
 
 How to deploy NetRewind, where to put it, what to watch, and what to do with it
@@ -105,6 +106,29 @@ netrewindd --check-config
 
 That is what the unit runs before starting, so a bad edit stops the service
 rather than starting a recorder that is not recording what you asked for.
+
+## Sending the record somewhere else
+
+If you already run an OpenTelemetry collector, point the recorder at it and
+network change arrives in the same pipeline as everything else - which is what
+lets an application incident be lined up against what the network did
+underneath it.
+
+```yaml
+otlp_endpoint: http://localhost:4318
+```
+
+OTLP over HTTP, so that is port **4318**, not the gRPC 4317. The recorder
+refuses to start if you give it the wrong one rather than exporting into
+silence. Events and incidents go as log records: the body is the same sentence
+the CLI prints, and every attribute travels with it, so a query written against
+one reads the same in the other. An incident carries its whole chain, including
+which links claim a cause and which only claim co-occurrence.
+
+This is a copy. The store remains the record, exporting never blocks recording,
+and a collector that is down costs nothing but the copy - counted in
+`netrewind_otlp_dropped_total` and said once in the log rather than on every
+batch.
 
 ## Where to put it
 

@@ -54,6 +54,9 @@ type Store interface {
 	Query(ctx context.Context, f Filter) ([]*event.Event, error)
 	// Prune deletes events older than the cutoff and reports how many went.
 	Prune(ctx context.Context, before time.Time) (int64, error)
+	// CountEvents reports how much history is held. Exported as a gauge so an
+	// operator can see retention working, and see it stop working.
+	CountEvents(ctx context.Context) (int64, error)
 	// AppendIncidents stores what correlation concluded.
 	AppendIncidents(ctx context.Context, incidents ...*incident.Incident) error
 	// QueryIncidents returns matching incidents, oldest first.

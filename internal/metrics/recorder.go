@@ -21,6 +21,7 @@ const (
 	CollectorUp    = "netrewind_collector_up"
 	StoredEvents   = "netrewind_stored_events"
 	StoreWritable  = "netrewind_store_writable"
+	OTLPDropped    = "netrewind_otlp_dropped_total"
 	BuildInfo      = "netrewind_build_info"
 )
 
@@ -52,6 +53,12 @@ func NewRecorder(version, observerID string) *Recorder {
 	reg.Declare(StoredEvents, Gauge, "Events currently held in the store.")
 	reg.Declare(StoreWritable, Gauge,
 		"1 while the event store accepts writes. 0 means events are being lost right now.")
+	// Separate from netrewind_dropped_events_total on purpose. That one means
+	// the record is incomplete; this one means a copy of a complete record did
+	// not reach somebody else's pipeline. Conflating them would page an
+	// operator about missing evidence when the evidence is intact.
+	reg.Declare(OTLPDropped, Counter,
+		"Records the OpenTelemetry collector never received. The store still has them.")
 
 	reg.Set(BuildInfo, Labels{"version": version, "observer": observerID}, 1)
 
@@ -71,6 +78,7 @@ func NewRecorder(version, observerID string) *Recorder {
 	// its life, and an alert that fires on every restart is an alert that gets
 	// silenced.
 	reg.Set(StoreWritable, nil, 1)
+	reg.Add(OTLPDropped, nil, 0)
 
 	return &Recorder{reg: reg}
 }
@@ -133,6 +141,11 @@ func (r *Recorder) SetStoreWritable(ok bool) {
 		v = 1
 	}
 	r.reg.Set(StoreWritable, nil, v)
+}
+
+// SetOTLPDropped records how many exported records never arrived.
+func (r *Recorder) SetOTLPDropped(n uint64) {
+	r.reg.Set(OTLPDropped, nil, float64(n))
 }
 
 // SetStoredEvents records how much history is currently held.

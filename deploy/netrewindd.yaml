@@ -52,3 +52,21 @@ record_dns_names: false
 # current default gateway, which is usually the right thing. These are pinged,
 # so they must be addresses, not names.
 # probe: 10.0.0.1,10.0.0.53
+
+# Copy the record to an OpenTelemetry collector, so network change lands in the
+# same pipeline as everything else and an application incident can be lined up
+# against what the network did underneath it.
+#
+# OTLP over HTTP, so this is the 4318 port and not the gRPC 4317. Events and
+# incidents are exported as log records, carrying the same narration the CLI
+# prints. Empty means no export at all, which is the default: an appliance
+# should not open a connection nobody asked it to open.
+#
+# The store is still the record. If the collector is unreachable the recorder
+# carries on recording, and what the collector missed is counted in
+# netrewind_otlp_dropped_total.
+# otlp_endpoint: http://localhost:4318
+#
+# Headers to send with each export, for a collector behind authentication.
+# otlp_headers:
+#   Authorization: Bearer some-token

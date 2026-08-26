@@ -113,6 +113,26 @@ querying a path with no store there says so instead of creating an empty one
 and reporting "no events in this window", which was indistinguishable from a
 quiet network. A misspelled `--family` is refused for the same reason.
 
+### Sending the record elsewhere
+
+Events and incidents can be copied to an OpenTelemetry collector as log
+records, so network change lands in whatever pipeline a team already runs. OTLP
+over HTTP with JSON bodies, encoded by hand: there is no OpenTelemetry SDK here
+for the same reason there is no Prometheus client library, and what goes on the
+wire is checked against the specification by tests rather than by trusting a
+dependency to be right. Verified against a real collector, not a stub.
+
+The body of each record is the same sentence the CLI prints, so a dashboard and
+a terminal cannot disagree about what an event means. An incident carries its
+whole chain, including which links claim a cause and which claim only
+co-occurrence - losing that distinction in the export would undo the one
+discipline the engine is built on.
+
+It is a copy, and the store remains the record. Exporting never blocks
+recording, a collector that is down costs nothing but the copy, and what it
+missed is counted in `netrewind_otlp_dropped_total` - deliberately a different
+metric from the one that means the record itself is incomplete.
+
 ### Delivery
 
 Static binaries for `linux/amd64` and `linux/arm64` with no runtime
@@ -136,7 +156,7 @@ by an ARP change and another broken by a filtering rule, a rogue DHCP server, a
 redirected resolver, and measured packet loss — and checks both that every one
 can be found in the record afterwards and that correlation named the cause. It
 runs in CI, alongside a load job that verifies the store absorbs five thousand
-events a second and a govulncheck job. 198 tests.
+events a second and a govulncheck job. 219 tests.
 
 Beyond the lab, each of these was run rather than assumed: the release tarball
 unpacked and installed onto a clean host; the container image built, started,
@@ -154,5 +174,5 @@ secrets and personal paths before any of it becomes public.
   therefore host-local today. conntrack is what would extend it to forwarded
   traffic, and to UDP, which has no sockets to watch.
 - LLDP topology, and SNMP for switch state
-- An OpenTelemetry exporter and a bootable appliance image
+- A bootable appliance image
 - Multiple recorders on one network

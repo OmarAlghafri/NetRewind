@@ -9,6 +9,7 @@ import (
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/incident"
 	"github.com/OmarAlghafri/netrewind/internal/metrics"
+	"github.com/OmarAlghafri/netrewind/internal/otel"
 	"github.com/OmarAlghafri/netrewind/internal/store"
 )
 
@@ -73,7 +74,7 @@ func (l *storeLoss) admission(b *event.Builder, at time.Time) *event.Event {
 // daemon: on shutdown the collectors stop first, then the writer flushes what
 // they already produced. Dropping buffered events at exit would put an
 // unexplained hole at the end of every recording.
-func writer(ctx context.Context, st store.Store, engine *correlate.Engine, meter *metrics.Recorder, b *event.Builder, queue <-chan *event.Event, log *slog.Logger) {
+func writer(ctx context.Context, st store.Store, engine *correlate.Engine, meter *metrics.Recorder, b *event.Builder, ship *otel.Shipper, queue <-chan *event.Event, log *slog.Logger) {
 	ticker := time.NewTicker(flushInterval)
 	defer ticker.Stop()
 
@@ -117,8 +118,8 @@ func writer(ctx context.Context, st store.Store, engine *correlate.Engine, meter
 		for _, e := range batch {
 			meter.Observe(e)
 		}
+		var incidents []*incident.Incident
 		if engine != nil {
-			var incidents []*incident.Incident
 			for _, e := range batch {
 				incidents = append(incidents, engine.Offer(e)...)
 			}
@@ -132,6 +133,13 @@ func writer(ctx context.Context, st store.Store, engine *correlate.Engine, meter
 						"severity", inc.Severity, "confidence", inc.Confidence, "links", len(inc.Chain))
 				}
 			}
+		}
+
+		// Only after everything is durable. A copy in somebody else's pipeline
+		// of an event the store does not hold would be a record that disagrees
+		// with itself, and the store is the one that has to be right.
+		if ship != nil {
+			ship.Ship(batch, incidents)
 		}
 		batch = batch[:0]
 	}

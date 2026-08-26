@@ -5,14 +5,18 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/incident"
 	"github.com/OmarAlghafri/netrewind/internal/metrics"
+	"github.com/OmarAlghafri/netrewind/internal/otel"
 	"github.com/OmarAlghafri/netrewind/internal/store"
 )
 
@@ -48,10 +52,16 @@ func (s *brokenStore) stored() []*event.Event {
 }
 
 func (s *brokenStore) Query(context.Context, store.Filter) ([]*event.Event, error) { return nil, nil }
-func (s *brokenStore) Prune(context.Context, time.Time) (int64, error)             { return 0, nil }
-func (s *brokenStore) GetMeta(context.Context, string) (string, error)             { return "", nil }
-func (s *brokenStore) SetMeta(context.Context, string, string) error               { return nil }
-func (s *brokenStore) Close() error                                                { return nil }
+
+func (s *brokenStore) CountEvents(context.Context) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return int64(len(s.accepted)), nil
+}
+func (s *brokenStore) Prune(context.Context, time.Time) (int64, error) { return 0, nil }
+func (s *brokenStore) GetMeta(context.Context, string) (string, error) { return "", nil }
+func (s *brokenStore) SetMeta(context.Context, string, string) error   { return nil }
+func (s *brokenStore) Close() error                                    { return nil }
 func (s *brokenStore) AppendIncidents(context.Context, ...*incident.Incident) error {
 	return nil
 }
@@ -74,7 +84,7 @@ func TestEventsLostToAFullDiskAreAdmittedOnRecovery(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		writer(context.Background(), st, nil, meter, b, queue, quiet())
+		writer(context.Background(), st, nil, meter, b, nil, queue, quiet())
 	}()
 
 	// The disk fills.
@@ -137,7 +147,7 @@ func TestTheAdmissionIsNotItselfLost(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		writer(context.Background(), st, nil, meter, b, queue, quiet())
+		writer(context.Background(), st, nil, meter, b, nil, queue, quiet())
 	}()
 
 	st.refuse(true)
@@ -182,7 +192,7 @@ func TestAWorkingStoreRecordsEverythingAndAdmitsNothing(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		writer(context.Background(), st, nil, meter, b, queue, quiet())
+		writer(context.Background(), st, nil, meter, b, nil, queue, quiet())
 	}()
 
 	for i := 0; i < 10; i++ {
@@ -236,4 +246,81 @@ func gauge(meter *metrics.Recorder, name string) float64 {
 		}
 	}
 	return -1
+}
+
+// The record has to reach the collector only after it is durable. A copy in
+// somebody else's pipeline of an event the store does not hold would be a
+// record that disagrees with itself.
+func TestTheRecordIsShippedOnlyAfterItIsStored(t *testing.T) {
+	var received atomic.Int32
+	var sawBody atomic.Bool
+	collector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), "link.down") {
+			sawBody.Store(true)
+		}
+		received.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer collector.Close()
+
+	st := &brokenStore{}
+	meter := metrics.NewRecorder("test", "obs-1")
+	b := event.NewBuilder("obs-1", nil)
+	ship := otel.NewShipper(otel.New(collector.URL, "obs-1", "test", nil, quiet()), quiet())
+	queue := make(chan *event.Event, 16)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		writer(context.Background(), st, nil, meter, b, ship, queue, quiet())
+	}()
+
+	queue <- b.New(event.SourceNetlink, event.KindLinkDown, event.SevWarn, event.Iface("eth1", 3))
+	close(queue)
+	<-done
+	ship.Close()
+
+	if received.Load() == 0 {
+		t.Fatal("the collector received nothing")
+	}
+	if !sawBody.Load() {
+		t.Error("the payload did not carry the event that was recorded")
+	}
+	if len(st.stored()) != 1 {
+		t.Errorf("stored %d events; shipping must not replace storing", len(st.stored()))
+	}
+}
+
+// A store that refuses writes must not result in the collector being told the
+// event happened. The store is the record; the export is a copy of it.
+func TestNothingIsShippedThatWasNotStored(t *testing.T) {
+	var received atomic.Int32
+	collector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		received.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer collector.Close()
+
+	st := &brokenStore{}
+	st.refuse(true)
+	meter := metrics.NewRecorder("test", "obs-1")
+	b := event.NewBuilder("obs-1", nil)
+	ship := otel.NewShipper(otel.New(collector.URL, "obs-1", "test", nil, quiet()), quiet())
+	queue := make(chan *event.Event, 16)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		writer(context.Background(), st, nil, meter, b, ship, queue, quiet())
+	}()
+
+	queue <- b.New(event.SourceNetlink, event.KindLinkDown, event.SevWarn, event.Iface("eth1", 3))
+	close(queue)
+	<-done
+	ship.Close()
+
+	if received.Load() != 0 {
+		t.Error("an event the store refused was still exported, so the two records disagree")
+	}
 }

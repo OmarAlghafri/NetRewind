@@ -483,3 +483,16 @@ func OpenSQLiteRead(path string) (*SQLite, error) {
 
 	return &SQLite{db: db}, nil
 }
+
+// CountEvents reports how many events the store holds.
+//
+// A plain COUNT(*) rather than a maintained counter. It runs once a heartbeat
+// on a table with an index on every column anyone queries, and a counter kept
+// in step by hand is a counter that eventually is not.
+func (s *SQLite) CountEvents(ctx context.Context) (int64, error) {
+	var n int64
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM events").Scan(&n); err != nil {
+		return 0, fmt.Errorf("store: count events: %w", err)
+	}
+	return n, nil
+}
