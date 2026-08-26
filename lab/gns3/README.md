@@ -109,3 +109,24 @@ what it can answer — see [the runbook](../../docs/runbook.md#where-to-put-it).
 own mount namespace. The node mounts it at start; if that is refused, the
 recorder records `system.collector_down` rather than quietly missing every
 `flow.*` event.
+
+**A long-running Docker node can wedge the GNS3 VM.** After sixteen hours the
+VM's load average was over twelve and Docker commands began timing out. It is
+worth writing down what that turned out to be, because the obvious suspect was
+the recorder:
+
+| process | elapsed | CPU used |
+|---|---|---|
+| `netrewindd` | 16 h | **40 s** |
+| `containerd-shim` for the same container | 16 h | **30,465 s** |
+
+The recorder used 0.07% of a core. The shim beside it used 53%, spinning in
+userspace, and would not die to `kill -9` even as root — so `systemctl restart
+docker` then hung trying to reap it. This is GNS3's container plumbing, not
+anything in the container: two identical nodes with the recorder switched off
+sat at three seconds of CPU over the same period.
+
+If Docker nodes stop responding, restart the GNS3 VM. The project is saved, and
+`provision_lab.py --start` rebuilds the topology in about three minutes. For a
+long soak, run the recorder somewhere else and reach the segment through a
+cloud node instead.
