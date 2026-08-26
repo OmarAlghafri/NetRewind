@@ -160,6 +160,12 @@ has gone deaf and a network that has gone quiet look identical from the outside.
   HTTP, encoded by hand - there is no SDK here, for the same reason there is no
   Prometheus client library
 
+- Keeps **itself** current: it checks its own releases and can install them,
+  verifying the checksum published with the release and running the new binary
+  before replacing anything. Installing is off by default and the whole thing
+  can be turned off, because a recorder that rewrites its own binary is a
+  change of trust rather than a convenience
+
 Planned next: conntrack, so a recorder at the gateway sees the connections it
 forwards and not only its own.
 
@@ -271,6 +277,7 @@ sudo make lab
 | **M5b** | web interface, release packaging for amd64 and arm64, container image | done |
 | **M5c** | OpenTelemetry export | done |
 | **M5d** | bootable appliance image, booted and verified in QEMU | done |
+| **M5e** | self-update from signed releases, verified against the live release feed | done |
 
 ## Documentation
 

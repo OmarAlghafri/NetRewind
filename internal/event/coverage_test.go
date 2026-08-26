@@ -105,7 +105,10 @@ func producersIn(t *testing.T, root string) map[string]bool {
 	t.Helper()
 	produced := make(map[string]bool)
 
-	for _, dir := range []string{"internal/collect", "cmd"} {
+	// internal/update is here because the updater is a collector in every way
+	// that matters: it runs under the same supervision and emits events into the
+	// same queue. A kind produced only there would otherwise look unproduced.
+	for _, dir := range []string{"internal/collect", "internal/update", "cmd"} {
 		err := filepath.Walk(filepath.Join(root, dir), func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err

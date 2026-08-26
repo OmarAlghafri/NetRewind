@@ -107,6 +107,54 @@ netrewindd --check-config
 That is what the unit runs before starting, so a bad edit stops the service
 rather than starting a recorder that is not recording what you asked for.
 
+## Keeping it current
+
+The recorder asks GitHub once a day whether a newer release exists, and records
+`system.update_available` when one does. That is one HTTPS request; on a segment
+that must not talk outward, turn it off:
+
+```yaml
+update:
+  check: false
+```
+
+Installing is a separate setting and is **off by default**. This recorder's
+output is meant to be evidence, and letting a machine on your network rewrite
+its own binary is a change of trust rather than a convenience - so it is opted
+into:
+
+```yaml
+update:
+  apply: true
+```
+
+When it does apply: the tarball is fetched over HTTPS, checked against the
+`SHA256SUMS` published with the release, unpacked, and the new recorder is
+**run** before anything is replaced. Only then is the binary swapped, and the
+old one is kept as `.old`. Rules that are new in the release are added; rules
+you have edited are never touched. The swap is recorded as `system.updated`, so
+the restart either side of it has an explanation beside it instead of being
+unexplained silence.
+
+If the new binary will not run, nothing is replaced and `system.update_failed`
+says why. That check is the only thing standing between an update and an
+appliance in a cupboard that has quietly stopped recording.
+
+### Making the checksum mean something
+
+Checksums prove the file arrived as GitHub served it. They do not prove who
+built it. Set an ed25519 public key and a release whose `SHA256SUMS` is not
+signed by it is **refused** rather than installed:
+
+```yaml
+update:
+  public_key: "base64-encoded-ed25519-public-key"
+```
+
+Without that, automatic installation trusts anybody who can publish a release.
+With it, it trusts a key that never has to touch CI. If you are turning `apply`
+on anywhere that matters, turn this on with it.
+
 ## Sending the record somewhere else
 
 If you already run an OpenTelemetry collector, point the recorder at it and

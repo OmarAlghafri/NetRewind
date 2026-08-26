@@ -206,7 +206,8 @@ the family that lets the timeline answer *what were we doing when it broke*.
 
 ### `system.*` — the recorder reporting on itself
 
-`gap` · `drop` · `clock_step` · `start` · `stop` · `collector_down`
+`gap` · `drop` · `clock_step` · `start` · `stop` · `collector_down` ·
+`update_available` · `updated` · `update_failed`
 
 Never remove these. A recorder that silently omits what it missed is not
 evidence of anything: the record would show a quiet network, and a quiet
@@ -288,6 +289,9 @@ against, so the gap is written down rather than glossed over.
 | `system.start` | internal | The recorder started |
 | `system.stop` | internal | The recorder stopped deliberately, which is how a later gap is explained |
 | `system.collector_down` | internal | A source stopped feeding the record while the recorder kept running |
+| `system.update_available` | internal | A newer release exists. Reported whether or not installing it is allowed |
+| `system.updated` | internal | The recorder replaced its own binary and restarted. The gap either side of it has an explanation because of this row |
+| `system.update_failed` | internal | An update was refused or did not install; the running version is unchanged |
 
 ## The incident
 

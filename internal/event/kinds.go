@@ -148,6 +148,13 @@ const (
 	// nothing to say they were never being watched for - which reads exactly
 	// like a network on which nothing of that kind happened.
 	KindCollectorDown Kind = "system.collector_down"
+
+	// The recorder maintaining itself. An update replaces the binary and
+	// restarts, which leaves a gap; a gap with no explanation beside it is the
+	// failure this project exists to prevent, so the swap is recorded.
+	KindUpdateAvailable Kind = "system.update_available"
+	KindUpdated         Kind = "system.updated"
+	KindUpdateFailed    Kind = "system.update_failed"
 )
 
 // Families are the nine layers an event can describe, in the order they are

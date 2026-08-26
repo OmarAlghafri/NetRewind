@@ -147,6 +147,26 @@ hardware, twice what the plan called for, and answers queries during the burst.
 Repeats fold, so ten thousand transitions of one flapping port become a handful
 of rows carrying an occurrence count rather than ten thousand rows.
 
+### Keeping itself current
+
+The recorder checks its own releases once a day and records
+`system.update_available` when a newer one exists. Installing it is a separate
+setting and is off by default: this output is meant to be evidence, and letting
+a machine on your network rewrite its own binary is a change of trust rather
+than a convenience.
+
+When it is turned on, the download is checked against the `SHA256SUMS` published
+with the release and the new recorder is **run** before anything is replaced -
+the check that stands between an update and an appliance that has quietly
+stopped recording. The previous binary is kept, edited rules are never
+overwritten, and the swap is recorded as `system.updated` so the restart either
+side of it is explained rather than being unexplained silence.
+
+An ed25519 public key can be configured, and then a release whose checksums are
+not signed by it is refused. Checksums alone prove the file arrived as GitHub
+served it; they do not prove who built it, and that difference is worth being
+plain about.
+
 ### The appliance
 
 A bootable disk image that comes up recording: write it to a USB stick, plug a
@@ -170,7 +190,7 @@ by an ARP change and another broken by a filtering rule, a rogue DHCP server, a
 redirected resolver, and measured packet loss — and checks both that every one
 can be found in the record afterwards and that correlation named the cause. It
 runs in CI, alongside a load job that verifies the store absorbs five thousand
-events a second and a govulncheck job. 219 tests.
+events a second and a govulncheck job. 235 tests.
 
 Beyond the lab, each of these was run rather than assumed: the release tarball
 unpacked and installed onto a clean host; the container image built, started,

@@ -221,6 +221,26 @@ func Describe(e *Event) string {
 		}
 		return "the clock jumped"
 
+	case KindUpdateAvailable:
+		if v, ok := e.Attrs["version"].(string); ok {
+			return fmt.Sprintf("version %s is available", v)
+		}
+		return "a newer version is available"
+
+	case KindUpdated:
+		from, _ := e.Attrs["from_version"].(string)
+		to, _ := e.Attrs["to_version"].(string)
+		if from != "" && to != "" {
+			return fmt.Sprintf("the recorder updated itself from %s to %s and restarted", from, to)
+		}
+		return "the recorder updated itself and restarted"
+
+	case KindUpdateFailed:
+		if v, ok := e.Attrs["version"].(string); ok {
+			return fmt.Sprintf("updating to %s did not work; the running version is unchanged", v)
+		}
+		return "an update did not work; the running version is unchanged"
+
 	case KindCollectorDown:
 		if name, ok := e.Attrs["collector"].(string); ok {
 			return fmt.Sprintf("the %s source stopped feeding the record; nothing of what it watches was seen after this", name)

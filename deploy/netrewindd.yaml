@@ -70,3 +70,41 @@ record_dns_names: false
 # Headers to send with each export, for a collector behind authentication.
 # otlp_headers:
 #   Authorization: Bearer some-token
+
+# Keeping itself current.
+#
+# `check` asks GitHub once a day whether a newer release exists and records
+# system.update_available if one does. It is one HTTPS request and nothing else;
+# turn it off entirely on a segment that must not talk outward.
+#
+# `apply` installs it. That is off by default, and deliberately so: this
+# recorder's output is meant to be evidence, and letting a machine on your
+# network rewrite its own binary is a change of trust rather than a
+# convenience. Turn it on if you want it.
+#
+# What happens when it does apply: the tarball is downloaded over HTTPS, checked
+# against the SHA256SUMS published with the release, unpacked, and the new
+# recorder is *run* before it is trusted. The previous binary is kept as
+# .old. The swap is recorded as system.updated, so the gap either side of the
+# restart has an explanation beside it rather than being unexplained silence.
+# Rules that are new in the release are added; rules you have edited are never
+# touched.
+update:
+  check: true
+  apply: false
+  every: 24h
+
+# Checksums prove the file arrived as GitHub served it. They do not prove who
+# built it. Set an ed25519 public key here and a release whose SHA256SUMS is not
+# signed by it is refused rather than installed - which is what turns this from
+# an update channel into one you can reason about.
+#
+#   public_key: "base64-encoded-ed25519-public-key"
+#
+# While the repository is private, a token is needed to see its releases at all:
+#
+#   token: "ghp_..."
+#
+# And to follow a fork instead:
+#
+#   repo: "owner/name"

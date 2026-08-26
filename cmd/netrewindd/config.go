@@ -13,6 +13,7 @@ import (
 
 	"github.com/OmarAlghafri/netrewind/internal/collect/probe"
 	"github.com/OmarAlghafri/netrewind/internal/store"
+	"github.com/OmarAlghafri/netrewind/internal/update"
 	"gopkg.in/yaml.v3"
 )
 
@@ -45,13 +46,40 @@ type config struct {
 	LogLevel       string            `yaml:"log_level"`
 	RecordDNSNames bool              `yaml:"record_dns_names"`
 
+	// Update controls whether the recorder looks for, and installs, new
+	// releases of itself.
+	Update updateConfig `yaml:"update"`
+
 	// CheckOnly comes from --check-config and never from the file. It is what
 	// the systemd unit runs before starting, so a configuration the recorder
 	// cannot use stops the service instead of starting one that records the
 	// wrong thing.
-	CheckOnly bool     `yaml:"-"`
-	Retention duration `yaml:"retention"`
-	GapAfter  duration `yaml:"gap_threshold"`
+	CheckOnly bool `yaml:"-"`
+	// ShowVersion prints the version and exits. The updater runs a downloaded
+	// binary with this before trusting it, so it is the check that a new build
+	// is the right architecture and not truncated.
+	ShowVersion bool     `yaml:"-"`
+	Retention   duration `yaml:"retention"`
+	GapAfter    duration `yaml:"gap_threshold"`
+}
+
+// updateConfig is what the operator decides about the recorder maintaining
+// itself.
+//
+// Checking and applying are separate because they are separate decisions.
+// Knowing a version exists is information; letting a machine on your network
+// rewrite its own binary is a change of trust, and an operator is entitled to
+// want the first without the second.
+type updateConfig struct {
+	Check bool     `yaml:"check"`
+	Apply bool     `yaml:"apply"`
+	Every duration `yaml:"every"`
+	Repo  string   `yaml:"repo"`
+	// Token reaches a private repository. Not needed once it is public.
+	Token string `yaml:"token"`
+	// PublicKey is an ed25519 key, base64. When set, a release whose
+	// SHA256SUMS is not signed by it is refused rather than installed.
+	PublicKey string `yaml:"public_key"`
 }
 
 // duration is a time.Duration the config file can write the way the flag does.
@@ -86,6 +114,13 @@ func defaultConfig() config {
 		LogLevel:   "info",
 		Retention:  duration(7 * 24 * time.Hour),
 		GapAfter:   duration(defaultGapThreshold),
+		// Checking is on and installing is off by default.
+		//
+		// Knowing a fix exists costs one HTTPS request a day and is nearly
+		// always wanted. Replacing the binary of a recorder whose output is
+		// meant to be evidence is a decision its operator should make
+		// deliberately, so it is opted into rather than out of.
+		Update: updateConfig{Check: true, Apply: false, Every: duration(24 * time.Hour)},
 	}
 }
 
@@ -96,6 +131,7 @@ func loadConfig(fs *flag.FlagSet, args []string) (config, error) {
 	var (
 		configPath     = fs.String("config", "", "YAML configuration file; defaults to "+DefaultConfigPath+" when that exists")
 		checkOnly      = fs.Bool("check-config", false, "check the configuration and exit without recording")
+		showVersion    = fs.Bool("version", false, "print the version and exit")
 		dbPath         = fs.String("db", cfg.DBPath, "path to the event store")
 		observerID     = fs.String("observer-id", cfg.ObserverID, "identity of this recorder")
 		logLevel       = fs.String("log-level", cfg.LogLevel, "debug, info, warn or error")
@@ -107,6 +143,8 @@ func loadConfig(fs *flag.FlagSet, args []string) (config, error) {
 		recordDNSNames = fs.Bool("record-dns-names", false, "store the names looked up. Off by default: there are networks where recording them is not permitted")
 		probeTargets   = fs.String("probe", "", "addresses to measure reachability to; empty follows the default gateway")
 		otlpEndpoint   = fs.String("otlp-endpoint", "", "copy the record to this OpenTelemetry collector, e.g. http://localhost:4318; empty disables it")
+		updateCheck    = fs.Bool("update-check", true, "look for newer releases")
+		updateApply    = fs.Bool("update-apply", false, "install newer releases automatically")
 	)
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
@@ -147,6 +185,10 @@ func loadConfig(fs *flag.FlagSet, args []string) (config, error) {
 			cfg.ProbeTargets = *probeTargets
 		case "otlp-endpoint":
 			cfg.OTLPEndpoint = *otlpEndpoint
+		case "update-check":
+			cfg.Update.Check = *updateCheck
+		case "update-apply":
+			cfg.Update.Apply = *updateApply
 		}
 	})
 
@@ -154,6 +196,7 @@ func loadConfig(fs *flag.FlagSet, args []string) (config, error) {
 		return config{}, err
 	}
 	cfg.CheckOnly = *checkOnly
+	cfg.ShowVersion = *showVersion
 	return cfg, nil
 }
 
@@ -232,6 +275,26 @@ func (c *config) validate() error {
 			c.GapAfter, heartbeatInterval))
 	}
 
+	if c.Update.Apply && !c.Update.Check {
+		problems = append(problems,
+			"update: apply is on but check is off, so nothing would ever be installed")
+	}
+	if c.Update.Check && time.Duration(c.Update.Every) < time.Hour {
+		problems = append(problems, fmt.Sprintf(
+			"update.every: %s is too often; github rate limits, and a release does not appear more than once an hour", c.Update.Every))
+	}
+	if c.Update.Repo != "" && !strings.Contains(c.Update.Repo, "/") {
+		problems = append(problems, fmt.Sprintf(
+			"update.repo: %q is not owner/name", c.Update.Repo))
+	}
+	if c.Update.PublicKey != "" {
+		// Checked here rather than at the first update, which might be months
+		// away and would then silently refuse every release.
+		if err := update.VerifySignature(c.Update.PublicKey, nil, make([]byte, 64)); err != nil &&
+			strings.Contains(err.Error(), "public_key") {
+			problems = append(problems, "update.public_key: "+err.Error())
+		}
+	}
 	if c.OTLPEndpoint != "" {
 		// A malformed endpoint means the export silently never happens, and the
 		// operator believes the record is reaching their pipeline.

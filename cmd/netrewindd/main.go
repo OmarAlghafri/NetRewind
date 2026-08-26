@@ -34,6 +34,7 @@ import (
 	"github.com/OmarAlghafri/netrewind/internal/metrics"
 	"github.com/OmarAlghafri/netrewind/internal/otel"
 	"github.com/OmarAlghafri/netrewind/internal/store"
+	"github.com/OmarAlghafri/netrewind/internal/update"
 )
 
 // version is stamped at build time with -ldflags "-X main.version=...".
@@ -65,6 +66,11 @@ func main() {
 		// the log level is one of the things that might be wrong.
 		fmt.Fprintf(os.Stderr, "netrewindd: %v\n", err)
 		os.Exit(2)
+	}
+
+	if cfg.ShowVersion {
+		fmt.Printf("netrewindd %s (schema v%d)\n", version, event.SchemaVersion)
+		return
 	}
 
 	if cfg.CheckOnly {
@@ -182,6 +188,15 @@ func run(log *slog.Logger, cfg config) error {
 		policy.NewCollector(builder, log),
 		wire.NewCollector(builder, log, cfg.WireIface, cfg.RecordDNSNames),
 		probe.NewCollector(builder, log, cfg.ProbeTargets),
+		update.New(update.Config{
+			Check:     cfg.Update.Check,
+			Apply:     cfg.Update.Apply,
+			Interval:  time.Duration(cfg.Update.Every),
+			Repo:      cfg.Update.Repo,
+			Token:     cfg.Update.Token,
+			PublicKey: cfg.Update.PublicKey,
+			RulesDir:  cfg.RulesDir,
+		}, version, builder, log, stop),
 	}
 	for _, c := range collectors {
 		wg.Add(1)

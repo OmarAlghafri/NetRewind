@@ -4,10 +4,21 @@ name="netrewindd"
 description="NetRewind network black box recorder"
 
 command="/usr/local/bin/netrewindd"
-command_background="yes"
 pidfile="/run/netrewindd.pid"
 output_log="/var/log/netrewindd.log"
 error_log="/var/log/netrewindd.log"
+
+# supervise-daemon rather than start-stop-daemon, so the recorder is restarted
+# if it exits.
+#
+# Two things depend on this. A crash should not leave the appliance quietly not
+# recording until somebody notices. And an update works by installing the new
+# binary and exiting: without a supervisor to bring it back, the recorder would
+# install its own replacement and then stop, which is the worst possible outcome
+# of an update.
+supervisor="supervise-daemon"
+respawn_delay=5
+respawn_max=0
 
 depend() {
     need net
