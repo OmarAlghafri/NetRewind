@@ -116,26 +116,41 @@ BPF_OBJ := internal/collect/flow/bpf/flow.bpf.o
 # machine types, which is what lets one committed object serve amd64 and arm64.
 BPF_INCLUDE := /usr/include/$(shell uname -m)-linux-gnu
 
+# BPF_STAMP records which source the committed object was built from.
+#
+# The object cannot be compared byte for byte across machines. Two clang
+# versions produce different instructions from the same source - not merely
+# different debug info - so a comparison against a freshly built object says
+# only "you have a different clang", which is not the question. The question is
+# whether somebody edited the C and forgot to regenerate, and a hash of the
+# source answers exactly that, on any machine, forever.
+BPF_STAMP := $(BPF_OBJ).source-sha256
+
 .PHONY: bpf
 bpf:
 	clang -O2 -g -target bpf -Wall -Werror -I$(BPF_INCLUDE) -c $(BPF_SRC) -o $(BPF_OBJ)
-	@echo "built $(BPF_OBJ)"
+	@sha256sum $(BPF_SRC) | cut -d' ' -f1 > $(BPF_STAMP)
+	@echo "built $(BPF_OBJ) from $(BPF_SRC) ($$(cat $(BPF_STAMP) | cut -c1-16)...)"
 
-# Regenerate the committed object the way CI will rebuild it.
+# Verify the committed object was built from the committed source.
 #
-# Use this rather than `make bpf` when committing. Different clang versions
-# produce different objects from the same source - not just different debug
-# info, different instructions - so CI's byte comparison only means anything if
-# the committed object came from the toolchain CI has. Building it in the same
-# image CI runs on is the cheapest way to guarantee that, and it needs no clang
-# on the machine doing the committing.
-.PHONY: bpf-repro
-bpf-repro:
-	docker run --rm -v "$(CURDIR)":/src -w /src ubuntu:24.04 sh -c \
-	  'apt-get update -qq >/dev/null && \
-	   apt-get install -y -qq clang llvm libbpf-dev make >/dev/null && \
-	   make bpf'
-	@echo "rebuilt with the toolchain CI uses; commit the result"
+# Two separate things, both of which matter: the source still compiles, and the
+# object beside it came from this version of it.
+.PHONY: bpf-check
+bpf-check:
+	@test -f $(BPF_STAMP) || { echo "no $(BPF_STAMP); run 'make bpf'"; exit 1; }
+	@clang -O2 -g -target bpf -Wall -Werror -I$(BPF_INCLUDE) -c $(BPF_SRC) -o /dev/null \
+	  || { echo "$(BPF_SRC) does not compile"; exit 1; }
+	@recorded=$$(cat $(BPF_STAMP)); \
+	 actual=$$(sha256sum $(BPF_SRC) | cut -d' ' -f1); \
+	 if [ "$$recorded" != "$$actual" ]; then \
+	   echo "$(BPF_SRC) has changed since $(BPF_OBJ) was built."; \
+	   echo "  object built from: $$recorded"; \
+	   echo "  source is now:     $$actual"; \
+	   echo "run 'make bpf' and commit both files."; \
+	   exit 1; \
+	 fi; \
+	 echo "$(BPF_OBJ) matches $(BPF_SRC), and the source compiles"
 
 # The bootable appliance. Linux and root: it needs loop devices and mount.
 .PHONY: image

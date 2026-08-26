@@ -1,9 +1,16 @@
 # Normalise line endings: text files stored as LF in the repository.
 * text=auto eol=lf
 
-# Treat images as binary.
+# Anything that is not text is binary, explicitly.
+#
+# `text=auto` above guesses, and a compiled object it guesses wrong about comes
+# out of a checkout corrupted - which then fails as something that looks like a
+# compiler problem rather than a checkout problem.
 *.png binary
 *.gif binary
+*.o binary
+*.img binary
+*.gz binary
 
 # eBPF C sources and Go sources are always LF.
 *.c text eol=lf
