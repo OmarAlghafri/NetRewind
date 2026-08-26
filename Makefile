@@ -109,10 +109,33 @@ BPF_OBJ := internal/collect/flow/bpf/flow.bpf.o
 # architecture-specific. BPF bytecode is portable, which is what lets one
 # committed object serve amd64 and arm64 alike - and arm64 is not incidental,
 # since a Raspberry Pi is the cheapest thing this is meant to run on.
+# -target bpf makes clang forget which machine it is on, so it stops looking in
+# the multiarch include directory and <linux/types.h> fails on the asm/types.h
+# it includes. Pointing it back at the host's headers is the standard fix and
+# does not make the output architecture-specific: the BPF program uses no
+# machine types, which is what lets one committed object serve amd64 and arm64.
+BPF_INCLUDE := /usr/include/$(shell uname -m)-linux-gnu
+
 .PHONY: bpf
 bpf:
-	clang -O2 -g -target bpf -Wall -Werror -c $(BPF_SRC) -o $(BPF_OBJ)
+	clang -O2 -g -target bpf -Wall -Werror -I$(BPF_INCLUDE) -c $(BPF_SRC) -o $(BPF_OBJ)
 	@echo "built $(BPF_OBJ)"
+
+# Regenerate the committed object the way CI will rebuild it.
+#
+# Use this rather than `make bpf` when committing. Different clang versions
+# produce different objects from the same source - not just different debug
+# info, different instructions - so CI's byte comparison only means anything if
+# the committed object came from the toolchain CI has. Building it in the same
+# image CI runs on is the cheapest way to guarantee that, and it needs no clang
+# on the machine doing the committing.
+.PHONY: bpf-repro
+bpf-repro:
+	docker run --rm -v "$(CURDIR)":/src -w /src ubuntu:24.04 sh -c \
+	  'apt-get update -qq >/dev/null && \
+	   apt-get install -y -qq clang llvm libbpf-dev make >/dev/null && \
+	   make bpf'
+	@echo "rebuilt with the toolchain CI uses; commit the result"
 
 # The bootable appliance. Linux and root: it needs loop devices and mount.
 .PHONY: image

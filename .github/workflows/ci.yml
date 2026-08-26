@@ -81,13 +81,19 @@ jobs:
       # The compiled object is committed so the tree builds without a BPF
       # toolchain. Committed build output drifts from its source unless
       # something checks, so this rebuilds it and fails if it differs.
+      #
+      # The comparison is byte-for-byte, which means it also fails if the
+      # object was built with a different clang than this image has - two
+      # versions produce different instructions from the same source, not just
+      # different debug info. `make bpf-repro` builds it in this same image,
+      # which is what the committed object should always come from.
       - name: rebuild and compare
         run: |
           cp internal/collect/flow/bpf/flow.bpf.o /tmp/committed.o
           make bpf
           if ! cmp -s /tmp/committed.o internal/collect/flow/bpf/flow.bpf.o; then
             echo "the committed eBPF object does not match flow.bpf.c"
-            echo "run 'make bpf' and commit the result"
+            echo "run 'make bpf-repro' and commit the result"
             exit 1
           fi
 
@@ -111,7 +117,7 @@ jobs:
         run: CGO_ENABLED=0 make build
 
       # The real gate. Builds a topology in network namespaces, records it,
-      # injects eleven faults, and asserts that every one can be found in the
+      # injects fourteen faults, and asserts that every one can be found in the
       # record afterwards *and* that correlation named the cause. A green tick
       # here means the thing works, not that it compiles.
       - name: inject faults and check the record
