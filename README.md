@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo-128.png" alt="" width="120" height="120">
+</p>
+
 # NetRewind — a black box recorder for the network
 
 A Linux service that records what *changed* on a network — interfaces, ARP
