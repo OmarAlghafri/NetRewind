@@ -1,5 +1,87 @@
 # Changelog
 
+## 0.9.0 — 2026-08-27
+
+The release the recorder can install for itself, and the first one an operator
+can prove came from its author rather than from whoever holds the repository.
+
+### The recorder keeps itself current
+
+It asks its own release feed once a day, records `system.update_available` when
+a newer version exists, and — only if told to — installs it. Checking and
+installing are separate settings because they are separate decisions: knowing a
+fix exists costs one HTTPS request and is nearly always wanted, while letting a
+machine on your network rewrite its own binary is a change of trust. Installing
+is off by default.
+
+Everything about the path is built on the assumption that this is a supply
+chain and the thing being replaced is a witness:
+
+- HTTPS only, and a plaintext asset URL is refused outright
+- every download checked against the `SHA256SUMS` published with the release
+- an optional ed25519 signature over that file, and a release **without** a
+  valid one is refused whenever a public key is configured, because an optional
+  check that can be skipped is decoration
+- the new binary is run before anything is replaced, and the old one is kept
+- rules that are new in the release are added; rules that were edited locally
+  are left alone
+- the swap is recorded as `system.updated`, so the gap either side of the
+  restart has an explanation beside it
+
+### Releases are signed with a key that never touches CI
+
+Checksums prove a download arrived as the server sent it. They do not prove who
+built it — anyone who can publish a release can publish checksums for it. `make
+signing-key` creates an ed25519 key that lives outside the repository and
+outside CI, and `make release` signs the checksum file with it and then
+**verifies the signature using the same code the recorder uses to check one**,
+because signing without verifying is how a release goes out that every updater
+refuses.
+
+### Fixes
+
+- **`make release` would have named its assets something no updater could
+  find.** `VERSION` came from `git describe --tags`, which returns `v0.9.0` at a
+  tag, and the updater asks for `netrewind-0.9.0-...`. The 0.8.0 release
+  happened to be built with the version passed by hand, so the bug stayed
+  invisible, waiting for the first release built the obvious way. The leading
+  `v` is now stripped in one place, and a test compares the Makefile's naming
+  against the updater's expectation.
+- **The appliance image named itself after a commit.** It worked out its own
+  version instead of being told one, so the 0.8.0 image reported `0fb51d7` — a
+  hash from an untagged tree, matching no release, and not a version any
+  updater can parse. An appliance is the deployment nobody looks at, so an
+  image that silently declines every update for the rest of its life is the
+  worst place for this to happen. `make image` now passes the release version,
+  and a test pins that it does.
+- **The eBPF object is checked against its source, not against a rebuild.**
+  Comparing bytes against a fresh build only ever asked whether the runner had
+  the same clang.
+- **The reserved-kind count in the schema document is now checked.** The prose
+  said nine while the table marked seven, which teaches a reader to go and
+  count the rows themselves.
+- **The operating runbook was missing two of the metrics it tells you to alert
+  on.** `netrewind_store_writable` and `netrewind_otlp_dropped_total` had been
+  stranded above the title rather than in the table — a document about not
+  missing things, quietly missing things.
+- **The rule-writing guide contradicted the engine.** It said the validator
+  refuses a rule that opens with an optional clause, which is precisely how a
+  rule asks what changed *before* a failure; what the validator actually
+  refuses is a rule in which every clause is optional.
+
+### Verified
+
+Every published 0.8.0 asset was downloaded, checked against its published
+checksums, and then actually run: the fault-injection lab was re-run against the
+release binaries rather than a development build and reconstructed all fourteen
+faults with correlation naming the cause in eight of them; `install.sh` was
+exercised clean, over an existing installation, and on the way out, confirming
+it neither reverts an edited rule nor deletes a store; the arm64 build was run
+under emulation, where it recorded correctly and — the point of the exercise —
+admitted the two collectors that could not start rather than appearing healthy;
+and the appliance image was booted in QEMU, where it came up recording and
+reported a 31-hour blind spot it had genuinely had.
+
 ## 0.8.0 — 2026-08-26
 
 The first version that does everything the project set out to do: record state
