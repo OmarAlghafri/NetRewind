@@ -5,7 +5,14 @@
 # is expected to work from a Windows or macOS checkout too, which is why the
 # non-Linux collector stubs exist.
 
+# Tags carry a leading v by convention. Release assets must not: the updater
+# looks for netrewind-<tag without the v>-linux-<arch>.tar.gz (TarballName in
+# internal/update). Publishing netrewind-v0.9.0-... instead would leave every
+# installed recorder unable to find its own update, and nothing would say so -
+# the check would just report no matching asset. Strip it once, here, so only
+# one form exists. override, so it applies to VERSION= on the command line too.
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+override VERSION := $(patsubst v%,%,$(VERSION))
 LDFLAGS := -X main.version=$(VERSION)
 BUILD   := build
 
