@@ -236,7 +236,7 @@ failures on a host where connections were never being watched.
 ## Every kind, in one place
 
 The prose above explains why each family exists. This is the list, and a test
-fails if it and `internal/event/kinds.go` ever disagree. Nine of them are
+fails if it and `internal/event/kinds.go` ever disagree. Seven of them are
 declared but not yet produced, and are marked *reserved*: a schema that
 promises what the code does not do is the failure this project is built
 against, so the gap is written down rather than glossed over.

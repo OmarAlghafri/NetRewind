@@ -63,6 +63,39 @@ func TestTheSchemaDocumentListsEveryKind(t *testing.T) {
 			t.Errorf("the table calls %s reserved, but it is produced; the documentation understates what this records", kind)
 		}
 	}
+
+	// The sentence above the table counts the reserved kinds. Nothing checked
+	// it, so it said nine while the table marked seven - which is how a reader
+	// learns to distrust the number and go count the rows themselves.
+	assertReservedCountMatchesProse(t, filepath.Join(root, "docs", "schema.md"), len(reserved))
+}
+
+// numberWords covers the range the count can plausibly take. A count outside it
+// fails loudly rather than silently skipping the check.
+var numberWords = map[int]string{
+	0: "None", 1: "One", 2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six",
+	7: "Seven", 8: "Eight", 9: "Nine", 10: "Ten", 11: "Eleven", 12: "Twelve",
+}
+
+var proseCount = regexp.MustCompile(`(?s)(\w+) of them are\s+declared but not yet produced`)
+
+func assertReservedCountMatchesProse(t *testing.T, path string, want int) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	m := proseCount.FindSubmatch(data)
+	if m == nil {
+		t.Fatal("docs/schema.md no longer states how many kinds are reserved; the sentence above the table is what a reader reads instead of counting rows")
+	}
+	word, ok := numberWords[want]
+	if !ok {
+		t.Fatalf("%d reserved kinds is outside the range this check spells out; extend numberWords", want)
+	}
+	if got := string(m[1]); got != word {
+		t.Errorf("docs/schema.md says %q kinds are reserved; %d are", got, want)
+	}
 }
 
 // parseSchemaTable returns the kinds the reference table lists, and which of
