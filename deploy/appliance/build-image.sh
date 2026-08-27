@@ -36,6 +36,11 @@ usage: build-image.sh [options]
 
   --size MB     image size in megabytes (default $SIZE_MB)
   --out PATH    where to write the image (default ./dist/netrewind-appliance.img)
+  --version VER what the recorder reports as its version. Defaults to what git
+                describes, which is a bare commit hash on an untagged tree -
+                and an appliance that cannot name its own version is one
+                nobody can tell the state of. \`make image\` passes the same
+                version the tarballs are built with.
   --arch ARCH   x86_64 (default) - aarch64 needs a different bootloader and is
                 not built here; use the release tarball on a Raspberry Pi
   --keep-work   leave the staging directory for inspection
@@ -46,6 +51,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --size) SIZE_MB="$2"; shift 2 ;;
         --out) OUT="$2"; shift 2 ;;
+        --version) VERSION="$2"; shift 2 ;;
         --arch) ARCH="$2"; shift 2 ;;
         --keep-work) KEEP_WORK=1; shift ;;
         -h|--help) usage; exit 0 ;;
@@ -86,7 +92,16 @@ trap cleanup EXIT INT TERM
 
 echo "==> building the binaries"
 command -v go >/dev/null 2>&1 || die "go is needed to build the recorder"
-VERSION=$(cd "$REPO" && git describe --tags --always --dirty 2>/dev/null || echo dev)
+# The version is taken from the caller when there is one, and only guessed at
+# otherwise. Guessing was how 0.8.0 shipped an image that called itself
+# "0fb51d7": the tree it was built from had no tag yet, git describe fell back
+# to the commit hash, and the image went out identifying itself by something no
+# operator could match against a release. A bare hash is also not a version any
+# updater can parse, so such an image would refuse every update it was offered
+# for the rest of its life - on the one deployment nobody ever looks at.
+VERSION="${VERSION:-$(cd "$REPO" && git describe --tags --always --dirty 2>/dev/null || echo dev)}"
+# Tags carry a leading v; release artefacts do not. Same rule as the Makefile.
+VERSION="${VERSION#v}"
 mkdir -p "$WORK/bin"
 ( cd "$REPO" && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOFLAGS=-buildvcs=false \
     go build -trimpath -ldflags "-s -w -X main.version=$VERSION" \

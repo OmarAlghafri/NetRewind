@@ -162,7 +162,7 @@ bpf-check:
 # The bootable appliance. Linux and root: it needs loop devices and mount.
 .PHONY: image
 image:
-	sudo deploy/appliance/build-image.sh --out $(DIST)/netrewind-appliance.img
+	sudo deploy/appliance/build-image.sh --version $(VERSION) --out $(DIST)/netrewind-appliance.img
 
 .PHONY: kernel-check
 kernel-check:
