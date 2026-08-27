@@ -1,6 +1,4 @@
-| `netrewind_store_writable` | it is 0 | The store is refusing writes and events are being lost right now. This is the one signal that still works when the store itself is what broke |
-| `netrewind_otlp_dropped_total` | it increases | The OpenTelemetry collector is not receiving the record. The store still has it, so this is a delivery problem and not a recording one |
-| `netrewind_clock_steps_total` | it increases | The wall clock jumped. Timestamps either side of it are not comparable |# Running the recorder
+# Running the recorder
 
 How to deploy NetRewind, where to put it, what to watch, and what to do with it
 when something breaks.
@@ -222,7 +220,9 @@ The metrics worth alerting on are not the ones counting what was seen:
 | `netrewind_recorder_blind_seconds_total` | it increases at all | The record has a hole in it. Anything concluded about that window is worthless |
 | `netrewind_dropped_events_total` | it increases | Events arrived faster than they could be read. The record is incomplete and does not say where |
 | `netrewind_collector_up` | any drops to 0 | A whole source is missing. The timeline will look calm because it has gone deaf |
+| `netrewind_store_writable` | it is 0 | The store is refusing writes and events are being lost right now. This is the one signal that still works when the store itself is what broke |
 | `netrewind_clock_steps_total` | it increases | The wall clock jumped. Timestamps either side of it are not comparable |
+| `netrewind_otlp_dropped_total` | it increases | The OpenTelemetry collector is not receiving the record. The store still has it, so this is a delivery problem and not a recording one |
 | `netrewind_stored_events` | growth changes shape | Either the network became unstable or retention needs revisiting |
 
 Everything else — `netrewind_events_total`, `netrewind_incidents_total` — is for

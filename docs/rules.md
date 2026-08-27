@@ -170,6 +170,7 @@ sudo lab/inject.sh all                   # inject faults, see what concludes
 
 The validator refuses a rule that cannot work: one with no window, one that
 blames a clause it does not have, one whose second clause does not say how it
-relates to the first, one that opens with an optional clause. It caught exactly
-that last mistake in one of the rules shipped here, which would otherwise have
-sat in the library matching nothing forever.
+relates to the first, and one in which *every* clause is optional — that rule
+has no anchor to fire on and would match everything. It caught exactly that
+last mistake in one of the rules shipped here, which would otherwise have sat
+in the library firing on anything that moved.
