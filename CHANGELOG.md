@@ -54,6 +54,14 @@ refuses.
   image that silently declines every update for the rest of its life is the
   worst place for this to happen. `make image` now passes the release version,
   and a test pins that it does.
+- **`--version` was gated behind the configuration being valid**, so the same
+  binary printed its version from a directory that happened to contain a
+  `rules/` and exited 2 from one that did not. The updater runs exactly that
+  flag on a downloaded build to decide whether it works before replacing
+  anything, inheriting the daemon's working directory — so whether a recorder
+  could update itself depended on where it had been started from, and the
+  refusal blamed the new build rather than a rules path. A flag that exists to
+  prove a binary runs cannot fail for reasons of its own.
 - **The eBPF object is checked against its source, not against a rebuild.**
   Comparing bytes against a fresh build only ever asked whether the runner had
   the same clang.
