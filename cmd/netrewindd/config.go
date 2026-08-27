@@ -192,11 +192,32 @@ func loadConfig(fs *flag.FlagSet, args []string) (config, error) {
 		}
 	})
 
+	cfg.CheckOnly = *checkOnly
+	cfg.ShowVersion = *showVersion
+
+	// --version is answered before the configuration is judged, because it is
+	// a property of the binary and nothing else.
+	//
+	// The updater runs exactly this on a downloaded build to decide whether it
+	// works before replacing anything, and it inherits the running daemon's
+	// working directory when it does. With validation first, the answer
+	// depended on things that have nothing to do with the binary: the same
+	// file printed its version from a directory that happened to contain a
+	// rules/ and exited 2 from one that did not. An update refused that way
+	// reports only that running it failed, which points an operator at the new
+	// build when the cause is a rules path - and the check exists to be the
+	// last thing standing between an update and a recorder that has silently
+	// stopped, so it must not fail for reasons of its own.
+	//
+	// --check-config still validates. Judging the configuration is its entire
+	// purpose.
+	if cfg.ShowVersion {
+		return cfg, nil
+	}
+
 	if err := cfg.validate(); err != nil {
 		return config{}, err
 	}
-	cfg.CheckOnly = *checkOnly
-	cfg.ShowVersion = *showVersion
 	return cfg, nil
 }
 

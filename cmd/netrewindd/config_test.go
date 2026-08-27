@@ -210,3 +210,38 @@ func TestAllProblemsAreReportedTogether(t *testing.T) {
 		}
 	}
 }
+
+// --version has to be answerable by the binary alone, whatever state the host
+// it landed on is in.
+//
+// The updater runs it on a downloaded build to decide whether that build works
+// before replacing anything, inheriting the running daemon's working
+// directory. While the configuration was validated first, the same binary
+// printed its version from a directory that happened to contain a rules/ and
+// exited 2 from one that did not - so whether an update could be installed
+// depended on where the daemon happened to be running from, and the refusal
+// said only that running it failed, which points at the new build rather than
+// at a rules path.
+func TestVersionIsAnsweredWithoutJudgingTheConfiguration(t *testing.T) {
+	fs := flag.NewFlagSet("netrewindd", flag.ContinueOnError)
+	fs.SetOutput(&strings.Builder{})
+
+	// A rules directory that does not exist is enough to fail validation, and
+	// is exactly what a half-installed or freshly unpacked host looks like.
+	cfg, err := loadConfig(fs, []string{"--version", "--rules", "/nonexistent/rules"})
+	if err != nil {
+		t.Fatalf("--version must not depend on the configuration being usable: %v", err)
+	}
+	if !cfg.ShowVersion {
+		t.Error("--version was accepted but not recorded, so nothing would print it")
+	}
+}
+
+// ...and --check-config still judges it, because that is the whole job.
+func TestCheckConfigStillRefusesAConfigurationThatWouldNotWork(t *testing.T) {
+	fs := flag.NewFlagSet("netrewindd", flag.ContinueOnError)
+	fs.SetOutput(&strings.Builder{})
+	if _, err := loadConfig(fs, []string{"--check-config", "--rules", "/nonexistent/rules"}); err == nil {
+		t.Fatal("--check-config accepted a configuration the recorder cannot use")
+	}
+}
