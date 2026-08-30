@@ -489,3 +489,42 @@ func TestAReleaseTooOldToReportItsVersionIsRefusedClearly(t *testing.T) {
 		t.Errorf("the error does not explain why: %v", err)
 	}
 }
+
+// The checksum file that is actually going to be published, read by the code
+// that will read it in the field.
+//
+// It is assembled by `make release` and then, when an appliance image is part
+// of the release, has a line appended by hand. A checksum file the updater
+// cannot parse is a release every recorder refuses, and the failure would
+// arrive as "no matching asset" rather than as anything about the file.
+func TestThePublishedChecksumFileParses(t *testing.T) {
+	path := filepath.Join("..", "..", "release", "SHA256SUMS")
+	f, err := os.Open(path)
+	if err != nil {
+		t.Skipf("no release built here: %v", err)
+	}
+	defer f.Close()
+
+	sums, err := ParseChecksums(f)
+	if err != nil {
+		t.Fatalf("the updater cannot read %s: %v", path, err)
+	}
+	// The asset this machine's updater would go looking for has to be one of
+	// the names in it.
+	var listed []string
+	for name := range sums {
+		listed = append(listed, name)
+		if len(sums[name]) != 32 {
+			t.Errorf("%s: checksum is %d bytes, want 32", name, len(sums[name]))
+		}
+	}
+	sortStrings(listed)
+	t.Logf("the release lists %d assets: %v", len(listed), listed)
+
+	for _, arch := range []string{"amd64", "arm64"} {
+		want := "netrewind-0.9.1-linux-" + arch + ".tar.gz"
+		if _, ok := sums[want]; !ok {
+			t.Errorf("%s is not listed, so an updater on %s would refuse the release", want, arch)
+		}
+	}
+}
