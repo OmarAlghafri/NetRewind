@@ -188,3 +188,47 @@ func TestTheApplianceImageRefusesAnOlderToolchainToo(t *testing.T) {
 		t.Error("build-image.sh checks the toolchain after it has started creating the disk")
 	}
 }
+
+// CI must not publish to a release.
+//
+// It used to. The signature is made on the machine holding the key, so the
+// release already carries a signed SHA256SUMS by the time a tag's CI run
+// finishes - and action-gh-release replaces assets of the same name, so CI's
+// unsigned SHA256SUMS would take the place of the signed one and leave
+// SHA256SUMS.sig a signature over a file that is no longer there.
+//
+// The shape of that failure is why this is a test rather than a comment.
+// `sha256sum -c` still passes, because CI's sums match CI's tarballs, so the
+// release looks correct to anyone checking it by hand. Meanwhile every recorder
+// configured with update.public_key refuses it, and says only that no matching
+// asset was found. A release that is wrong in a way that reads as right is
+// exactly what this project exists to make impossible.
+func TestCIDoesNotPublishOverASignedRelease(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Skipf("no workflow to check: %v", err)
+	}
+	// Comments are stripped first. The comment beside this in the workflow
+	// names action-gh-release in order to explain why it is not used, and a
+	// test that cannot tell an explanation from a step is a test that punishes
+	// writing the explanation down.
+	var live []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if trimmed := strings.TrimSpace(line); !strings.HasPrefix(trimmed, "#") {
+			live = append(live, line)
+		}
+	}
+	workflow := strings.Join(live, "\n")
+
+	if strings.Contains(workflow, "action-gh-release") {
+		t.Error("CI uses action-gh-release, which replaces assets of the same name. " +
+			"A tag build finishing after the release was uploaded would overwrite the " +
+			"signed SHA256SUMS with an unsigned one, and SHA256SUMS.sig would then " +
+			"verify against nothing while sha256sum -c still passed")
+	}
+	// contents: write is what publishing needs. Nothing in this workflow should.
+	if strings.Contains(workflow, "contents: write") {
+		t.Error("a job in CI asks for contents: write; nothing here should be able " +
+			"to alter a release")
+	}
+}

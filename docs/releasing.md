@@ -75,9 +75,21 @@ git tag -a v0.9.0 -m "NetRewind 0.9.0"
 git push origin main v0.9.0
 ```
 
-> **The CI release job builds unsigned artefacts.** That is deliberate: CI has no
-> key, and giving it one would remove the guarantee. If you let CI publish, add
-> `SHA256SUMS.sig` to the release yourself afterwards, or cut releases locally.
+> **CI builds a release on a tag and does not publish it.** That is deliberate,
+> and it is not only because CI has no key.
+>
+> It used to publish. `action-gh-release` replaces assets of the same name, so
+> a CI run finishing after you uploaded would put its own unsigned
+> `SHA256SUMS` in place of the signed one — leaving `SHA256SUMS.sig` a
+> signature over a file no longer in the release. That failure is the worst
+> available shape: `sha256sum -c` still passes, because CI's sums match CI's
+> tarballs, so the release looks right to anyone checking by hand, while every
+> recorder configured with `update.public_key` refuses it and reports only that
+> no matching asset was found.
+>
+> The job now keeps its build as a workflow artefact instead. It answers
+> whether the tag builds a release on a machine that is not yours, and its
+> checksums can be compared against the published ones by anyone who cares to.
 
 ## What updaters do with it
 
