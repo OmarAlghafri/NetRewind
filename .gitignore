@@ -1,6 +1,10 @@
 # Go build output
 build/
 dist/
+# Release artefacts, built by `make release DIST=release`. They are large,
+# they are reproducible from the tag, and a checksum file in git is one that
+# disagrees with the one published.
+release/
 *.exe
 *.test
 *.out
