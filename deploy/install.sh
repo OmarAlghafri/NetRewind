@@ -56,6 +56,12 @@ if [ ! -r /sys/kernel/btf/vmlinux ]; then
 fi
 
 echo "==> binaries into $PREFIX"
+# Created rather than assumed. /usr/local/bin exists on most systems, which is
+# why this was missing for so long, and on the ones where it does not - a
+# minimal container image, a stripped appliance root - the install stopped
+# here, after the kernel checks and before anything else, with a message about
+# a file it could not create rather than a directory it needed.
+install -d -m 0755 "$PREFIX"
 install -m 0755 "$HERE/netrewindd" "$PREFIX/netrewindd"
 install -m 0755 "$HERE/netrewind" "$PREFIX/netrewind"
 
@@ -78,17 +84,35 @@ install -d -m 0750 "$CONFDIR"
 if [ -e "$CONFDIR/netrewindd.yaml" ]; then
     # An upgrade must never overwrite a configuration somebody tuned. The new
     # sample is left alongside so its comments can still be read.
+    #
+    # Nor may it be edited in passing. This script used to point db: and rules:
+    # at this host's paths unconditionally, including on an upgrade - so an
+    # operator who had moved the store to a bigger disk got it moved back, the
+    # recorder started a fresh one at the default path, and the timeline they
+    # had been keeping for months read as empty. A recorder that appears to
+    # have no history is the exact confusion this project exists to remove, and
+    # an upgrade is the worst moment to produce it.
     install -m 0640 "$HERE/deploy/netrewindd.yaml" "$CONFDIR/netrewindd.yaml.sample"
-    echo "    keeping existing netrewindd.yaml (new sample at netrewindd.yaml.sample)"
+    echo "    keeping existing netrewindd.yaml unchanged (new sample at netrewindd.yaml.sample)"
+    echo "    store: $(sed -n 's/^db: *//p' "$CONFDIR/netrewindd.yaml" | head -1)"
 else
     install -m 0640 "$HERE/deploy/netrewindd.yaml" "$CONFDIR/netrewindd.yaml"
+    # Point a fresh configuration at this host's paths, which may have been
+    # moved with CONFDIR or STATEDIR. Done before anything is started, and
+    # before the systemd check, so a host without systemd gets a correct file
+    # too.
+    sed -i "s|^db: .*|db: $STATEDIR/events.db|; s|^rules: .*|rules: $CONFDIR/rules|" \
+        "$CONFDIR/netrewindd.yaml"
 fi
 
-# Point the configuration at this host's paths, which may have been moved with
-# PREFIX, CONFDIR or STATEDIR. Done before anything is started, and before the
-# systemd check, so a host without systemd gets a correct file too.
-sed -i "s|^db: .*|db: $STATEDIR/events.db|; s|^rules: .*|rules: $CONFDIR/rules|" \
-    "$CONFDIR/netrewindd.yaml"
+# The recorder reads /etc/netrewind/netrewindd.yaml on its own; anywhere else
+# has to be named. Without this, CONFDIR was accepted and then ignored, and the
+# check below - along with the running service - read a file that was not the
+# one just installed.
+CONFIG_FLAG=""
+if [ "$CONFDIR" != /etc/netrewind ]; then
+    CONFIG_FLAG=" --config $CONFDIR/netrewindd.yaml"
+fi
 
 echo "==> state directory $STATEDIR"
 install -d -m 0750 "$STATEDIR"
@@ -99,23 +123,30 @@ if [ ! -d "$UNITDIR" ]; then
     # more use than a failed install command.
     echo
     echo "$UNITDIR does not exist, so there is no systemd to install a unit into."
-    echo "The binaries and /etc/netrewind are in place. Run the recorder under"
+    echo "The binaries and $CONFDIR are in place. Run the recorder under"
     echo "whatever supervisor this host uses:"
     echo
-    echo "    $PREFIX/netrewindd"
+    echo "    $PREFIX/netrewindd$CONFIG_FLAG"
     echo
-    "$PREFIX/netrewindd" --check-config
+    # shellcheck disable=SC2086 # CONFIG_FLAG is two words or none, deliberately
+    "$PREFIX/netrewindd" --check-config $CONFIG_FLAG
     exit 0
 fi
 
 echo "==> unit into $UNITDIR"
-install -m 0644 "$HERE/deploy/systemd/$UNIT" "$UNITDIR/$UNIT"
-# The unit needs no rewriting: it runs the recorder with no arguments and lets
-# the recorder read /etc/netrewind. One file to look at rather than two.
+# The unit ships with the default paths in it, and is rewritten here only so
+# that PREFIX and CONFDIR mean something. With no overrides the result is the
+# file as shipped.
+sed -e "s|^ExecStart=.*|ExecStart=$PREFIX/netrewindd$CONFIG_FLAG|" \
+    -e "s|^ExecStartPre=.*|ExecStartPre=$PREFIX/netrewindd --check-config$CONFIG_FLAG|" \
+    -e "s|^ReadOnlyPaths=/etc/netrewind$|ReadOnlyPaths=$CONFDIR|" \
+    "$HERE/deploy/systemd/$UNIT" > "$UNITDIR/$UNIT"
+chmod 0644 "$UNITDIR/$UNIT"
 systemctl daemon-reload
 
 # Fail here rather than in a restart loop nobody is watching.
-"$PREFIX/netrewindd" --check-config || die "the installed configuration is not usable"
+# shellcheck disable=SC2086
+"$PREFIX/netrewindd" --check-config $CONFIG_FLAG || die "the installed configuration is not usable"
 
 if [ "$start" = yes ]; then
     echo "==> starting"
