@@ -1,5 +1,121 @@
 # Changelog
 
+## 0.9.1 — 2026-08-29
+
+A hardening release. Nothing here changes what the recorder is for; all of it
+came out of trying to break the recorder deliberately, and all of it is about
+the same thing — the ways the record could stop being trustworthy without
+anybody being told.
+
+### The burst these rules exist for is no longer the burst that stopped the recorder
+
+Correlation re-walked every event in its window as a candidate opening on every
+arrival. The cost of one event grew with the window and the cost of a burst
+grew with its cube: two thousand flaps took thirteen seconds of CPU and five
+thousand took thirty-four, on the goroutine that also makes events durable. A
+flapping port is the shape `port-flapping` was written to recognise, and it was
+the shape that made the recorder fall behind the network — the queue backs up,
+netlink overruns, and the record ends up with a hole in exactly the period
+somebody will later need.
+
+Each opening now remembers what it is waiting for, so an arrival that cannot
+change the answer skips the walk, and openings waiting on a kind that has not
+arrived are not visited at all. The same burst is now linear in its size:
+eight thousand events take 34 ms rather than minutes. The window is also
+bounded by count as well as by time, because a time bound is not a bound when
+events arrive faster than the window empties — and what it had to drop is
+counted in `netrewind_correlation_dropped_total`, on the principle that
+correlation's blind spots belong in the same place as the recorder's.
+
+### Retention now bounds the disk, which is what it always said it did
+
+`retention` pruned the events. The conclusions and the identity bindings grew
+without limit: `PruneIncidents` existed, was tested, and was called by nothing,
+and nothing pruned identity at all. So a recorder on a segment with any churn
+filled its disk however retention was configured — and the deployment that
+suffers most is the appliance, whose whole premise is being plugged in and
+forgotten. Measured before the fix: a prune that removed all twenty thousand
+events left twenty thousand identity bindings and a thousand incidents behind.
+
+Incidents are now kept four times as long as the events under them, which is
+what the runbook always claimed. Identity is pruned on two rules that are
+provable rather than approximate: a superseded binding goes once it ended
+before the oldest event kept, and a binding still in force goes only when no
+retained event names its host — because a binding in force carries when it was
+made, not when it was last seen, and pruning those by age would delete exactly
+the machines that have been on the network longest.
+
+### The terminal no longer executes what the network wrote
+
+The Linux kernel accepts an escape character in an interface name. A DNS name
+is whatever a machine on the watched segment looked up. Printed unchanged,
+`ESC [ 2 J` clears the operator's screen and a carriage return overwrites the
+line before it — so the machine being investigated got to decide what the
+investigator read. Everything the CLI prints now renders those bytes as `\xNN`
+instead of passing them to the terminal. The store still keeps exactly what
+arrived; this is the last step before bytes become something a terminal acts
+on, and nothing else.
+
+### A release can no longer be cut with a standard library that has holes in it
+
+`go.mod` names a toolchain rather than raising the `go` line, so the tree keeps
+building on a distro that pins `GOTOOLCHAIN=local` with an older Go. The cost
+was that on exactly those machines the directive had no effect: the build
+succeeded and quietly linked the older standard library. `govulncheck` reports
+nine vulnerabilities against such a build and none against one built with the
+toolchain `go.mod` asks for — and one of the nine is in `html/template`, which
+is what renders network-supplied strings into the web interface. Building that
+way is still fine; `make release` and `make image` now refuse to.
+
+### Fixes
+
+- **`install.sh` edited a configuration somebody had tuned.** The rewrite that
+  points `db:` and `rules:` at the host's paths ran on every install, including
+  an upgrade — so an operator who had moved the store to a bigger disk got it
+  moved back, the recorder opened an empty one at the default path, and months
+  of timeline read as though the network had never done anything.
+- **`install.sh` never created the directory it installed into.** `/usr/local/bin`
+  exists on most systems, which is why this went unnoticed; where it does not,
+  the install stopped part way through.
+- **`CONFDIR` was accepted and then ignored.** The recorder reads
+  `/etc/netrewind/netrewindd.yaml` unless told otherwise, so a non-default
+  `CONFDIR` installed a file nothing would read, and the check meant to catch an
+  unusable configuration checked a different one. The unit and the check are now
+  told where the configuration is.
+- **The store outage that logs four lines a second.** A refused write was
+  reported on every flush for the duration of the outage, which buried the one
+  line that says what went wrong — and on a machine where the log and the store
+  share a filesystem, made a full disk fuller.
+- **An OTLP endpoint's credentials were written to the log.** A collector behind
+  basic auth is reached as `https://user:password@host`, and the endpoint was
+  logged verbatim at every start.
+- **The container image shipped its configuration world-readable and
+  executable.** That file is the documented place for `update.token` and for an
+  OTLP `Authorization` header, and the image's own comments suggest running it
+  as `--user 10001`, which could read them.
+- **The security test for the web interface tested nothing.** It sent the
+  payload as `?host=`, which no handler reads; the search field is `?q=`. The
+  escaping was in fact sound — html/template was doing its job — but the test
+  proving it was not looking at the page.
+- **The runbook did not mention every metric it should be watched through.** It
+  is now checked against the registry rather than against memory.
+
+### Hardening
+
+- The web interface declares a content security policy that forbids script
+  outright, along with `nosniff`, `DENY` framing and `no-referrer`. The pages
+  have no JavaScript, load nothing from anywhere else and submit only to
+  themselves, so the strictest policy that can be written is also the one that
+  describes them exactly.
+- The `nft` binary is found at an absolute path before `PATH` is consulted. A
+  process running as root with `CAP_BPF` that can be configured to replace its
+  own binary should not let an inherited `PATH` decide what it executes.
+- Rule text carried as evidence is bounded by length as well as by line count.
+  An nftables rule with a large set inline is one line of arbitrary size.
+- Fuzz targets for the three parsers that read bytes off the wire. 18.3 million
+  executions found no crash; they are in the tree so the next change is checked
+  the same way.
+
 ## 0.9.0 — 2026-08-27
 
 The release the recorder can install for itself, and the first one an operator
