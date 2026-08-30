@@ -67,6 +67,25 @@ toolchain `go.mod` asks for — and one of the nine is in `html/template`, which
 is what renders network-supplied strings into the web interface. Building that
 way is still fine; `make release` and `make image` now refuse to.
 
+### CI cannot overwrite a signed release
+
+It could, and the way it would have failed is the reason this is worth a
+heading. A release is cut from the machine holding the signing key, so the
+release on GitHub already carries a signed `SHA256SUMS` by the time a tag's CI
+run finishes — and `action-gh-release` replaces assets of the same name. CI's
+unsigned checksum file would have taken the place of the signed one, leaving
+`SHA256SUMS.sig` a signature over a file no longer in the release.
+
+`sha256sum -c` would still have passed, because CI's sums match CI's tarballs.
+So the release would have looked correct to anyone checking it by hand, while
+every recorder configured with `update.public_key` refused it and reported only
+that no matching asset was found. The job now keeps its build as a workflow
+artefact and publishes nothing.
+
+> **Note.** 0.9.0 was written up here but never tagged or published. This is
+> the first release since 0.8.0, and it contains everything both entries
+> describe.
+
 ### Fixes
 
 - **`install.sh` edited a configuration somebody had tuned.** The rewrite that
