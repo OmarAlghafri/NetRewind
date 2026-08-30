@@ -2,6 +2,8 @@ package metrics
 
 import (
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -225,4 +227,59 @@ func TestHandlerServesTheTextFormat(t *testing.T) {
 	if !strings.Contains(body, `netrewind_build_info{observer="obs",version="0.6.0"} 1`) {
 		t.Errorf("build info missing or malformed:\n%s", body)
 	}
+}
+
+// A metric nobody was told about is a metric nobody watches.
+//
+// This has gone wrong before: two series were added and the runbook's alert
+// table was not, so an operator following the documentation was not watching
+// the two signals that had just been created for them to watch. The failure is
+// silent by construction - the metric is there, the scrape works, and the only
+// thing missing is anyone's knowledge of it.
+//
+// So the runbook is checked against the registry rather than against memory.
+// Every series the recorder declares has to appear in docs/runbook.md, either
+// in the table of what to alert on or in the sentence listing what is
+// deliberately not worth paging anyone about.
+func TestEveryMetricAppearsInTheRunbook(t *testing.T) {
+	runbook, err := os.ReadFile(filepath.Join("..", "..", "docs", "runbook.md"))
+	if err != nil {
+		t.Fatalf("read the runbook: %v", err)
+	}
+	text := string(runbook)
+
+	var missing []string
+	for _, name := range declaredMetricNames() {
+		if !strings.Contains(text, "`"+name+"`") {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		t.Errorf("docs/runbook.md never mentions %s.\n"+
+			"Add each to the table of what to alert on, or to the sentence naming what is "+
+			"deliberately not worth paging on. A series nobody was told about is a series "+
+			"nobody is watching.", strings.Join(missing, ", "))
+	}
+}
+
+// declaredMetricNames is every series a fresh recorder exposes, taken from a
+// scrape rather than from a list kept by hand beside the one in recorder.go.
+func declaredMetricNames() []string {
+	var buf strings.Builder
+	NewRecorder("test", "obs").Registry().WriteTo(&buf)
+
+	seen := map[string]bool{}
+	var names []string
+	for _, line := range strings.Split(buf.String(), "\n") {
+		if !strings.HasPrefix(line, "# TYPE ") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 3 || seen[fields[2]] {
+			continue
+		}
+		seen[fields[2]] = true
+		names = append(names, fields[2])
+	}
+	return names
 }
