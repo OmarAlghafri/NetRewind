@@ -20,8 +20,13 @@ prints the public half in the form the configuration wants:
 
 ```yaml
 update:
-  public_key: "wlWKX72VqTxeyK9nPQzBpMH49VaNnXl4Cvirlxz/74U="
+  public_key: "<the 44 characters make signing-key printed>"
 ```
+
+That value is the trust anchor for every recorder configured with it, so it has
+to be the one *your* key printed. A key copied from a document is a key
+somebody else holds the private half of, and a recorder configured with it will
+either refuse every release you publish or accept one you did not.
 
 **Back the private key up offline, now.** Losing it means every recorder
 configured with the matching public key stops accepting updates, and there is no
