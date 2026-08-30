@@ -102,9 +102,19 @@ func writer(ctx context.Context, st store.Store, engine *correlate.Engine, meter
 			// The admission, if there was one, is folded back in rather than
 			// lost with the batch - the store is still broken and still owes an
 			// account of it.
+			wasBroken := loss.any()
 			loss.note(lost, err, now)
-			log.Error("the store would not accept writes; these events are lost",
-				"events", lost, "err", err)
+			// Said once when the store breaks, and again when it is still
+			// broken but has actually lost something more. A full disk is the
+			// ordinary way this happens, the flush timer runs four times a
+			// second, and a line every 250ms for the duration of the outage
+			// would bury the one that says what went wrong - on a machine
+			// where the log and the store usually share a filesystem, it also
+			// makes a full disk fuller.
+			if !wasBroken || lost > 0 {
+				log.Error("the store would not accept writes; these events are lost",
+					"events", lost, "lost_since", loss.since.Format(time.RFC3339), "err", err)
+			}
 			meter.SetStoreWritable(false)
 			batch = batch[:0]
 			return
@@ -123,6 +133,10 @@ func writer(ctx context.Context, st store.Store, engine *correlate.Engine, meter
 			for _, e := range batch {
 				incidents = append(incidents, engine.Offer(e)...)
 			}
+			// Correlation's own blind spot. The store holds everything either
+			// way, but a window that had to be truncated means an incident the
+			// engine did not report is not evidence there was none.
+			meter.SetCorrelationDropped(engine.Truncated())
 			if len(incidents) > 0 {
 				if err := st.AppendIncidents(ctx, incidents...); err != nil {
 					log.Error("could not store incidents", "err", err)

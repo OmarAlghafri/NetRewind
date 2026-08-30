@@ -23,6 +23,11 @@ const (
 	StoreWritable  = "netrewind_store_writable"
 	OTLPDropped    = "netrewind_otlp_dropped_total"
 	BuildInfo      = "netrewind_build_info"
+	// CorrelationDropped is correlation's own blind spot, kept separate from
+	// the recorder's: the events are in the store and the timeline is whole,
+	// but the engine was reasoning about part of the period rather than all of
+	// it, so an incident it did not report is not evidence there was none.
+	CorrelationDropped = "netrewind_correlation_dropped_total"
 )
 
 // Recorder turns the event stream into metrics.
@@ -59,6 +64,9 @@ func NewRecorder(version, observerID string) *Recorder {
 	// operator about missing evidence when the evidence is intact.
 	reg.Declare(OTLPDropped, Counter,
 		"Records the OpenTelemetry collector never received. The store still has them.")
+	reg.Declare(CorrelationDropped, Counter,
+		"Events correlation dropped from its window because the window was full. "+
+			"Above zero, an incident it did not report is not evidence there was none.")
 
 	reg.Set(BuildInfo, Labels{"version": version, "observer": observerID}, 1)
 
@@ -79,6 +87,7 @@ func NewRecorder(version, observerID string) *Recorder {
 	// silenced.
 	reg.Set(StoreWritable, nil, 1)
 	reg.Add(OTLPDropped, nil, 0)
+	reg.Add(CorrelationDropped, nil, 0)
 
 	return &Recorder{reg: reg}
 }
@@ -151,6 +160,13 @@ func (r *Recorder) SetOTLPDropped(n uint64) {
 // SetStoredEvents records how much history is currently held.
 func (r *Recorder) SetStoredEvents(n int64) {
 	r.reg.Set(StoredEvents, nil, float64(n))
+}
+
+// SetCorrelationDropped records how much of the period correlation could not
+// hold in its window. Set rather than added: the engine keeps the running
+// total, and it only ever grows.
+func (r *Recorder) SetCorrelationDropped(n uint64) {
+	r.reg.Set(CorrelationDropped, nil, float64(n))
 }
 
 // Handler serves the registry over HTTP.
