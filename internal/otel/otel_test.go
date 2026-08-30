@@ -369,3 +369,22 @@ func attrsOf(rec map[string]any) map[string]any {
 	}
 	return out
 }
+
+// A collector behind basic auth is reached as https://user:password@host, which
+// is an ordinary thing to configure. The recorder logs the endpoint it was
+// given at every start, and a log is the thing most likely to be copied into a
+// support ticket.
+func TestTheEndpointIsLoggedWithoutItsCredentials(t *testing.T) {
+	ex := New("https://scraper:hunter2@collector.example:4318", "obs", "1.0", nil, quiet())
+
+	if shown := ex.Endpoint(); strings.Contains(shown, "hunter2") {
+		t.Errorf("Endpoint() = %q, which carries the password", shown)
+	}
+	if shown := ex.Endpoint(); !strings.Contains(shown, "collector.example:4318") {
+		t.Errorf("Endpoint() = %q, which no longer says where it posts", shown)
+	}
+	// The request itself still has to carry them.
+	if !strings.Contains(ex.endpoint, "hunter2") {
+		t.Error("the credentials were stripped from the address requests are made to")
+	}
+}

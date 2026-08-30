@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -33,7 +34,13 @@ const (
 // is the record; this is a copy going somewhere else, and a copy that cannot be
 // delivered must never be allowed to stop the original being written.
 type Exporter struct {
-	endpoint   string
+	endpoint string
+	// shown is the endpoint with any credentials removed, for logs and for
+	// anything an operator reads. A collector behind basic auth is reached as
+	// https://user:password@host, which is a perfectly ordinary thing to
+	// configure and not something to write into a log file that gets shipped
+	// somewhere for support.
+	shown      string
 	headers    map[string]string
 	observerID string
 	version    string
@@ -53,12 +60,14 @@ type Exporter struct {
 // signal path is appended. Passing a URL that already ends in /v1/logs is
 // accepted too, because that is what half the documentation shows.
 func New(endpoint, observerID, version string, headers map[string]string, log *slog.Logger) *Exporter {
-	url := strings.TrimRight(endpoint, "/")
-	if !strings.HasSuffix(url, logsPath) {
-		url += logsPath
+	// Named target rather than url: net/url is imported here.
+	target := strings.TrimRight(endpoint, "/")
+	if !strings.HasSuffix(target, logsPath) {
+		target += logsPath
 	}
 	return &Exporter{
-		endpoint:   url,
+		endpoint:   target,
+		shown:      redact(target),
 		headers:    headers,
 		observerID: observerID,
 		version:    version,
@@ -67,8 +76,10 @@ func New(endpoint, observerID, version string, headers map[string]string, log *s
 	}
 }
 
-// Endpoint is where this exporter posts. Useful for logging what was configured.
-func (e *Exporter) Endpoint() string { return e.endpoint }
+// Endpoint is where this exporter posts, with any credentials removed. It is
+// what gets logged and what an operator is shown; nothing needs the password
+// except the request itself.
+func (e *Exporter) Endpoint() string { return e.shown }
 
 // Dropped is how many records the receiver never got.
 func (e *Exporter) Dropped() uint64 { return e.dropped.Load() }
@@ -94,7 +105,7 @@ func (e *Exporter) Export(ctx context.Context, events []*event.Event, incidents 
 		case err == nil && status/100 == 2:
 			if e.failing.Swap(false) {
 				e.log.Info("the OTLP collector is accepting the record again",
-					"endpoint", e.endpoint)
+					"endpoint", e.shown)
 			}
 			return nil
 
@@ -102,7 +113,7 @@ func (e *Exporter) Export(ctx context.Context, events []*event.Event, incidents 
 			// A 400 will be a 400 next time too. Retrying a rejected payload
 			// just delays finding out that it is malformed.
 			e.note(len(events) + len(incidents))
-			return fmt.Errorf("otel: %s rejected the batch with HTTP %d", e.endpoint, status)
+			return fmt.Errorf("otel: %s rejected the batch with HTTP %d", e.shown, status)
 
 		case err != nil:
 			last = err
@@ -126,9 +137,9 @@ func (e *Exporter) Export(ctx context.Context, events []*event.Event, incidents 
 		// that has been down for an hour should not have produced an hour of
 		// identical log lines to scroll past.
 		e.log.Warn("the OTLP collector is not accepting the record; the store still has it",
-			"endpoint", e.endpoint, "err", last)
+			"endpoint", e.shown, "err", last)
 	}
-	return fmt.Errorf("otel: export to %s: %w", e.endpoint, last)
+	return fmt.Errorf("otel: export to %s: %w", e.shown, last)
 }
 
 func (e *Exporter) post(ctx context.Context, body []byte) (int, error) {
@@ -169,4 +180,17 @@ func backoff(attempt int) time.Duration {
 	// 200ms, 400ms. Short: the batch behind this one is already accumulating,
 	// and the store has the data regardless.
 	return time.Duration(200*(1<<(attempt-1))) * time.Millisecond
+}
+
+// redact removes the userinfo from a URL, leaving something safe to print.
+//
+// A URL that does not parse is not passed through: this is only ever used for
+// display, and showing nothing is better than showing a password because the
+// string happened to be malformed.
+func redact(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "(unparseable endpoint)"
+	}
+	return u.Redacted()
 }
