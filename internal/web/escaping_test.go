@@ -48,7 +48,7 @@ func TestHostileStringsFromTheWireAreEscaped(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			for _, path := range []string{"/", "/timeline?window=24h", "/host?host=" + url.QueryEscape(tc.payload)} {
+			for _, path := range []string{"/", "/timeline?window=24h", "/host?q=" + url.QueryEscape(tc.payload)} {
 				rec := httptest.NewRecorder()
 				req := httptest.NewRequest("GET", path, nil)
 				srv.Handler().ServeHTTP(rec, req)
@@ -70,9 +70,13 @@ func TestHostileStringsFromTheWireAreEscaped(t *testing.T) {
 func TestHostileQueryParametersAreEscaped(t *testing.T) {
 	srv, _ := newTestServer(t)
 
+	// q is the parameter the search box on the host page submits, and the only
+	// one echoed straight back into the document. It was spelled "host" here
+	// for a while, which is not a parameter any handler reads: the test passed
+	// because the payload never reached the page at all.
 	const payload = `<script>alert(1)</script>`
 	for _, path := range []string{
-		"/host?host=" + url.QueryEscape(payload),
+		"/host?q=" + url.QueryEscape(payload),
 		"/timeline?window=" + url.QueryEscape(payload),
 		"/incidents?window=" + url.QueryEscape(payload),
 	} {
@@ -82,6 +86,20 @@ func TestHostileQueryParametersAreEscaped(t *testing.T) {
 		if strings.Contains(rec.Body.String(), payload) {
 			t.Errorf("%s echoed the query string unescaped", path)
 		}
+	}
+}
+
+// The escaping test above is only worth anything if the parameter it uses is
+// the one the page actually reads. This asserts that directly, so a rename of
+// the search field cannot quietly turn the test above back into a no-op.
+func TestTheSearchParameterReachesThePage(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/host?q=10.99.0.11", nil))
+
+	if !strings.Contains(rec.Body.String(), "10.99.0.11") {
+		t.Fatal("/host?q=... did not reach the page; the escaping tests above are testing nothing")
 	}
 }
 
@@ -133,6 +151,36 @@ func TestStaticAssetsCannotEscapeTheEmbeddedFilesystem(t *testing.T) {
 
 		if strings.Contains(rec.Body.String(), "{{") {
 			t.Errorf("%s served a template source file", path)
+		}
+	}
+}
+
+// The pages say what they are allowed to do, and it is almost nothing. Worth
+// pinning rather than assuming: a header that quietly stops being sent looks
+// exactly like one that is still there.
+func TestPagesCarryAPolicyThatForbidsScript(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	want := map[string]string{
+		"X-Content-Type-Options": "nosniff",
+		"X-Frame-Options":        "DENY",
+		"Referrer-Policy":        "no-referrer",
+	}
+	for _, path := range []string{"/", "/incidents", "/timeline", "/host", "/static/style.css"} {
+		rec := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+
+		csp := rec.Header().Get("Content-Security-Policy")
+		if !strings.Contains(csp, "default-src 'none'") {
+			t.Errorf("%s: policy %q does not forbid loading by default", path, csp)
+		}
+		if strings.Contains(csp, "script-src") && !strings.Contains(csp, "script-src 'none'") {
+			t.Errorf("%s: policy %q allows script; these pages have none", path, csp)
+		}
+		for header, value := range want {
+			if got := rec.Header().Get(header); got != value {
+				t.Errorf("%s: %s = %q, want %q", path, header, got, value)
+			}
 		}
 	}
 }

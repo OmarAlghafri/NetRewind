@@ -72,7 +72,36 @@ func (s *Server) Handler() http.Handler {
 		mux.Handle("GET /static/", http.StripPrefix("/static/",
 			cacheForever(http.FileServer(http.FS(static)))))
 	}
-	return withLogging(s.log, mux)
+	return withLogging(s.log, withSecurityHeaders(mux))
+}
+
+// withSecurityHeaders states what these pages are allowed to do, which is
+// almost nothing.
+//
+// The interface has no JavaScript, loads nothing from anywhere else, and
+// submits only to itself, so the strictest policy that can be written is also
+// the one that describes it exactly. That costs nothing today and is worth a
+// great deal on the day a template picks up a string from the wire in a
+// context html/template escapes differently than expected: a policy that
+// forbids script outright turns that from a compromise of the machine reading
+// the evidence into a rendering bug.
+//
+// frame-ancestors and the older X-Frame-Options keep the pages out of a frame
+// on some other page - the interface is unauthenticated on loopback, and a
+// browser that has been persuaded to load a hostile page can otherwise read it
+// through one. no-referrer keeps the address someone searched for from being
+// sent anywhere at all.
+func withSecurityHeaders(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		head := w.Header()
+		head.Set("Content-Security-Policy",
+			"default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; "+
+				"base-uri 'none'; frame-ancestors 'none'")
+		head.Set("X-Content-Type-Options", "nosniff")
+		head.Set("X-Frame-Options", "DENY")
+		head.Set("Referrer-Policy", "no-referrer")
+		h.ServeHTTP(w, r)
+	})
 }
 
 // Serve builds the HTTP server. The caller owns its lifetime.
