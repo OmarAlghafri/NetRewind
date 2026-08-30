@@ -60,10 +60,18 @@ FROM alpine:3.24
 RUN apk add --no-cache nftables iproute2 ca-certificates && \
     adduser -D -H -u 10001 netrewind
 
-COPY --from=build /out/netrewindd /usr/local/bin/netrewindd
-COPY --from=build /out/netrewind  /usr/local/bin/netrewind
-COPY rules/ /etc/netrewind/rules/
-COPY deploy/netrewindd.yaml /etc/netrewind/netrewindd.yaml
+COPY --from=build --chmod=0755 /out/netrewindd /usr/local/bin/netrewindd
+COPY --from=build --chmod=0755 /out/netrewind  /usr/local/bin/netrewind
+COPY --chmod=0640 rules/ /etc/netrewind/rules/
+# 0640, and not because a config file has any business being executable.
+#
+# This is the documented place for update.token and for the Authorization
+# header an OTLP collector behind authentication wants, so it is a file that
+# holds credentials. It arrived 0755 and world-readable, because COPY keeps the
+# mode of the build context and a Windows checkout marks everything executable
+# - which meant `--user 10001`, the invocation this image's own comments
+# suggest for reading a store, could read them.
+COPY --chmod=0640 deploy/netrewindd.yaml /etc/netrewind/netrewindd.yaml
 
 # Runs as root by default because reading netlink and loading eBPF need
 # capabilities the container has to be granted anyway. The unprivileged user is
