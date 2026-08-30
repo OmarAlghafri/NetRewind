@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -31,6 +32,11 @@ const (
 	// to recognise the change, not enough to copy a firewall's whole policy
 	// into the event store.
 	maxSampleLines = 8
+	// maxSampleLineLen bounds one of them. A line count alone is not a bound:
+	// an nftables rule with a large set inline is a single line of arbitrary
+	// length, and eight of those is an arbitrary amount of it copied into
+	// every event the change produces.
+	maxSampleLineLen = 512
 )
 
 // Collector watches the nftables ruleset for changes.
@@ -136,7 +142,38 @@ func sample(lines []string) string {
 		suffix = fmt.Sprintf("\n... and %d more", len(shown)-maxSampleLines)
 		shown = shown[:maxSampleLines]
 	}
-	return strings.Join(shown, "\n") + suffix
+	trimmed := make([]string, len(shown))
+	for i, line := range shown {
+		if len(line) > maxSampleLineLen {
+			line = line[:maxSampleLineLen] + fmt.Sprintf(" ... (%d more characters)", len(line)-maxSampleLineLen)
+		}
+		trimmed[i] = line
+	}
+	return strings.Join(trimmed, "\n") + suffix
+}
+
+// nftPath finds the nft binary, preferring the places a distribution puts it.
+//
+// PATH is not a safe way for this process to name a program. The recorder runs
+// as root with CAP_BPF and can be configured to replace its own binary, so
+// anything it executes is part of its supply chain, and PATH is inherited from
+// whatever started it - a unit file, a container image, a shell. Looking in the
+// standard directories first means a writable directory earlier in someone's
+// PATH cannot decide what "nft" means here.
+//
+// PATH remains the fallback, because a host that keeps nft somewhere else
+// should still get the collector rather than a mysterious absence of
+// policy.rule_changed events.
+func nftPath() string {
+	for _, p := range []string{"/usr/sbin/nft", "/sbin/nft", "/usr/bin/nft", "/bin/nft"} {
+		if info, err := os.Stat(p); err == nil && !info.IsDir() {
+			return p
+		}
+	}
+	if p, err := exec.LookPath("nft"); err == nil {
+		return p
+	}
+	return "nft"
 }
 
 // readNftables shells out to nft.
@@ -145,11 +182,15 @@ func sample(lines []string) string {
 // than this is worth for a collector that only needs to know whether the
 // ruleset changed, and nft is present on any machine that has a ruleset to
 // read in the first place.
+//
+// No shell, and no argument that came from anywhere but this file: the
+// ruleset is read, never written, and nothing an observed network can say
+// reaches this command line.
 func readNftables(ctx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, readTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "nft", "list", "ruleset")
+	cmd := exec.CommandContext(ctx, nftPath(), "list", "ruleset")
 	out, err := cmd.Output()
 	if err != nil {
 		var ee *exec.ExitError
