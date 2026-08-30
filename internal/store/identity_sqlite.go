@@ -87,6 +87,62 @@ func (s *SQLite) CloseBinding(ctx context.Context, attrType, attrValue string, a
 	return nil
 }
 
+// PruneIdentity drops bindings that can no longer be needed.
+//
+// Retention was documented as how much history the recorder keeps and it
+// bounded the events table alone. This table grew forever: one ARP sweep across
+// a /16 is sixty-five thousand rows that no configured retention would ever
+// remove, and the deployment that suffers most is the appliance, whose whole
+// premise is being plugged in and forgotten.
+//
+// It cannot simply delete by age, and the trap is worth naming. A binding still
+// in force carries the time it was made, not the last time it was seen, so a
+// machine that has held one address for a year looks older than everything else
+// in the table - and pruning by age would delete precisely the stable,
+// long-lived, most useful entries while keeping the churn.
+//
+// Two rules, and both are provable rather than approximate:
+//
+//   - a binding that has been superseded exists to answer "which machine held
+//     this address at that moment", and the moments anyone can ask about are
+//     the ones there are still events for. Once it ended before the oldest
+//     event kept, nothing can ask.
+//
+//   - a binding still in force is worth keeping while its host appears anywhere
+//     in the record. When no retained event names that host, the binding cannot
+//     be needed to explain one - and the next time the machine is seen it is
+//     recorded again, at which point the recorder knows it once more.
+//
+// The second is run only against bindings older than the cutoff, so the
+// correlated lookup is over the stale part of the table rather than all of it.
+func (s *SQLite) PruneIdentity(ctx context.Context, before int64) (int64, error) {
+	var removed int64
+	res, err := s.db.ExecContext(ctx,
+		"DELETE FROM identity_binding WHERE valid_to > 0 AND valid_to < ?", before)
+	if err != nil {
+		return 0, fmt.Errorf("store: prune superseded bindings: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("store: prune superseded bindings: %w", err)
+	}
+	removed += n
+
+	res, err = s.db.ExecContext(ctx, `
+		DELETE FROM identity_binding
+		WHERE valid_to = 0 AND valid_from < ?
+		  AND NOT EXISTS (SELECT 1 FROM events WHERE events.subject_id = identity_binding.host_id)`,
+		before)
+	if err != nil {
+		return 0, fmt.Errorf("store: prune forgotten bindings: %w", err)
+	}
+	n, err = res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("store: prune forgotten bindings: %w", err)
+	}
+	return removed + n, nil
+}
+
 // ResolveAt returns the host an attribute belonged to at an instant.
 func (s *SQLite) ResolveAt(ctx context.Context, attrType, value string, at int64) (string, bool, error) {
 	var host string

@@ -327,15 +327,57 @@ func heartbeat(ctx context.Context, st store.Store, b *event.Builder, meter *met
 						WithAttr("step_ms", ns/int64(time.Millisecond)))
 			}
 		case <-prune.C:
-			n, err := st.Prune(ctx, time.Now().Add(-retention))
-			if err != nil {
-				log.Warn("prune failed", "err", err)
-				continue
-			}
-			if n > 0 {
-				log.Info("pruned expired history", "events", n, "retention", retention)
-			}
+			trim(ctx, st, log, retention)
 		}
+	}
+}
+
+// incidentRetentionFactor is how much longer a conclusion is kept than the
+// evidence under it.
+//
+// Incidents are small, they are the answer rather than the raw material, and
+// they are what somebody comes back to months later - so a week of events is a
+// month of incidents. Every link in a chain carries its own description
+// precisely so that an incident still reads once the events it cites have gone.
+//
+// Derived from the configured retention rather than being a setting of its own:
+// an operator who has already said how much history they want should not have
+// to answer a second, subtler question about how much of the conclusion drawn
+// from it to keep.
+const incidentRetentionFactor = 4
+
+// trim removes what has aged out of all three kinds of history the store holds.
+//
+// All three, because for a long time it was one. Retention was documented as
+// how much history to keep and it bounded the events table alone: the
+// conclusions and the identity bindings grew without limit, so a recorder on a
+// segment with any churn filled its disk however retention was set. On an
+// appliance that is a recorder which one day stops recording, having been
+// configured exactly as the documentation said.
+func trim(ctx context.Context, st store.Store, log *slog.Logger, retention time.Duration) {
+	now := time.Now()
+	events, err := st.Prune(ctx, now.Add(-retention))
+	if err != nil {
+		log.Warn("prune failed", "what", "events", "err", err)
+		return
+	}
+	// Bindings that ended before the oldest event we still hold can no longer
+	// be needed: they exist to say which machine held an address at a moment,
+	// and there are no moments left to ask about.
+	bindings, err := st.PruneIdentity(ctx, now.Add(-retention).UnixNano())
+	if err != nil {
+		log.Warn("prune failed", "what", "identity bindings", "err", err)
+		return
+	}
+	incidents, err := st.PruneIncidents(ctx, now.Add(-retention*incidentRetentionFactor))
+	if err != nil {
+		log.Warn("prune failed", "what", "incidents", "err", err)
+		return
+	}
+	if events > 0 || bindings > 0 || incidents > 0 {
+		log.Info("pruned expired history",
+			"events", events, "identity_bindings", bindings, "incidents", incidents,
+			"retention", retention, "incident_retention", retention*incidentRetentionFactor)
 	}
 }
 

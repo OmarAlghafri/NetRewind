@@ -223,10 +223,12 @@ The metrics worth alerting on are not the ones counting what was seen:
 | `netrewind_store_writable` | it is 0 | The store is refusing writes and events are being lost right now. This is the one signal that still works when the store itself is what broke |
 | `netrewind_clock_steps_total` | it increases | The wall clock jumped. Timestamps either side of it are not comparable |
 | `netrewind_otlp_dropped_total` | it increases | The OpenTelemetry collector is not receiving the record. The store still has it, so this is a delivery problem and not a recording one |
+| `netrewind_correlation_dropped_total` | it increases | Change arrived faster than correlation could hold a window of it, so it was reasoning about part of the period. The timeline is complete; an incident it did **not** report for that window is not evidence there was none |
 | `netrewind_stored_events` | growth changes shape | Either the network became unstable or retention needs revisiting |
 
-Everything else — `netrewind_events_total`, `netrewind_incidents_total` — is for
-dashboards and capacity, not for paging anyone.
+Everything else — `netrewind_events_total`, `netrewind_incidents_total`,
+`netrewind_build_info` — is for dashboards, capacity and knowing which version
+answered, not for paging anyone.
 
 ## Using it during an incident
 
@@ -278,11 +280,31 @@ again before believing it.
 
 ## Retention and pruning
 
-`retention` (default 7 days, or `--retention`) prunes events hourly. Incidents are kept far
-longer: they are the conclusion, they are small, and they are what someone comes
-back to months later. Their links will eventually point at events that have been
-pruned, which is why every link carries its own description — the account
-survives its evidence.
+`retention` (default 7 days, or `--retention`) is applied hourly, and it bounds
+all three of the things the store holds:
+
+| | Kept for | Why |
+|---|---|---|
+| Events | `retention` | The raw record. This is nearly all of the volume |
+| Incidents | `retention` × 4 | The conclusion, not the raw material. Small, and what someone comes back to months later. Their links will eventually point at events that have been pruned, which is why every link carries its own description — the account survives its evidence |
+| Identity bindings | Until nothing can need them | A binding that was superseded goes once it ended before the oldest event kept. One still in force is kept while its host appears anywhere in the record, however long ago it was made — otherwise the prune would delete exactly the machines that have been on the network longest |
+
+Setting `retention` therefore bounds the disk. It did not always: the events
+went and the other two grew without limit, so a recorder on a segment with any
+churn eventually filled its disk however retention was configured. If you are
+upgrading a recorder that has been running a while, expect the first hourly
+prune after the upgrade to remove a great deal.
+
+The file itself does not shrink when rows go — SQLite keeps the freed pages and
+reuses them, so the size plateaus rather than growing. Reclaiming the space on
+disk needs `VACUUM`, which rewrites the whole file and is worth doing only if
+you have just cut retention sharply and need the space back:
+
+```bash
+systemctl stop netrewindd
+sqlite3 /var/lib/netrewind/events.db 'VACUUM;'
+systemctl start netrewindd
+```
 
 To keep raw events longer, raise `retention` and watch
 `netrewind_stored_events`. The store is one SQLite file; back it up by copying it
@@ -294,9 +316,17 @@ The recorder stores **no packet payloads**, ever. It records that a connection
 was attempted, not what was said over it.
 
 DNS query names are the one piece of content-adjacent data it can hold, and
-there are networks where recording them is not permitted. That collector is not
-yet implemented; when it is, it will be behind a switch that can be turned off
-entirely rather than a setting that has to be remembered.
+there are networks where recording them is not permitted. They are **off by
+default**: the recorder notes that a lookup happened, through which resolver,
+and whether it worked, and does not keep the name. Turning them on is one
+setting and it is opted into rather than out of:
+
+```yaml
+record_dns_names: true
+```
+
+With it off, no name reaches the store at all — it is not stored and redacted
+later, it is never written.
 
 If you need to demonstrate what is in the store to someone who will ask:
 

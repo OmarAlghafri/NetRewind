@@ -18,6 +18,12 @@ db: /var/lib/netrewind/events.db
 
 # How much history to keep. Pruning runs hourly, so anything under an hour is
 # refused. A week of a quiet segment is a few megabytes.
+#
+# This bounds all three things the store holds, not only the events: the
+# conclusions correlation drew are kept four times as long (they are small, and
+# they are what somebody comes back to months later), and an identity binding
+# goes once nothing left in the record could need it. That is what makes this
+# setting a bound on the disk.
 retention: 168h
 
 # How long the recorder must have been absent before the silence is recorded as

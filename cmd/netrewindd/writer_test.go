@@ -58,10 +58,12 @@ func (s *brokenStore) CountEvents(context.Context) (int64, error) {
 	defer s.mu.Unlock()
 	return int64(len(s.accepted)), nil
 }
-func (s *brokenStore) Prune(context.Context, time.Time) (int64, error) { return 0, nil }
-func (s *brokenStore) GetMeta(context.Context, string) (string, error) { return "", nil }
-func (s *brokenStore) SetMeta(context.Context, string, string) error   { return nil }
-func (s *brokenStore) Close() error                                    { return nil }
+func (s *brokenStore) Prune(context.Context, time.Time) (int64, error)          { return 0, nil }
+func (s *brokenStore) PruneIncidents(context.Context, time.Time) (int64, error) { return 0, nil }
+func (s *brokenStore) PruneIdentity(context.Context, int64) (int64, error)      { return 0, nil }
+func (s *brokenStore) GetMeta(context.Context, string) (string, error)          { return "", nil }
+func (s *brokenStore) SetMeta(context.Context, string, string) error            { return nil }
+func (s *brokenStore) Close() error                                             { return nil }
 func (s *brokenStore) AppendIncidents(context.Context, ...*incident.Incident) error {
 	return nil
 }

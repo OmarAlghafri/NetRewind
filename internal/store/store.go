@@ -54,6 +54,16 @@ type Store interface {
 	Query(ctx context.Context, f Filter) ([]*event.Event, error)
 	// Prune deletes events older than the cutoff and reports how many went.
 	Prune(ctx context.Context, before time.Time) (int64, error)
+	// PruneIncidents deletes conclusions older than the cutoff. Separate from
+	// Prune because they are kept longer: an incident is small, it is the
+	// conclusion rather than the raw material, and it is what somebody comes
+	// back to months later.
+	PruneIncidents(ctx context.Context, before time.Time) (int64, error)
+	// PruneIdentity drops bindings that ended before the cutoff, never ones
+	// that are still current. Separate from Prune for the opposite reason: the
+	// live half of this table is not history at all, and deleting it would
+	// make the recorder forget which machine is which.
+	PruneIdentity(ctx context.Context, before int64) (int64, error)
 	// CountEvents reports how much history is held. Exported as a gauge so an
 	// operator can see retention working, and see it stop working.
 	CountEvents(ctx context.Context) (int64, error)
