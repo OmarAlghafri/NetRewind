@@ -41,7 +41,7 @@ func newTimelineCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return renderTimeline(cmd.OutOrStdout(), filterSeverity(events, minSev), from, to)
+			return renderTimeline(safeOut(cmd), filterSeverity(events, minSev), from, to)
 		},
 	}
 	cmd.Flags().DurationVar(&last, "last", 30*time.Minute, "how far back to read")
@@ -115,7 +115,7 @@ func newWhatHappenedCmd() *cobra.Command {
 			}
 			found = append(found, health...)
 
-			out := cmd.OutOrStdout()
+			out := safeOut(cmd)
 			if len(labels) > 1 {
 				fmt.Fprintf(out, "%s also answered to: %s\n\n", host,
 					strings.Join(without(labels, host), ", "))

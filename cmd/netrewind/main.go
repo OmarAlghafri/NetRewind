@@ -51,7 +51,7 @@ func newVersionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Print the version",
 		Run: func(cmd *cobra.Command, _ []string) {
-			fmt.Fprintf(cmd.OutOrStdout(), "netrewind %s (schema v%d)\n", version, event.SchemaVersion)
+			fmt.Fprintf(safeOut(cmd), "netrewind %s (schema v%d)\n", version, event.SchemaVersion)
 		},
 	}
 }
@@ -108,7 +108,7 @@ func newEventsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return render(cmd.OutOrStdout(), events, output)
+			return render(safeOut(cmd), events, output)
 		},
 	}
 

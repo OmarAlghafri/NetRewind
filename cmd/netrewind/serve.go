@@ -62,7 +62,7 @@ func newServeCmd() *cobra.Command {
 
 			errs := make(chan error, 1)
 			go func() {
-				fmt.Fprintf(cmd.OutOrStdout(), "reading %s at http://%s\n", dbPath, addr)
+				fmt.Fprintf(safeOut(cmd), "reading %s at http://%s\n", dbPath, addr)
 				if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 					errs <- err
 					return

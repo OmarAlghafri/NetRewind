@@ -53,7 +53,7 @@ func newIncidentsCmd() *cobra.Command {
 				return err
 			}
 
-			out := cmd.OutOrStdout()
+			out := safeOut(cmd)
 			if output == "json" {
 				enc := json.NewEncoder(out)
 				enc.SetIndent("", "  ")
@@ -150,7 +150,7 @@ func newRulesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out := cmd.OutOrStdout()
+			out := safeOut(cmd)
 			fmt.Fprintf(out, "%d rules loaded from %s\n\n", len(rules), dir)
 			for _, r := range rules {
 				required := 0
