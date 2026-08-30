@@ -47,6 +47,11 @@ test:
 .PHONY: load
 load:
 	NETREWIND_LOAD_TEST=1 go test ./internal/store/ -run "Burst|Storm|Prune" -v -count=1
+	# And the whole write path, not only the store. The writer makes a batch
+	# durable and then offers every event of it to correlation, on one
+	# goroutine; correlation is the slower half, so the store's number on its
+	# own says nothing about whether the queue drains.
+	NETREWIND_LOAD_TEST=1 go test ./cmd/netrewindd/ -run "ThePipelineKeepsUp" -v -count=1
 
 .PHONY: vet
 vet:
@@ -161,7 +166,7 @@ bpf-check:
 
 # The bootable appliance. Linux and root: it needs loop devices and mount.
 .PHONY: image
-image:
+image: toolchain-check
 	sudo deploy/appliance/build-image.sh --version $(VERSION) --out $(DIST)/netrewind-appliance.img
 
 .PHONY: kernel-check
@@ -224,8 +229,44 @@ signing-pubkey:
 	@echo "update:"
 	@echo "  public_key: \"$$(openssl pkey -in $(SIGNING_KEY) -pubout -outform DER | tail -c 32 | base64 | tr -d '\n')\""
 
+# ---------------------------------------------------------------------------
+# Toolchain
+# ---------------------------------------------------------------------------
+#
+# go.mod names a toolchain rather than raising the go line, so the tree still
+# builds on a distro that sets GOTOOLCHAIN=local with an older Go - see the
+# comment there. The cost of that choice is that on exactly those machines
+# nothing makes the newer toolchain happen: the build succeeds, and quietly
+# links a standard library with known holes in it, including in html/template,
+# which is what renders network-supplied strings into the web interface.
+#
+# Building day to day that way is fine and deliberate. Publishing that way is
+# not: the binary goes to other people, and a recorder with update.apply on
+# will install it without anybody looking. So the release path checks, and
+# refuses, rather than warning into a scrollback nobody reads.
+.PHONY: toolchain-check
+toolchain-check:
+	@want=$$(sed -n 's/^toolchain //p' go.mod); \
+	 if [ -z "$$want" ]; then exit 0; fi; \
+	 have=$$(go env GOVERSION); \
+	 newest=$$(printf '%s\n%s\n' "$${want#go}" "$${have#go}" | sort -V | tail -1); \
+	 if [ "go$$newest" != "$$have" ]; then \
+	   echo "go.mod asks for $$want; this is $$have."; \
+	   echo; \
+	   echo "  Building with it is fine. Publishing with it is not: the older"; \
+	   echo "  standard library has known holes, and one of them is in"; \
+	   echo "  html/template, which renders strings this recorder reads off the"; \
+	   echo "  watched network."; \
+	   echo; \
+	   echo "  GOTOOLCHAIN is $$(go env GOTOOLCHAIN). If it is local, the"; \
+	   echo "  toolchain directive cannot take effect: install $$want, or build"; \
+	   echo "  the release somewhere GOTOOLCHAIN can fetch it."; \
+	   exit 1; \
+	 fi; \
+	 echo "toolchain: $$have, and go.mod asks for $$want"
+
 .PHONY: release
-release: test
+release: toolchain-check test
 	rm -rf $(DIST) && mkdir -p $(DIST)
 	@for p in $(PLATFORMS); do \
 	  os=$${p%/*}; arch=$${p#*/}; \

@@ -102,3 +102,89 @@ func TestTheApplianceImageIsBuiltWithTheReleaseVersion(t *testing.T) {
 			"the reasoning above needs revisiting")
 	}
 }
+
+// A release must not be built with a standard library that has known holes in
+// it, and on some machines nothing stops that happening.
+//
+// go.mod names a toolchain rather than raising the go line, so the tree keeps
+// building on a distro that pins GOTOOLCHAIN=local with an older Go - Alpine
+// does, because upstream toolchains are linked against glibc. The cost is that
+// on exactly those machines the directive has no effect: the build succeeds and
+// silently links the older standard library. govulncheck reports nine
+// vulnerabilities in a tree built that way and none in one built with the
+// toolchain go.mod asks for, and one of them is in html/template, which is what
+// renders network-supplied strings into the web interface.
+//
+// Building day to day that way is deliberate and fine. Publishing that way is
+// not: the binary goes to other people, and a recorder with update.apply on
+// installs it without anybody looking. So the release path has to check.
+func TestTheReleaseRefusesAnOlderToolchainThanGoModAsksFor(t *testing.T) {
+	root := filepath.Join("..", "..")
+
+	mod, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		t.Fatalf("read go.mod: %v", err)
+	}
+	if !regexp.MustCompile(`(?m)^toolchain go1\.\d+`).Match(mod) {
+		t.Skip("go.mod names no toolchain, so there is nothing to enforce")
+	}
+
+	data, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatalf("read Makefile: %v", err)
+	}
+	makefile := string(data)
+
+	if !strings.Contains(makefile, "toolchain-check:") {
+		t.Fatal("the Makefile has no toolchain-check target; a release built on a " +
+			"machine with GOTOOLCHAIN=local and an older Go would ship a standard " +
+			"library with known holes, and nothing would say so")
+	}
+	// It has to read the version out of go.mod rather than carry its own copy,
+	// or the two drift and the check starts approving what it exists to refuse.
+	if !strings.Contains(makefile, "sed -n 's/^toolchain //p' go.mod") {
+		t.Error("toolchain-check no longer reads the wanted version from go.mod")
+	}
+	for _, target := range []string{"release:", "image:"} {
+		line := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(target) + `.*$`).FindString(makefile)
+		if line == "" {
+			t.Errorf("no %s target in the Makefile", target)
+			continue
+		}
+		if !strings.Contains(line, "toolchain-check") {
+			t.Errorf("%q does not depend on toolchain-check, so it can publish a "+
+				"binary built with a standard library go.mod says is too old", line)
+		}
+	}
+}
+
+// build-image.sh is documented as something to run directly, so the guard in
+// the Makefile is not enough on its own: `sudo deploy/appliance/build-image.sh`
+// never goes near make. An appliance is written to a disk and left running for
+// months, which is the worst place to put a standard library with known holes
+// in it.
+func TestTheApplianceImageRefusesAnOlderToolchainToo(t *testing.T) {
+	script, err := os.ReadFile(filepath.Join("..", "..", "deploy", "appliance", "build-image.sh"))
+	if err != nil {
+		t.Fatalf("read build-image.sh: %v", err)
+	}
+	text := string(script)
+
+	if !strings.Contains(text, `sed -n 's/^toolchain //p' "$REPO/go.mod"`) {
+		t.Fatal("build-image.sh does not read the wanted toolchain from go.mod, " +
+			"so running it directly can build an appliance with a standard library " +
+			"go.mod says is too old")
+	}
+	// And it has to refuse rather than warn: this runs unattended.
+	guard := text[strings.Index(text, "WANT=$(sed -n"):]
+	if end := strings.Index(guard, "\nfi\n"); end > 0 {
+		guard = guard[:end]
+	}
+	if !strings.Contains(guard, "die ") {
+		t.Error("the toolchain guard in build-image.sh does not stop the build")
+	}
+	// Before anything is written to a disk.
+	if strings.Index(text, "WANT=$(sed -n") > strings.Index(text, "truncate -s") {
+		t.Error("build-image.sh checks the toolchain after it has started creating the disk")
+	}
+}

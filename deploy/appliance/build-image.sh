@@ -28,6 +28,7 @@ OUT=""
 ALPINE_BRANCH="v3.22"
 ALPINE_VERSION="3.22.2"
 ARCH="x86_64"
+BINARIES=""
 KEEP_WORK=0
 
 usage() {
@@ -43,6 +44,13 @@ usage: build-image.sh [options]
                 version the tarballs are built with.
   --arch ARCH   x86_64 (default) - aarch64 needs a different bootloader and is
                 not built here; use the release tarball on a Raspberry Pi
+  --binaries D  use netrewindd and netrewind from D instead of building them.
+                Point it at an unpacked release tarball to write an image of
+                exactly the binaries that were published, rather than of
+                another build of the same source. It also means the machine
+                that makes images needs no Go toolchain - which matters,
+                because it needs loop devices instead, and the two are not
+                always the same machine.
   --keep-work   leave the staging directory for inspection
 USAGE
 }
@@ -53,6 +61,7 @@ while [ $# -gt 0 ]; do
         --out) OUT="$2"; shift 2 ;;
         --version) VERSION="$2"; shift 2 ;;
         --arch) ARCH="$2"; shift 2 ;;
+        --binaries) BINARIES="$2"; shift 2 ;;
         --keep-work) KEEP_WORK=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) echo "unknown option: $1" >&2; usage; exit 2 ;;
@@ -90,8 +99,53 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+mkdir -p "$WORK/bin"
+
+if [ -n "$BINARIES" ]; then
+    echo "==> taking the binaries from $BINARIES"
+    for b in netrewindd netrewind; do
+        [ -f "$BINARIES/$b" ] || die "no $b in $BINARIES"
+        install -m 0755 "$BINARIES/$b" "$WORK/bin/$b"
+    done
+    # Run it rather than trust it. This is the same check the updater makes
+    # before replacing anything, and it answers three questions at once: the
+    # file executes on this machine, it is the architecture the image needs,
+    # and it is the version the image is about to claim to be.
+    REPORTED=$("$WORK/bin/netrewindd" --version 2>&1) ||
+        die "$BINARIES/netrewindd does not run here: $REPORTED"
+    echo "    $REPORTED"
+    if [ -n "${VERSION:-}" ]; then
+        case "$REPORTED" in
+        *"${VERSION#v}"*) ;;
+        *) die "the binaries report '$REPORTED' but --version says ${VERSION#v}.
+  An image that names itself something the binaries inside it do not is an
+  image nobody can tell the state of." ;;
+        esac
+    fi
+    # Nothing is compiled here, so there is no toolchain to check: whatever
+    # built these answered for that when it did.
+else
+
 echo "==> building the binaries"
 command -v go >/dev/null 2>&1 || die "go is needed to build the recorder"
+
+# The same guard `make release` has, repeated here because this script is
+# documented as something to run directly and `make image` is not the only way
+# in. go.mod names a toolchain rather than raising the go line so the tree keeps
+# building on a distro that pins GOTOOLCHAIN=local with an older Go; on exactly
+# those machines the directive has no effect and the build quietly links a
+# standard library with known holes in it, one of them in html/template. An
+# appliance is written to a disk and forgotten, which is the worst place for it.
+WANT=$(sed -n 's/^toolchain //p' "$REPO/go.mod")
+HAVE=$(go env GOVERSION)
+if [ -n "$WANT" ]; then
+    NEWEST=$(printf '%s\n%s\n' "${WANT#go}" "${HAVE#go}" | sort -V | tail -1)
+    [ "go$NEWEST" = "$HAVE" ] || die "go.mod asks for $WANT; this is $HAVE.
+  An image is written to a disk and left running for months. Building it with
+  an older standard library is not something to do by accident.
+  GOTOOLCHAIN is $(go env GOTOOLCHAIN); if it is local, install $WANT or build
+  this somewhere the toolchain can be fetched."
+fi
 # The version is taken from the caller when there is one, and only guessed at
 # otherwise. Guessing was how 0.8.0 shipped an image that called itself
 # "0fb51d7": the tree it was built from had no tag yet, git describe fell back
@@ -102,13 +156,19 @@ command -v go >/dev/null 2>&1 || die "go is needed to build the recorder"
 VERSION="${VERSION:-$(cd "$REPO" && git describe --tags --always --dirty 2>/dev/null || echo dev)}"
 # Tags carry a leading v; release artefacts do not. Same rule as the Makefile.
 VERSION="${VERSION#v}"
-mkdir -p "$WORK/bin"
 ( cd "$REPO" && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOFLAGS=-buildvcs=false \
     go build -trimpath -ldflags "-s -w -X main.version=$VERSION" \
     -o "$WORK/bin/netrewindd" ./cmd/netrewindd )
 ( cd "$REPO" && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOFLAGS=-buildvcs=false \
     go build -trimpath -ldflags "-s -w -X main.version=$VERSION" \
     -o "$WORK/bin/netrewind" ./cmd/netrewind )
+
+fi
+
+# Both paths need a version to stamp the image with, and --binaries leaves the
+# default unresolved because it never reaches the block above.
+VERSION="${VERSION:-$(cd "$REPO" && git describe --tags --always --dirty 2>/dev/null || echo dev)}"
+VERSION="${VERSION#v}"
 
 echo "==> creating a ${SIZE_MB} MB disk"
 mkdir -p "$(dirname "$OUT")"
