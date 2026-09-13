@@ -1,0 +1,290 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Dell — NetRewind</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap bar-inner">
+    <span class="mark">net<span class="dim">rewind</span></span>
+    <nav>
+      <a href="/?window=1h0m0s"          class="">overview</a>
+      <a href="/incidents?window=1h0m0s" class="">incidents</a>
+      <a href="/timeline?window=1h0m0s"  class="">timeline</a>
+      <a href="/host?window=1h0m0s"      class="on">host</a>
+    </nav>
+    <span class="obs dim">Dell</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <form class="controls" method="get" action="/host">
+    <span class="dim">window</span>
+    
+      <button type="submit" name="window" value="15m" class="chip ">15m</button>
+    
+      <button type="submit" name="window" value="1h" class="chip on">1h</button>
+    
+      <button type="submit" name="window" value="6h" class="chip ">6h</button>
+    
+      <button type="submit" name="window" value="24h" class="chip ">24h</button>
+    
+      <button type="submit" name="window" value="168h" class="chip ">7d</button>
+    
+    
+      <input type="search" name="q" value="10.99.0.11" placeholder="address or hardware address" aria-label="Machine to follow">
+      <button type="submit" class="chip">follow</button>
+    
+    <span class="range dim">12:56:48 &rarr; 13:56:48</span>
+  </form>
+
+  
+
+  
+  
+
+
+
+  <h1 class="mono">10.99.0.11</h1>
+  
+    <p class="dim narrow">
+      Everything recorded about this machine in the window &mdash; including
+      events recorded while it answered to a different address.
+    </p>
+    <ul class="bare timeline">
+      
+      
+        
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:20.266</span>
+  <span class="gap mono dim"></span>
+  <span class="say">
+    10.99.0.11 moved from 02:00:00:00:00:11 to 02:00:00:00:00:aa
+    <span class="kind mono dim">l2.arp_binding_changed</span>
+    <span class="attrs mono dim">ip=10.99.0.11  is_gateway=false  mac_new=02:00:00:00:00:aa  mac_old=02:00:00:00:00:11</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:20.378</span>
+  <span class="gap mono dim">&#43;110ms</span>
+  <span class="say">
+    10.99.0.11 moved from 02:00:00:00:00:aa to 02:00:00:00:00:11
+    <span class="kind mono dim">l2.arp_binding_changed</span>
+    <span class="attrs mono dim">address_changed_hands=true  ip=10.99.0.11  is_gateway=false  mac_new=02:00:00:00:00:11  mac_old=02:00:00:00:00:aa</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:22.287</span>
+  <span class="gap mono dim">&#43;1.91s</span>
+  <span class="say">
+    10.99.0.11 moved from 02:00:00:00:00:11 to 02:00:00:00:00:bb
+    <span class="kind mono dim">l2.arp_binding_changed</span>
+    <span class="attrs mono dim">address_changed_hands=true  ip=10.99.0.11  is_gateway=false  mac_new=02:00:00:00:00:bb  mac_old=02:00:00:00:00:11</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-error">!!</span>
+  <span class="t mono dim">13:50:22.288</span>
+  <span class="gap mono dim">&#43;0s</span>
+  <span class="say">
+    10.99.0.11 is being claimed by more than one machine <span class="dim">(x3)</span>
+    <span class="kind mono dim">l2.duplicate_ip</span>
+    <span class="attrs mono dim">changes_in_window=3  claimants=[02:00:00:00:00:aa 02:00:00:00:00:11 02:00:00:00:00:bb]  ip=10.99.0.11</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:23.295</span>
+  <span class="gap mono dim">&#43;1.01s</span>
+  <span class="say">
+    10.99.0.11 moved from 02:00:00:00:00:bb to 02:00:00:00:00:aa
+    <span class="kind mono dim">l2.arp_binding_changed</span>
+    <span class="attrs mono dim">ip=10.99.0.11  is_gateway=false  mac_new=02:00:00:00:00:aa  mac_old=02:00:00:00:00:bb</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:24.303</span>
+  <span class="gap mono dim">&#43;1.01s</span>
+  <span class="say">
+    10.99.0.11 moved from 02:00:00:00:00:aa to 02:00:00:00:00:bb
+    <span class="kind mono dim">l2.arp_binding_changed</span>
+    <span class="attrs mono dim">ip=10.99.0.11  is_gateway=false  mac_new=02:00:00:00:00:bb  mac_old=02:00:00:00:00:aa</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:50:30.349</span>
+  <span class="gap mono dim">&#43;6.05s</span>
+  <span class="say">
+    connections to 10.99.0.11 port 9999 went unanswered <span class="dim">(x4)</span>
+    <span class="kind mono dim">flow.handshake_fail</span>
+    <span class="attrs mono dim">dport=9999  dst=10.99.0.11  sport=41827  src=10.99.0.1</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-error">!!</span>
+  <span class="t mono dim">13:50:35.545</span>
+  <span class="gap mono dim">&#43;5.2s</span>
+  <span class="say">
+    10.99.0.11 stopped answering entirely
+    <span class="kind mono dim">metric.anomaly</span>
+    <span class="attrs mono dim">answered=0  loss_percent=100  metric=unreachable  probes=5  target=10.99.0.11</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:50:37.371</span>
+  <span class="gap mono dim">&#43;1.83s</span>
+  <span class="say">
+    connections to 10.99.0.11 port 9100 went unanswered <span class="dim">(x3)</span>
+    <span class="kind mono dim">flow.handshake_fail</span>
+    <span class="attrs mono dim">dport=9100  dst=10.99.0.11  sport=37289  src=10.99.0.1</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:50:54.437</span>
+  <span class="gap mono dim">&#43;17.07s</span>
+  <span class="say">
+    connections to 10.99.0.11 port 9300 went unanswered <span class="dim">(x2)</span>
+    <span class="kind mono dim">flow.handshake_fail</span>
+    <span class="attrs mono dim">dport=9300  dst=10.99.0.11  sport=35771  src=10.99.0.1</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:51:10.618</span>
+  <span class="gap mono dim">&#43;16.18s</span>
+  <span class="say">
+    10.99.0.11 started asking 10.99.0.99 instead of 10.99.0.1
+    <span class="kind mono dim">dns.resolver_changed</span>
+    <span class="attrs mono dim">client=10.99.0.11  resolver_new=10.99.0.99  resolver_old=10.99.0.1</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:51:15.929</span>
+  <span class="gap mono dim">&#43;5.31s</span>
+  <span class="say">
+    10.99.0.11 stopped answering at layer 2 <span class="dim">(x2)</span>
+    <span class="kind mono dim">l2.neighbor_failed</span>
+    <span class="attrs mono dim">ip=10.99.0.11  mac=02:00:00:00:00:bb</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-info"></span>
+  <span class="t mono dim">13:51:17.882</span>
+  <span class="gap mono dim">&#43;1.95s</span>
+  <span class="say">
+    10.99.0.11 first answered from 02:00:00:00:00:11 <span class="dim">(x2)</span>
+    <span class="kind mono dim">l2.arp_binding_new</span>
+    <span class="attrs mono dim">ifindex=4  ip=10.99.0.11  is_gateway=false  mac=02:00:00:00:00:11</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:51:28.538</span>
+  <span class="gap mono dim">&#43;10.66s</span>
+  <span class="say">
+    10.99.0.1 reported host unreachable for 10.99.0.11 <span class="dim">(x14)</span>
+    <span class="kind mono dim">l3.icmp_unreachable</span>
+    <span class="attrs mono dim">destination=10.99.0.11  dport=63399  reason=host unreachable  reported_by=10.99.0.1  source=10.99.0.1</span>
+  </span>
+</li>
+
+        
+      
+        
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:51:45.463</span>
+  <span class="gap mono dim">&#43;16.93s</span>
+  <span class="say">
+    10.99.0.11 is answering again
+    <span class="kind mono dim">metric.anomaly</span>
+    <span class="attrs mono dim">answered=5  metric=recovered  probes=5  target=10.99.0.11</span>
+  </span>
+</li>
+
+        
+      
+    </ul>
+  
+
+
+
+</div>
+
+<footer class="bar foot">
+  <div class="wrap dim small">
+    Read-only. NetRewind never modifies the store from here.
+    &nbsp;·&nbsp; A lab project on GNS3 and network namespaces; not deployed to production hardware.
+  </div>
+</footer>
+
+</body>
+</html>
+

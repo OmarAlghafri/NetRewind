@@ -1,0 +1,663 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Dell — NetRewind</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap bar-inner">
+    <span class="mark">net<span class="dim">rewind</span></span>
+    <nav>
+      <a href="/?window=1h0m0s"          class="">overview</a>
+      <a href="/incidents?window=1h0m0s" class="on">incidents</a>
+      <a href="/timeline?window=1h0m0s"  class="">timeline</a>
+      <a href="/host?window=1h0m0s"      class="">host</a>
+    </nav>
+    <span class="obs dim">Dell</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <form class="controls" method="get" action="/incidents">
+    <span class="dim">window</span>
+    
+      <button type="submit" name="window" value="15m" class="chip ">15m</button>
+    
+      <button type="submit" name="window" value="1h" class="chip on">1h</button>
+    
+      <button type="submit" name="window" value="6h" class="chip ">6h</button>
+    
+      <button type="submit" name="window" value="24h" class="chip ">24h</button>
+    
+      <button type="submit" name="window" value="168h" class="chip ">7d</button>
+    
+    
+    <span class="range dim">12:56:48 &rarr; 13:56:48</span>
+  </form>
+
+  
+
+  
+  
+
+
+<h1>Incidents</h1>
+
+  <p class="dim">14 incidents, newest first. Every link names the event it rests on.</p>
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> A second DHCP server is answering on this segment</p>
+    <p class="meta mono dim">
+      2026-09-13 13:51:08
+      &nbsp;·&nbsp;2s
+      &nbsp;·&nbsp;rule rogue-dhcp-server
+      &nbsp;·&nbsp;confidence 92%
+      &nbsp;·&nbsp;affected 10.99.0.99, 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:51:08.551</span> dhcp.server_seen <span class="dim">10.99.0.99</span></p>
+          <p class="why">A DHCP server answered on a segment that already had one. Every client that renews from here on gets whichever of them replies first.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:51:10.618</span> dns.resolver_changed <span class="dim">10.99.0.11</span></p>
+          <p class="why">Clients began taking different addresses, gateways or resolvers, which is the second server&#39;s configuration arriving.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> dhcp.server_seen on 10.99.0.99 <span class="dim">(92%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Find the switch port the new server&#39;s hardware address is learned on and shut it. Almost always a consumer router plugged in the wrong way round, with its LAN side facing the network. Until it is off, clients will keep taking its addresses and its gateway at random.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> A path that was working stopped working</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:46
+      &nbsp;·&nbsp;4s
+      &nbsp;·&nbsp;rule change-broke-a-path
+      &nbsp;·&nbsp;confidence 88%
+      &nbsp;·&nbsp;affected 10.99.1.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:46.414</span> l2.arp_binding_changed <span class="dim">10.99.1.11</span></p>
+          <p class="why">This is the last thing that changed on the path before it broke.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:50.421</span> flow.first_failure_for_pair <span class="dim">10.99.1.11</span></p>
+          <p class="why">Two machines that had been connecting successfully can no longer complete a handshake. Whatever else is true, something between them changed.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-correlates"><span>and at the same time</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">3</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:50.423</span> l2.neighbor_failed <span class="dim">10.99.1.11</span></p>
+          <p class="why">Other connections started failing in the same window.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.arp_binding_changed on 10.99.1.11 <span class="dim">(88%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> The change named here is the nearest one in time, not a proven cause. Confirm it against your change record before acting: if it was intended, the breakage is a side effect nobody planned; if it was not, something changed the network without going through you.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> An address moved to a different machine</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:46
+      &nbsp;·&nbsp;0s
+      &nbsp;·&nbsp;rule address-changed-hands
+      &nbsp;·&nbsp;confidence 75%
+      &nbsp;·&nbsp;affected 10.99.1.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:46.414</span> l2.arp_binding_changed <span class="dim">10.99.1.11</span></p>
+          <p class="why">This address is now answered by hardware that was not previously bound to it, so the machine behind it is a different machine.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.arp_binding_changed on 10.99.1.11 <span class="dim">(75%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Normal after a DHCP lease expires. Worth a look if the address is a server, is statically assigned, or moved without a lease renewal near it.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> A service stopped answering</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:37
+      &nbsp;·&nbsp;6s
+      &nbsp;·&nbsp;rule service-unreachable
+      &nbsp;·&nbsp;confidence 80%
+      &nbsp;·&nbsp;affected 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:37.371</span> flow.handshake_fail <span class="dim">10.99.0.11</span></p>
+          <p class="why">Repeated connections to this service went from the opening SYN straight to closed without ever being answered. Something refused them, dropped them, or was not listening.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> flow.handshake_fail on 10.99.0.11 <span class="dim">(80%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Check whether the service is listening before blaming the network. If it is, look at the timeline for a filtering change or a route change just before the first failure - both look identical from the client.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> A service stopped answering</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:30
+      &nbsp;·&nbsp;2s
+      &nbsp;·&nbsp;rule service-unreachable
+      &nbsp;·&nbsp;confidence 80%
+      &nbsp;·&nbsp;affected 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:30.349</span> flow.handshake_fail <span class="dim">10.99.0.11</span></p>
+          <p class="why">Repeated connections to this service went from the opening SYN straight to closed without ever being answered. Something refused them, dropped them, or was not listening.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> flow.handshake_fail on 10.99.0.11 <span class="dim">(80%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Check whether the service is listening before blaming the network. If it is, look at the timeline for a filtering change or a route change just before the first failure - both look identical from the client.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> The default route disappeared</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:28
+      &nbsp;·&nbsp;22s
+      &nbsp;·&nbsp;rule default-route-lost
+      &nbsp;·&nbsp;confidence 95%
+      &nbsp;·&nbsp;affected 10.99.1.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:28.343</span> l3.route_removed <span class="dim">default</span></p>
+          <p class="why">The default route was withdrawn. Nothing beyond the local segment is reachable from here.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:50.423</span> l2.neighbor_failed <span class="dim">10.99.1.11</span></p>
+          <p class="why">Reachability began failing once there was no default path.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l3.route_removed on default <span class="dim">(95%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Look at the timeline immediately before this. A default route rarely leaves on its own; it follows an interface going down, a DHCP lease expiring, or a routing daemon losing its peer. Fix that, not the route.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> The default route was re-pointed</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:27
+      &nbsp;·&nbsp;1s
+      &nbsp;·&nbsp;rule default-route-moved
+      &nbsp;·&nbsp;confidence 85%
+      
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:27.338</span> l3.default_route_changed <span class="dim">default</span></p>
+          <p class="why">The route all outbound traffic follows now points somewhere else.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:28.343</span> l3.route_removed <span class="dim">default</span></p>
+          <p class="why">Reachability changed once the traffic started taking the new path.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l3.default_route_changed on default <span class="dim">(85%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Confirm this was intended. Compare the time against your change record: an unplanned default route change means outbound traffic is leaving through a path nobody chose.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> A machine&#39;s resolver changed under it</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:24
+      &nbsp;·&nbsp;46s
+      &nbsp;·&nbsp;rule resolver-hijacked
+      &nbsp;·&nbsp;confidence 80%
+      &nbsp;·&nbsp;affected 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:24.303</span> l2.arp_binding_changed <span class="dim">10.99.0.11</span></p>
+          <p class="why">This is what changed on the path just before the resolver did.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:51:10.618</span> dns.resolver_changed <span class="dim">10.99.0.11</span></p>
+          <p class="why">This machine started sending its lookups somewhere else. Every name it resolves from here on is answered by a different party.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> dns.resolver_changed on 10.99.0.11 <span class="dim">(80%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Compare against your DHCP scope. A client that changed resolver without a lease renewal near it did not choose to; something told it to. Check for a second DHCP server and for the gateway&#39;s hardware address changing at about the same time.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> A measured path stopped answering</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:24
+      &nbsp;·&nbsp;1m21s
+      &nbsp;·&nbsp;rule reachability-lost
+      &nbsp;·&nbsp;confidence 90%
+      &nbsp;·&nbsp;affected 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:24.303</span> l2.arp_binding_changed <span class="dim">10.99.0.11</span></p>
+          <p class="why">This is the last thing that changed before the path stopped answering.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:35.545</span> metric.anomaly <span class="dim">10.99.0.11</span></p>
+          <p class="why">Probes to this address began going unanswered. Packet loss announces itself to nobody; it has to be measured, and it was.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-precedes"><span>and then, without a known link</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">3</span>
+        <div>
+          <p class="mono small"><span class="dim">13:51:45.463</span> metric.anomaly <span class="dim">10.99.0.11</span></p>
+          <p class="why">It later answered again, which bounds how long the outage lasted.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.arp_binding_changed on 10.99.0.11 <span class="dim">(90%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> This is measured, not reported: the recorder sent probes and they did not come back. If the change named above was intended, the loss is a side effect nobody planned. If there is no change above it, the fault is beyond what this recorder can see from where it sits.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> Two machines are claiming the same address</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:22
+      &nbsp;·&nbsp;28s
+      &nbsp;·&nbsp;rule contested-address
+      &nbsp;·&nbsp;confidence 80%
+      &nbsp;·&nbsp;affected 10.99.0.11, 10.99.1.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:22.288</span> l2.duplicate_ip <span class="dim">10.99.0.11</span></p>
+          <p class="why">The hardware address answering for this address kept changing between the same few machines, which is what an address conflict looks like from the neighbour table.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:50.423</span> l2.neighbor_failed <span class="dim">10.99.1.11</span></p>
+          <p class="why">The address stopped answering reliably while it was contested.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.duplicate_ip on 10.99.0.11 <span class="dim">(80%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Check for a statically configured host inside the DHCP pool, or a second DHCP server. Both produce this, and both keep producing it until one is removed.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> An address moved to a different machine</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:22
+      &nbsp;·&nbsp;0s
+      &nbsp;·&nbsp;rule address-changed-hands
+      &nbsp;·&nbsp;confidence 75%
+      &nbsp;·&nbsp;affected 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:22.287</span> l2.arp_binding_changed <span class="dim">10.99.0.11</span></p>
+          <p class="why">This address is now answered by hardware that was not previously bound to it, so the machine behind it is a different machine.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.arp_binding_changed on 10.99.0.11 <span class="dim">(75%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Normal after a DHCP lease expires. Worth a look if the address is a server, is statically assigned, or moved without a lease renewal near it.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> The default gateway is being answered by a different machine</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:21
+      &nbsp;·&nbsp;29s
+      &nbsp;·&nbsp;rule gateway-hijack
+      &nbsp;·&nbsp;confidence 90%
+      &nbsp;·&nbsp;affected 10.99.0.201, 10.99.1.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:21.276</span> l2.arp_binding_changed <span class="dim">10.99.0.201</span></p>
+          <p class="why">The hardware address answering for the default gateway changed. Every host on this segment now sends its outbound traffic to a different machine.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:27.338</span> l3.default_route_changed <span class="dim">default</span></p>
+          <p class="why">Routing followed the change, so traffic is now leaving through a path nobody chose.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-correlates"><span>and at the same time</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">3</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:50.423</span> l2.neighbor_failed <span class="dim">10.99.1.11</span></p>
+          <p class="why">Connectivity was lost while the gateway was being answered elsewhere.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.arp_binding_changed on 10.99.0.201 <span class="dim">(90%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Find which switch port the new hardware address is learned on before changing anything. A failover looks identical to an attack from here; the port tells them apart.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> An address moved to a different machine</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:20
+      &nbsp;·&nbsp;0s
+      &nbsp;·&nbsp;rule address-changed-hands
+      &nbsp;·&nbsp;confidence 75%
+      &nbsp;·&nbsp;affected 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:20.378</span> l2.arp_binding_changed <span class="dim">10.99.0.11</span></p>
+          <p class="why">This address is now answered by hardware that was not previously bound to it, so the machine behind it is a different machine.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.arp_binding_changed on 10.99.0.11 <span class="dim">(75%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Normal after a DHCP lease expires. Worth a look if the address is a server, is statically assigned, or moved without a lease renewal near it.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> A link went down and took hosts with it</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:17
+      &nbsp;·&nbsp;33s
+      &nbsp;·&nbsp;rule link-down-isolated-hosts
+      &nbsp;·&nbsp;confidence 80%
+      &nbsp;·&nbsp;affected 10.99.1.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:17.248</span> link.down <span class="dim">nrlab1</span></p>
+          <p class="why">An interface went down.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:50.423</span> l2.neighbor_failed <span class="dim">10.99.1.11</span></p>
+          <p class="why">Hosts stopped answering at layer 2 immediately afterwards, which is the link failure showing up as apparent host failures.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> link.down on nrlab1 <span class="dim">(80%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> The hosts did not fail. Restore the link and they will return; investigating them individually wastes the outage.</p>
+  </footer>
+</article>
+
+  
+
+
+
+</div>
+
+<footer class="bar foot">
+  <div class="wrap dim small">
+    Read-only. NetRewind never modifies the store from here.
+    &nbsp;·&nbsp; A lab project on GNS3 and network namespaces; not deployed to production hardware.
+  </div>
+</footer>
+
+</body>
+</html>
+

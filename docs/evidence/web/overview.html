@@ -1,0 +1,1246 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Dell — NetRewind</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap bar-inner">
+    <span class="mark">net<span class="dim">rewind</span></span>
+    <nav>
+      <a href="/?window=1h0m0s"          class="on">overview</a>
+      <a href="/incidents?window=1h0m0s" class="">incidents</a>
+      <a href="/timeline?window=1h0m0s"  class="">timeline</a>
+      <a href="/host?window=1h0m0s"      class="">host</a>
+    </nav>
+    <span class="obs dim">Dell</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <form class="controls" method="get" action="/">
+    <span class="dim">window</span>
+    
+      <button type="submit" name="window" value="15m" class="chip ">15m</button>
+    
+      <button type="submit" name="window" value="1h" class="chip on">1h</button>
+    
+      <button type="submit" name="window" value="6h" class="chip ">6h</button>
+    
+      <button type="submit" name="window" value="24h" class="chip ">24h</button>
+    
+      <button type="submit" name="window" value="168h" class="chip ">7d</button>
+    
+    
+    <span class="range dim">12:56:48 &rarr; 13:56:48</span>
+  </form>
+
+  
+
+  
+  
+
+
+
+  <h1>What went wrong</h1>
+  <p class="dim">14 incidents in this window, newest first.</p>
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> A second DHCP server is answering on this segment</p>
+    <p class="meta mono dim">
+      2026-09-13 13:51:08
+      &nbsp;·&nbsp;2s
+      &nbsp;·&nbsp;rule rogue-dhcp-server
+      &nbsp;·&nbsp;confidence 92%
+      &nbsp;·&nbsp;affected 10.99.0.99, 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:51:08.551</span> dhcp.server_seen <span class="dim">10.99.0.99</span></p>
+          <p class="why">A DHCP server answered on a segment that already had one. Every client that renews from here on gets whichever of them replies first.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:51:10.618</span> dns.resolver_changed <span class="dim">10.99.0.11</span></p>
+          <p class="why">Clients began taking different addresses, gateways or resolvers, which is the second server&#39;s configuration arriving.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> dhcp.server_seen on 10.99.0.99 <span class="dim">(92%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Find the switch port the new server&#39;s hardware address is learned on and shut it. Almost always a consumer router plugged in the wrong way round, with its LAN side facing the network. Until it is off, clients will keep taking its addresses and its gateway at random.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> A path that was working stopped working</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:46
+      &nbsp;·&nbsp;4s
+      &nbsp;·&nbsp;rule change-broke-a-path
+      &nbsp;·&nbsp;confidence 88%
+      &nbsp;·&nbsp;affected 10.99.1.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:46.414</span> l2.arp_binding_changed <span class="dim">10.99.1.11</span></p>
+          <p class="why">This is the last thing that changed on the path before it broke.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:50.421</span> flow.first_failure_for_pair <span class="dim">10.99.1.11</span></p>
+          <p class="why">Two machines that had been connecting successfully can no longer complete a handshake. Whatever else is true, something between them changed.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-correlates"><span>and at the same time</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">3</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:50.423</span> l2.neighbor_failed <span class="dim">10.99.1.11</span></p>
+          <p class="why">Other connections started failing in the same window.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.arp_binding_changed on 10.99.1.11 <span class="dim">(88%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> The change named here is the nearest one in time, not a proven cause. Confirm it against your change record before acting: if it was intended, the breakage is a side effect nobody planned; if it was not, something changed the network without going through you.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> An address moved to a different machine</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:46
+      &nbsp;·&nbsp;0s
+      &nbsp;·&nbsp;rule address-changed-hands
+      &nbsp;·&nbsp;confidence 75%
+      &nbsp;·&nbsp;affected 10.99.1.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:46.414</span> l2.arp_binding_changed <span class="dim">10.99.1.11</span></p>
+          <p class="why">This address is now answered by hardware that was not previously bound to it, so the machine behind it is a different machine.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.arp_binding_changed on 10.99.1.11 <span class="dim">(75%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Normal after a DHCP lease expires. Worth a look if the address is a server, is statically assigned, or moved without a lease renewal near it.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> A service stopped answering</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:37
+      &nbsp;·&nbsp;6s
+      &nbsp;·&nbsp;rule service-unreachable
+      &nbsp;·&nbsp;confidence 80%
+      &nbsp;·&nbsp;affected 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:37.371</span> flow.handshake_fail <span class="dim">10.99.0.11</span></p>
+          <p class="why">Repeated connections to this service went from the opening SYN straight to closed without ever being answered. Something refused them, dropped them, or was not listening.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> flow.handshake_fail on 10.99.0.11 <span class="dim">(80%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Check whether the service is listening before blaming the network. If it is, look at the timeline for a filtering change or a route change just before the first failure - both look identical from the client.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> A service stopped answering</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:30
+      &nbsp;·&nbsp;2s
+      &nbsp;·&nbsp;rule service-unreachable
+      &nbsp;·&nbsp;confidence 80%
+      &nbsp;·&nbsp;affected 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:30.349</span> flow.handshake_fail <span class="dim">10.99.0.11</span></p>
+          <p class="why">Repeated connections to this service went from the opening SYN straight to closed without ever being answered. Something refused them, dropped them, or was not listening.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> flow.handshake_fail on 10.99.0.11 <span class="dim">(80%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Check whether the service is listening before blaming the network. If it is, look at the timeline for a filtering change or a route change just before the first failure - both look identical from the client.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> The default route disappeared</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:28
+      &nbsp;·&nbsp;22s
+      &nbsp;·&nbsp;rule default-route-lost
+      &nbsp;·&nbsp;confidence 95%
+      &nbsp;·&nbsp;affected 10.99.1.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:28.343</span> l3.route_removed <span class="dim">default</span></p>
+          <p class="why">The default route was withdrawn. Nothing beyond the local segment is reachable from here.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:50.423</span> l2.neighbor_failed <span class="dim">10.99.1.11</span></p>
+          <p class="why">Reachability began failing once there was no default path.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l3.route_removed on default <span class="dim">(95%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Look at the timeline immediately before this. A default route rarely leaves on its own; it follows an interface going down, a DHCP lease expiring, or a routing daemon losing its peer. Fix that, not the route.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> The default route was re-pointed</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:27
+      &nbsp;·&nbsp;1s
+      &nbsp;·&nbsp;rule default-route-moved
+      &nbsp;·&nbsp;confidence 85%
+      
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:27.338</span> l3.default_route_changed <span class="dim">default</span></p>
+          <p class="why">The route all outbound traffic follows now points somewhere else.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:28.343</span> l3.route_removed <span class="dim">default</span></p>
+          <p class="why">Reachability changed once the traffic started taking the new path.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l3.default_route_changed on default <span class="dim">(85%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Confirm this was intended. Compare the time against your change record: an unplanned default route change means outbound traffic is leaving through a path nobody chose.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> A machine&#39;s resolver changed under it</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:24
+      &nbsp;·&nbsp;46s
+      &nbsp;·&nbsp;rule resolver-hijacked
+      &nbsp;·&nbsp;confidence 80%
+      &nbsp;·&nbsp;affected 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:24.303</span> l2.arp_binding_changed <span class="dim">10.99.0.11</span></p>
+          <p class="why">This is what changed on the path just before the resolver did.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:51:10.618</span> dns.resolver_changed <span class="dim">10.99.0.11</span></p>
+          <p class="why">This machine started sending its lookups somewhere else. Every name it resolves from here on is answered by a different party.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> dns.resolver_changed on 10.99.0.11 <span class="dim">(80%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Compare against your DHCP scope. A client that changed resolver without a lease renewal near it did not choose to; something told it to. Check for a second DHCP server and for the gateway&#39;s hardware address changing at about the same time.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> A measured path stopped answering</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:24
+      &nbsp;·&nbsp;1m21s
+      &nbsp;·&nbsp;rule reachability-lost
+      &nbsp;·&nbsp;confidence 90%
+      &nbsp;·&nbsp;affected 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:24.303</span> l2.arp_binding_changed <span class="dim">10.99.0.11</span></p>
+          <p class="why">This is the last thing that changed before the path stopped answering.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:35.545</span> metric.anomaly <span class="dim">10.99.0.11</span></p>
+          <p class="why">Probes to this address began going unanswered. Packet loss announces itself to nobody; it has to be measured, and it was.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-precedes"><span>and then, without a known link</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">3</span>
+        <div>
+          <p class="mono small"><span class="dim">13:51:45.463</span> metric.anomaly <span class="dim">10.99.0.11</span></p>
+          <p class="why">It later answered again, which bounds how long the outage lasted.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.arp_binding_changed on 10.99.0.11 <span class="dim">(90%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> This is measured, not reported: the recorder sent probes and they did not come back. If the change named above was intended, the loss is a side effect nobody planned. If there is no change above it, the fault is beyond what this recorder can see from where it sits.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> Two machines are claiming the same address</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:22
+      &nbsp;·&nbsp;28s
+      &nbsp;·&nbsp;rule contested-address
+      &nbsp;·&nbsp;confidence 80%
+      &nbsp;·&nbsp;affected 10.99.0.11, 10.99.1.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:22.288</span> l2.duplicate_ip <span class="dim">10.99.0.11</span></p>
+          <p class="why">The hardware address answering for this address kept changing between the same few machines, which is what an address conflict looks like from the neighbour table.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:50.423</span> l2.neighbor_failed <span class="dim">10.99.1.11</span></p>
+          <p class="why">The address stopped answering reliably while it was contested.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.duplicate_ip on 10.99.0.11 <span class="dim">(80%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Check for a statically configured host inside the DHCP pool, or a second DHCP server. Both produce this, and both keep producing it until one is removed.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> An address moved to a different machine</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:22
+      &nbsp;·&nbsp;0s
+      &nbsp;·&nbsp;rule address-changed-hands
+      &nbsp;·&nbsp;confidence 75%
+      &nbsp;·&nbsp;affected 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:22.287</span> l2.arp_binding_changed <span class="dim">10.99.0.11</span></p>
+          <p class="why">This address is now answered by hardware that was not previously bound to it, so the machine behind it is a different machine.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.arp_binding_changed on 10.99.0.11 <span class="dim">(75%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Normal after a DHCP lease expires. Worth a look if the address is a server, is statically assigned, or moved without a lease renewal near it.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-error"><span class="mk">!!</span> The default gateway is being answered by a different machine</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:21
+      &nbsp;·&nbsp;29s
+      &nbsp;·&nbsp;rule gateway-hijack
+      &nbsp;·&nbsp;confidence 90%
+      &nbsp;·&nbsp;affected 10.99.0.201, 10.99.1.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:21.276</span> l2.arp_binding_changed <span class="dim">10.99.0.201</span></p>
+          <p class="why">The hardware address answering for the default gateway changed. Every host on this segment now sends its outbound traffic to a different machine.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:27.338</span> l3.default_route_changed <span class="dim">default</span></p>
+          <p class="why">Routing followed the change, so traffic is now leaving through a path nobody chose.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-correlates"><span>and at the same time</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">3</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:50.423</span> l2.neighbor_failed <span class="dim">10.99.1.11</span></p>
+          <p class="why">Connectivity was lost while the gateway was being answered elsewhere.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.arp_binding_changed on 10.99.0.201 <span class="dim">(90%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Find which switch port the new hardware address is learned on before changing anything. A failover looks identical to an attack from here; the port tells them apart.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> An address moved to a different machine</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:20
+      &nbsp;·&nbsp;0s
+      &nbsp;·&nbsp;rule address-changed-hands
+      &nbsp;·&nbsp;confidence 75%
+      &nbsp;·&nbsp;affected 10.99.0.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:20.378</span> l2.arp_binding_changed <span class="dim">10.99.0.11</span></p>
+          <p class="why">This address is now answered by hardware that was not previously bound to it, so the machine behind it is a different machine.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> l2.arp_binding_changed on 10.99.0.11 <span class="dim">(75%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> Normal after a DHCP lease expires. Worth a look if the address is a server, is statically assigned, or moved without a lease renewal near it.</p>
+  </footer>
+</article>
+
+  
+    
+<article class="card">
+  <header>
+    <p class="ititle sev-warn"><span class="mk">!</span> A link went down and took hosts with it</p>
+    <p class="meta mono dim">
+      2026-09-13 13:50:17
+      &nbsp;·&nbsp;33s
+      &nbsp;·&nbsp;rule link-down-isolated-hosts
+      &nbsp;·&nbsp;confidence 80%
+      &nbsp;·&nbsp;affected 10.99.1.11
+    </p>
+  </header>
+
+  <ol class="chain">
+    
+      
+      <li class="link">
+        <span class="n mono dim">1</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:17.248</span> link.down <span class="dim">nrlab1</span></p>
+          <p class="why">An interface went down.</p>
+        </div>
+      </li>
+    
+      
+        <li class="rel rel-causes"><span>which caused</span></li>
+      
+      <li class="link">
+        <span class="n mono dim">2</span>
+        <div>
+          <p class="mono small"><span class="dim">13:50:50.423</span> l2.neighbor_failed <span class="dim">10.99.1.11</span></p>
+          <p class="why">Hosts stopped answering at layer 2 immediately afterwards, which is the link failure showing up as apparent host failures.</p>
+        </div>
+      </li>
+    
+  </ol>
+
+  <footer>
+    <p class="mono small"><span class="dim">root cause:</span> link.down on nrlab1 <span class="dim">(80%)</span></p>
+    <p class="advice"><span class="mono dim small">next:</span> The hosts did not fail. Restore the link and they will return; investigating them individually wastes the outage.</p>
+  </footer>
+</article>
+
+  
+
+
+
+  <h2 class="split">The last of it</h2>
+  <ul class="bare timeline">
+    
+    
+      
+<li class="row">
+  <span class="mk sev-info"></span>
+  <span class="t mono dim">13:50:15.462</span>
+  <span class="gap mono dim"></span>
+  <span class="say">
+    the recorder started
+    <span class="kind mono dim">system.start</span>
+    
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:17.248</span>
+  <span class="gap mono dim">&#43;1.79s</span>
+  <span class="say">
+    nrlab1 was shut down administratively
+    <span class="kind mono dim">link.down</span>
+    <span class="attrs mono dim">admin_up=false  cause=administrative  oper_state=down</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:50:19.254</span>
+  <span class="gap mono dim">&#43;2.01s</span>
+  <span class="say">
+    nrlab1 came back after 2.006s
+    <span class="kind mono dim">link.up</span>
+    <span class="attrs mono dim">admin_up=true  down_duration_ms=2006  oper_state=up</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:20.266</span>
+  <span class="gap mono dim">&#43;1.01s</span>
+  <span class="say">
+    10.99.0.11 moved from 02:00:00:00:00:11 to 02:00:00:00:00:aa
+    <span class="kind mono dim">l2.arp_binding_changed</span>
+    <span class="attrs mono dim">ip=10.99.0.11  is_gateway=false  mac_new=02:00:00:00:00:aa  mac_old=02:00:00:00:00:11</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:20.378</span>
+  <span class="gap mono dim">&#43;110ms</span>
+  <span class="say">
+    10.99.0.11 moved from 02:00:00:00:00:aa to 02:00:00:00:00:11
+    <span class="kind mono dim">l2.arp_binding_changed</span>
+    <span class="attrs mono dim">address_changed_hands=true  ip=10.99.0.11  is_gateway=false  mac_new=02:00:00:00:00:11  mac_old=02:00:00:00:00:aa</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-error">!!</span>
+  <span class="t mono dim">13:50:21.276</span>
+  <span class="gap mono dim">&#43;900ms</span>
+  <span class="say">
+    10.99.0.201 moved from 02:00:00:00:00:01 to 02:00:00:00:00:ff - this is the default gateway
+    <span class="kind mono dim">l2.arp_binding_changed</span>
+    <span class="attrs mono dim">ip=10.99.0.201  is_gateway=true  mac_new=02:00:00:00:00:ff  mac_old=02:00:00:00:00:01</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:22.287</span>
+  <span class="gap mono dim">&#43;1.01s</span>
+  <span class="say">
+    10.99.0.11 moved from 02:00:00:00:00:11 to 02:00:00:00:00:bb
+    <span class="kind mono dim">l2.arp_binding_changed</span>
+    <span class="attrs mono dim">address_changed_hands=true  ip=10.99.0.11  is_gateway=false  mac_new=02:00:00:00:00:bb  mac_old=02:00:00:00:00:11</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-error">!!</span>
+  <span class="t mono dim">13:50:22.288</span>
+  <span class="gap mono dim">&#43;0s</span>
+  <span class="say">
+    10.99.0.11 is being claimed by more than one machine <span class="dim">(x3)</span>
+    <span class="kind mono dim">l2.duplicate_ip</span>
+    <span class="attrs mono dim">changes_in_window=3  claimants=[02:00:00:00:00:aa 02:00:00:00:00:11 02:00:00:00:00:bb]  ip=10.99.0.11</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:23.295</span>
+  <span class="gap mono dim">&#43;1.01s</span>
+  <span class="say">
+    10.99.0.11 moved from 02:00:00:00:00:bb to 02:00:00:00:00:aa
+    <span class="kind mono dim">l2.arp_binding_changed</span>
+    <span class="attrs mono dim">ip=10.99.0.11  is_gateway=false  mac_new=02:00:00:00:00:aa  mac_old=02:00:00:00:00:bb</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:24.303</span>
+  <span class="gap mono dim">&#43;1.01s</span>
+  <span class="say">
+    10.99.0.11 moved from 02:00:00:00:00:aa to 02:00:00:00:00:bb
+    <span class="kind mono dim">l2.arp_binding_changed</span>
+    <span class="attrs mono dim">ip=10.99.0.11  is_gateway=false  mac_new=02:00:00:00:00:bb  mac_old=02:00:00:00:00:aa</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-info"></span>
+  <span class="t mono dim">13:50:25.315</span>
+  <span class="gap mono dim">&#43;1.01s</span>
+  <span class="say">
+    route to 10.200.0.0/24 added via 10.99.0.11
+    <span class="kind mono dim">l3.route_added</span>
+    <span class="attrs mono dim">gateway=10.99.0.11  ifindex=4  is_default=false  prefix=10.200.0.0/24</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:50:26.324</span>
+  <span class="gap mono dim">&#43;1.01s</span>
+  <span class="say">
+    route to 10.200.0.0/24 now goes via 10.99.1.11 (was 10.99.0.11)
+    <span class="kind mono dim">l3.route_changed</span>
+    <span class="attrs mono dim">alternatives=1  gateway_new=10.99.1.11  gateway_old=10.99.0.11  ifindex_new=6  ifindex_old=4  is_default=false  prefix=10.200.0.0/24</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-info"></span>
+  <span class="t mono dim">13:50:27.334</span>
+  <span class="gap mono dim">&#43;1.01s</span>
+  <span class="say">
+    10.99.0.202 first answered from 02:00:00:00:00:02
+    <span class="kind mono dim">l2.arp_binding_new</span>
+    <span class="attrs mono dim">ifindex=4  ip=10.99.0.202  is_gateway=false  mac=02:00:00:00:00:02</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-error">!!</span>
+  <span class="t mono dim">13:50:27.338</span>
+  <span class="gap mono dim">&#43;0s</span>
+  <span class="say">
+    the default route now goes via 10.99.0.202 (was 10.99.0.201)
+    <span class="kind mono dim">l3.default_route_changed</span>
+    <span class="attrs mono dim">alternatives=1  gateway_new=10.99.0.202  gateway_old=10.99.0.201  ifindex_new=4  ifindex_old=4  is_default=true  prefix=default</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-error">!!</span>
+  <span class="t mono dim">13:50:28.343</span>
+  <span class="gap mono dim">&#43;1.01s</span>
+  <span class="say">
+    the default route was removed - nothing beyond the local segment is reachable
+    <span class="kind mono dim">l3.route_removed</span>
+    <span class="attrs mono dim">gateway=10.99.0.202  is_default=true  prefix=default</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:50:30.349</span>
+  <span class="gap mono dim">&#43;2.01s</span>
+  <span class="say">
+    connections to 10.99.0.11 port 9999 went unanswered <span class="dim">(x4)</span>
+    <span class="kind mono dim">flow.handshake_fail</span>
+    <span class="attrs mono dim">dport=9999  dst=10.99.0.11  sport=41827  src=10.99.0.1</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-info"></span>
+  <span class="t mono dim">13:50:35.468</span>
+  <span class="gap mono dim">&#43;5.12s</span>
+  <span class="say">
+    0 connections opened, 0 closed, 4 unanswered
+    <span class="kind mono dim">flow.rollup</span>
+    <span class="attrs mono dim">closed=0  distinct_peers=1  handshake_failures=4  known_pairs=0  opened=0  tracked=0  window_seconds=10</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-error">!!</span>
+  <span class="t mono dim">13:50:35.545</span>
+  <span class="gap mono dim">&#43;80ms</span>
+  <span class="say">
+    10.99.0.11 stopped answering entirely
+    <span class="kind mono dim">metric.anomaly</span>
+    <span class="attrs mono dim">answered=0  loss_percent=100  metric=unreachable  probes=5  target=10.99.0.11</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:50:37.371</span>
+  <span class="gap mono dim">&#43;1.83s</span>
+  <span class="say">
+    connections to 10.99.0.11 port 9100 went unanswered <span class="dim">(x3)</span>
+    <span class="kind mono dim">flow.handshake_fail</span>
+    <span class="attrs mono dim">dport=9100  dst=10.99.0.11  sport=37289  src=10.99.0.1</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-info"></span>
+  <span class="t mono dim">13:50:45.404</span>
+  <span class="gap mono dim">&#43;8.03s</span>
+  <span class="say">
+    10.99.1.11 first answered from fe:f7:4a:04:6e:1f <span class="dim">(x2)</span>
+    <span class="kind mono dim">l2.arp_binding_new</span>
+    <span class="attrs mono dim">ifindex=6  ip=10.99.1.11  is_gateway=false  mac=fe:f7:4a:04:6e:1f</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-info"></span>
+  <span class="t mono dim">13:50:45.468</span>
+  <span class="gap mono dim">&#43;60ms</span>
+  <span class="say">
+    1 connections opened, 1 closed, 3 unanswered
+    <span class="kind mono dim">flow.rollup</span>
+    <span class="attrs mono dim">closed=1  distinct_peers=2  handshake_failures=3  known_pairs=1  mean_duration_ms=0  opened=1  tracked=0  window_seconds=10</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:46.414</span>
+  <span class="gap mono dim">&#43;950ms</span>
+  <span class="say">
+    10.99.1.11 moved from fe:f7:4a:04:6e:1f to 02:00:00:00:00:de
+    <span class="kind mono dim">l2.arp_binding_changed</span>
+    <span class="attrs mono dim">address_changed_hands=true  ip=10.99.1.11  is_gateway=false  mac_new=02:00:00:00:00:de  mac_old=fe:f7:4a:04:6e:1f</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:50.421</span>
+  <span class="gap mono dim">&#43;4.01s</span>
+  <span class="say">
+    10.99.1.1 can no longer reach 10.99.1.11 on port 9200 - it worked 5s ago
+    <span class="kind mono dim">flow.first_failure_for_pair</span>
+    <span class="attrs mono dim">dport=9200  dst=10.99.1.11  last_success_ago_ms=5016  src=10.99.1.1</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:50:50.423</span>
+  <span class="gap mono dim">&#43;0s</span>
+  <span class="say">
+    10.99.1.11 stopped answering at layer 2
+    <span class="kind mono dim">l2.neighbor_failed</span>
+    <span class="attrs mono dim">ip=10.99.1.11  mac=02:00:00:00:00:de</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:50:54.437</span>
+  <span class="gap mono dim">&#43;4.01s</span>
+  <span class="say">
+    connections to 10.99.0.11 port 9300 went unanswered <span class="dim">(x2)</span>
+    <span class="kind mono dim">flow.handshake_fail</span>
+    <span class="attrs mono dim">dport=9300  dst=10.99.0.11  sport=35771  src=10.99.0.1</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-info"></span>
+  <span class="t mono dim">13:50:55.467</span>
+  <span class="gap mono dim">&#43;1.03s</span>
+  <span class="say">
+    0 connections opened, 0 closed, 2 unanswered
+    <span class="kind mono dim">flow.rollup</span>
+    <span class="attrs mono dim">closed=0  distinct_peers=2  handshake_failures=2  known_pairs=1  opened=0  tracked=0  window_seconds=10</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:50:55.484</span>
+  <span class="gap mono dim">&#43;20ms</span>
+  <span class="say">
+    4 filtering rule(s) were added
+    <span class="kind mono dim">policy.rule_changed</span>
+    <span class="attrs mono dim">added=4  digest=df39e96009eb5654  removed=0  rules_now=4</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-info"></span>
+  <span class="t mono dim">13:51:05.467</span>
+  <span class="gap mono dim">&#43;9.98s</span>
+  <span class="say">
+    0 connections opened, 0 closed, 1 unanswered
+    <span class="kind mono dim">flow.rollup</span>
+    <span class="attrs mono dim">closed=0  distinct_peers=1  handshake_failures=1  known_pairs=1  opened=0  tracked=0  window_seconds=10</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:51:05.490</span>
+  <span class="gap mono dim">&#43;20ms</span>
+  <span class="say">
+    4 filtering rule(s) were removed
+    <span class="kind mono dim">policy.rule_changed</span>
+    <span class="attrs mono dim">added=0  digest=e3b0c44298fc1c14  removed=4  rules_now=0</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:51:06.502</span>
+  <span class="gap mono dim">&#43;1.01s</span>
+  <span class="say">
+    a DHCP server answered from 10.99.0.1
+    <span class="kind mono dim">dhcp.server_seen</span>
+    <span class="attrs mono dim">first_seen=true  offers_gateway=10.99.0.1  other_servers=0  server=10.99.0.1  server_mac=02:00:00:00:00:01</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-info"></span>
+  <span class="t mono dim">13:51:06.502</span>
+  <span class="gap mono dim">&#43;0s</span>
+  <span class="say">
+    10.99.0.50 was confirmed to 02:00:00:00:00:55
+    <span class="kind mono dim">dhcp.ack</span>
+    <span class="attrs mono dim">address=10.99.0.50  client_mac=02:00:00:00:00:55  lease_seconds=3600  server=10.99.0.1</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-error">!!</span>
+  <span class="t mono dim">13:51:08.551</span>
+  <span class="gap mono dim">&#43;2.05s</span>
+  <span class="say">
+    a second DHCP server appeared on 10.99.0.99, handing out 10.99.0.99 as the gateway
+    <span class="kind mono dim">dhcp.server_seen</span>
+    <span class="attrs mono dim">first_seen=true  offers_gateway=10.99.0.99  other_servers=1  server=10.99.0.99  server_mac=02:00:00:00:00:99</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-info"></span>
+  <span class="t mono dim">13:51:08.551</span>
+  <span class="gap mono dim">&#43;0s</span>
+  <span class="say">
+    10.99.0.77 was offered to 02:00:00:00:00:55
+    <span class="kind mono dim">dhcp.offer</span>
+    <span class="attrs mono dim">address=10.99.0.77  client_mac=02:00:00:00:00:55  lease_seconds=3600  server=10.99.0.99</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-warn">!</span>
+  <span class="t mono dim">13:51:10.618</span>
+  <span class="gap mono dim">&#43;2.07s</span>
+  <span class="say">
+    10.99.0.11 started asking 10.99.0.99 instead of 10.99.0.1
+    <span class="kind mono dim">dns.resolver_changed</span>
+    <span class="attrs mono dim">client=10.99.0.11  resolver_new=10.99.0.99  resolver_old=10.99.0.1</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:51:15.929</span>
+  <span class="gap mono dim">&#43;5.31s</span>
+  <span class="say">
+    10.99.0.11 stopped answering at layer 2 <span class="dim">(x2)</span>
+    <span class="kind mono dim">l2.neighbor_failed</span>
+    <span class="attrs mono dim">ip=10.99.0.11  mac=02:00:00:00:00:bb</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-info"></span>
+  <span class="t mono dim">13:51:17.882</span>
+  <span class="gap mono dim">&#43;1.95s</span>
+  <span class="say">
+    10.99.0.11 first answered from 02:00:00:00:00:11 <span class="dim">(x2)</span>
+    <span class="kind mono dim">l2.arp_binding_new</span>
+    <span class="attrs mono dim">ifindex=4  ip=10.99.0.11  is_gateway=false  mac=02:00:00:00:00:11</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:51:23.663</span>
+  <span class="gap mono dim">&#43;5.78s</span>
+  <span class="say">
+    10.99.0.202 stopped answering at layer 2
+    <span class="kind mono dim">l2.neighbor_failed</span>
+    <span class="attrs mono dim">ip=10.99.0.202  mac=02:00:00:00:00:02</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:51:23.663</span>
+  <span class="gap mono dim">&#43;0s</span>
+  <span class="say">
+    10.99.0.201 stopped answering at layer 2
+    <span class="kind mono dim">l2.neighbor_failed</span>
+    <span class="attrs mono dim">ip=10.99.0.201  mac=02:00:00:00:00:ff</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:51:28.538</span>
+  <span class="gap mono dim">&#43;4.87s</span>
+  <span class="say">
+    10.99.0.1 reported host unreachable for 10.99.0.11 <span class="dim">(x14)</span>
+    <span class="kind mono dim">l3.icmp_unreachable</span>
+    <span class="attrs mono dim">destination=10.99.0.11  dport=63399  reason=host unreachable  reported_by=10.99.0.1  source=10.99.0.1</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:51:37.670</span>
+  <span class="gap mono dim">&#43;9.13s</span>
+  <span class="say">
+    nrlab0 came up
+    <span class="kind mono dim">link.up</span>
+    <span class="attrs mono dim">admin_up=true  oper_state=up</span>
+  </span>
+</li>
+
+      
+    
+      
+<li class="row">
+  <span class="mk sev-notice">-</span>
+  <span class="t mono dim">13:51:45.463</span>
+  <span class="gap mono dim">&#43;7.79s</span>
+  <span class="say">
+    10.99.0.11 is answering again
+    <span class="kind mono dim">metric.anomaly</span>
+    <span class="attrs mono dim">answered=5  metric=recovered  probes=5  target=10.99.0.11</span>
+  </span>
+</li>
+
+      
+    
+  </ul>
+  <p class="dim small"><a href="/timeline?window=1h0m0s">the whole window &rarr;</a></p>
+
+
+
+</div>
+
+<footer class="bar foot">
+  <div class="wrap dim small">
+    Read-only. NetRewind never modifies the store from here.
+    &nbsp;·&nbsp; A lab project on GNS3 and network namespaces; not deployed to production hardware.
+  </div>
+</footer>
+
+</body>
+</html>
+
