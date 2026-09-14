@@ -94,6 +94,26 @@ repeatable.
     hypothesis and Phi-4-mini-instruct as a genuinely smaller,
     different-family second candidate; underperforms Phi-4-mini-instruct on
     every tracked metric in this run, consistent with its smaller size.
+    Arabic (same 6 cases, `docs/evidence/24-ai-eval-qwen-arabic.log`):
+    0/3 graded pass, 3/6 invalid - all three invalid outputs are
+    grammar-constrained greedy **repetition loops** (the same event ID or
+    the same Arabic sentence repeated until the token cap), not budget
+    truncations; a second pass at `-n-predict 1500` changed no outcome.
+    Both refusal cases were among the invalid ones, so no refusal number
+    exists for this combination. Worse than Phi-4-mini-instruct in Arabic
+    on every metric and worse than its own English run.
+  - Two caveats found while doing that, which apply to **all** runs so far
+    (log 24 has the detail): `temperature: 0` did not reproduce
+    byte-for-byte across two runs against one long-lived `llama-server`
+    (its prompt cache serves later prompts from KV state and the cached vs.
+    fresh paths are not bit-identical - restart the server or send
+    `cache_prompt: false` for any run that must be reproducible, e.g. the
+    eventual `test`-split one); and the system prompt never specifies an
+    answer language, so `-lang ar` measures acting on an Arabic question
+    against English evidence, not explaining in Arabic (Phi-4-mini answered
+    in Arabic on 3/6 cases, Qwen on 1/6). Neither is changed in `ai/eval/run`
+    yet, to keep the existing numbers comparable; both should be fixed
+    together before the next full candidate sweep.
   - `ai/eval/run` now supports `-lang {en,ar}` and correctly replicates
     `ai/eval/gen`'s address-substitution table for `-deidentified` cases
     (verified against the real `<HOST_1>` token already in

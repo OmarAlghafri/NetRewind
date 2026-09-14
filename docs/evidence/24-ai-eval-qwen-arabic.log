@@ -1,0 +1,230 @@
+Extends docs/evidence/23 (the two-model, two-language comparison) with the
+one combination that log left explicitly open: Qwen2.5-1.5B-Instruct on the
+same 6 `dev`-split cases, asked in Arabic. Same model file, same
+`llama-server` build (b10948, CPU-only), same schema grammar, same
+`temperature: 0`, same `-t 8`, same harness, same `-n-predict 700` as
+every prior run - nothing changed except `-lang ar`. A second, separately
+labelled pass at `-n-predict 1500` was then run to test the one hypothesis
+log 23 itself raised ("worth raising -n-predict for future Arabic runs"),
+not to replace the 700 result.
+
+## Setup, verbatim
+
+```
+llama-server -m ai/eval/models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf \
+  --host 127.0.0.1 --port 8811 -t 8 --no-jinja -jf schema.json
+go run ./ai/eval/run -split dev -server http://127.0.0.1:8811 -n-predict 700  -lang ar
+go run ./ai/eval/run -split dev -server http://127.0.0.1:8811 -n-predict 1500 -lang ar
+```
+
+`schema.json` was extracted mechanically from `ai/eval/run/main.go`'s own
+`expectedJSONSchema` constant (awk over the source, then parsed with
+`node` to confirm it is valid JSON with the 7 expected `required` keys) -
+not retyped, so the grammar the server enforced is byte-identical to what
+the harness expects. `/v1/models` confirmed the loaded model was the Qwen
+file before either run. Server health-checked before the first run and
+stopped after the second (not left running). Raw results:
+`ai/eval/results/20260914T023517Z/` (700) and
+`ai/eval/results/20260914T024408Z/` (1500), both gitignored like the rest
+of `ai/eval/results/`.
+
+## Result, -n-predict 700 (the like-for-like run)
+
+```
+[collector_down-ambiguous-en]              1m20s  INVALID JSON - repetition loop hit the cap
+[gateway_hijack-positive-en]                 49s  FAIL - no hypothesis offered
+[gateway_hijack-positive-en-deidentified]   1m02s  FAIL - no hypothesis offered
+[normal_traffic-negative-en]               1m13s  INVALID JSON - repetition loop hit the cap
+[rogue_dhcp-positive-en]                   1m31s  INVALID JSON - repetition loop hit the cap
+[rogue_dhcp-positive-en-deidentified]      1m45s  FAIL - Top-1 hit, citePrec 0.20, 5 confidence-ceiling violations
+
+pass: 0/3 graded, top-1: 1/3, top-3: 1/3, correct refusals: 0/0 graded, mean citePrec: 0.07
+```
+
+(Case IDs keep the `-en` suffix regardless of `-lang`, as in log 23 - that
+is `ai/eval/gen`'s file-naming, not which question was asked. `QuestionAr`
+was used for all 6; the runner's `-lang` branch at `main.go`'s
+`question := c.QuestionEn / if *lang == "ar" { question = c.QuestionAr }`
+is the only thing that changed between this run and log 23's English Qwen
+run.)
+
+**Both refusal cases went ungraded.** `normal_traffic` (the only true
+negative) and `collector_down` (the ambiguous, refusal-expected case) both
+produced invalid JSON, so "correct refusals" here is 0 of 0 graded - not a
+measured 0/1. Log 23's Qwen English run also lost `collector_down` to
+invalid JSON but kept `normal_traffic`; this run lost both.
+
+## The three invalid outputs are repetition loops, not budget truncations
+
+Each invalid raw output was read directly (`raw_tail` is the full response
+body - `main.go:168` - not a tail), not just counted:
+
+- `collector_down`: valid JSON opening, `"ranked_hypotheses": []`, then an
+  `evidence_event_ids` array that cites 27 IDs of which only 4 are distinct
+  - the last ~20 entries are the single ID `01M2DP0TD24AKB1RZP2229NPCV`
+  repeated verbatim until the 700-token cap cut it mid-string.
+- `rogue_dhcp-positive-en`: same shape - 20 ID citations, 2 distinct, the
+  tail is `01M2DNNXQ3TQRNGD59HD5A43EY` repeated ~18 times.
+- `normal_traffic`: the one case answered in Arabic. Valid opening,
+  `"ranked_hypotheses": []` (which would have been the correct refusal),
+  `counter_evidence: []`, then an `unknowns` array containing the sentence
+  "هذا التغيير في هذا المقطع هو ناتج لبداية تشغيل النظام." repeated
+  26 times until the cap.
+
+This is a different failure from log 23's Phi-4-mini Arabic truncation,
+which was a long but genuine, non-repeating `unknowns` list that ran out of
+budget. Here the content stopped being new well before the budget ran out.
+The mechanism is the expected one for this setup: greedy decoding
+(`temperature: 0`, no repetition penalty sent by the runner - see
+`chatCompletionRequest` in `main.go`) under a JSON grammar that, after each
+`,` inside an array, permits another string - and for a 1.5B model the
+single most likely next string is the one it just emitted.
+
+## Result, -n-predict 1500 (the hypothesis test)
+
+```
+[collector_down-ambiguous-en]              2m25s  INVALID JSON - same ID loop, 59 cites / 4 distinct, hit the 1500 cap
+[gateway_hijack-positive-en]                 24s  FAIL - no hypothesis offered
+[gateway_hijack-positive-en-deidentified]    25s  FAIL - no hypothesis offered
+[normal_traffic-negative-en]               1m56s  INVALID JSON - same sentence, now 61 times, hit the 1500 cap
+[rogue_dhcp-positive-en]                   1m30s  FAIL - no hypothesis offered (valid JSON this time, ~980 tokens)
+[rogue_dhcp-positive-en-deidentified]        53s  FAIL - Top-1 hit, citePrec 0.20, 5 confidence-ceiling violations
+
+pass: 0/4 graded, top-1: 1/4, top-3: 1/4, correct refusals: 0/0 graded, mean citePrec: 0.05
+```
+
+Doubling the budget changed no pass/fail outcome. The two loops that were
+still looping at 700 looped for the full 1500 (the server's `print_timing`
+lines for both read `eval time ... / 1500 tokens` - exactly the budget;
+at 700 the same two cases read `/ 700 tokens`). Generation speed was
+7-13 tokens/s throughout, so each looping case cost 1-2.5 minutes of CPU
+producing nothing new. `rogue_dhcp-positive-en` did produce valid JSON at 1500 -
+but see the next section before reading that as "the loop terminated given
+more room": it did not. It was a different generation.
+
+## Greedy decoding was not reproducible across the two runs
+
+With `temperature: 0` the 1500 run was expected to reproduce the 700 run's
+output byte-for-byte up to the cap. It did not: 4 of 6 cases diverged
+inside the first sentence of `summary` (at character 52, 76, 174 ...), e.g.
+
+```
+700 : ...ARP binding change. The change was caused by a system start event.
+1500: ...ARP binding change. The event was caused by a l2.arp_binding_changed event.
+```
+
+The server log shows why. `llama-server` (started once, `kv_unified`,
+32k context) served every one of the 1500 run's six prompts entirely from
+the KV cache left by the 700 run - its `print_timing` lines show
+`prompt eval time ... / 1 tokens` for all six, preceded by
+`need to evaluate at least 1 token ... (n_past = 2127, task.n_tokens() = 2127)`
+and the same for 1071, 1040, 726, 2008 and 1872 tokens: the whole prompt
+was a cache hit, one token re-evaluated. (That is also why the two
+`gateway_hijack` cases dropped from 49s/62s to 24s/25s: 8.7s and 10.3s of
+prompt evaluation became 0.07s and 0.14s.) In the 700 run itself, cases
+2-6 were already partial cache hits on the shared prefix - the server
+evaluated 740 of 1071, 572 of 1040, 395 of 726, 1677 of 2008 and 1395 of
+1872 prompt tokens, the rest coming from cache.
+
+The cached and freshly-evaluated paths do not produce bit-identical logits
+on this CPU build, and with greedy sampling any tiny difference that flips
+an argmax early propagates through the whole generation. This is a
+property of the server's prompt caching, not a runner bug, and every prior
+run (logs 20 and 23 included) ran under the same server configuration.
+
+Consequences, stated plainly:
+- Cross-model and cross-language comparisons in logs 20/23 and here remain
+  valid as comparisons - each run is a real sample of what the model does.
+- "Same model, same settings, run twice" is NOT guaranteed to give the same
+  numbers on this setup. Any future run whose purpose is reproducibility
+  (the eventual `test`-split selection run, above all) should either restart
+  `llama-server` between runs or send `cache_prompt: false` in the request,
+  and should say which it did. Not changed in `ai/eval/run` here, because
+  changing the request shape mid-comparison would make this run's numbers
+  incomparable to the three it is being compared against.
+- `rogue_dhcp-positive-en` going valid at 1500 is therefore a different
+  greedy path that happened not to loop (5 citations, 5 distinct, ~980
+  tokens - which would also have been cut at 700), not evidence that the
+  700 run's loop would have finished with more budget.
+
+## Answer language: neither model reliably answers in Arabic, and the prompt never asked
+
+The Arabic-question runs are scored only on the JSON fields (cause/entity/
+citations/confidence), so the harness is indifferent to what language the
+prose fields come back in. Checked anyway, by counting Arabic-script
+characters in every raw output across all seven result sets on disk:
+
+| Run | Answered in Arabic |
+|---|---|
+| Phi-4-mini-instruct, `-lang ar` (log 23) | 3 of 6 |
+| Qwen2.5-1.5B-Instruct, `-lang ar`, 700 (this log) | 1 of 6 |
+| Qwen2.5-1.5B-Instruct, `-lang ar`, 1500 (this log) | 1 of 6 |
+| every `-lang en` run | 0 of 6 (as expected) |
+
+The system prompt (`systemPrompt` in `main.go`) is English-only and says
+nothing about answer language; the event context is English JSON; only the
+one-line question is Arabic. So what `-lang ar` measures today is "can the
+model act on an Arabic question against English evidence", not "can it
+explain in Arabic". Both models mostly answered in English. This is a real
+scoping limit of the current prompt design, worth knowing before anyone
+reads log 23's Arabic citation-precision numbers as an Arabic-fluency
+result. Not changed here, for the same comparability reason as above; a
+future prompt revision that fixes the answer language should re-run every
+candidate, not just one.
+
+## Head-to-head, Arabic, same 6 cases, same harness, -n-predict 700
+
+| | Phi-4-mini-instruct (3.8B, MIT) | Qwen2.5-1.5B-Instruct (1.5B, Apache-2.0) |
+|---|---|---|
+| Valid JSON | 5/6 | 3/6 |
+| Pass (no hard violations) | 3/5 graded | 0/3 graded |
+| Top-1 cause hit | 1/5 | 1/3 |
+| Correct refusals | 1/1 graded | 0/0 graded (both refusal cases invalid) |
+| Mean citation precision | 0.75 | 0.07 |
+| Invalid-output cause | 1 genuine long list, cut by budget | 3 repetition loops, budget-independent |
+| Answered in Arabic | 3/6 | 1/6 |
+
+Honest reading: Qwen2.5-1.5B is worse than Phi-4-mini-instruct in Arabic
+on every tracked metric, and worse than its own English run (log 23: 5/6
+valid, 1/5 pass, citePrec 0.04 -> here 3/6 valid, 0/3 pass, 0.07). The
+one metric that looks better (citePrec 0.07 vs 0.04) is a single
+`rogue_dhcp-deidentified` case scoring 0.20 both times, averaged over
+fewer graded cases - not an improvement. The new information this run
+adds is qualitative: at this size, grammar-constrained greedy decoding
+degenerates into loops on half the Arabic-question cases, which a token
+budget cannot fix and which would need a decoding-side change
+(repetition penalty, or sampling with temperature > 0) to even test
+fairly. That is a real, model-specific finding, and a reason this
+candidate should not be the reference model for the Arabic UI regardless
+of what any larger run shows.
+
+## What this closes and what it does not
+
+- Closes: "Qwen2.5-1.5B in Arabic" (open since log 23) - done, both budgets.
+- Closes: "worth raising -n-predict for future Arabic runs" as a hypothesis
+  for THIS model - tested, does not help, for a stated reason.
+- Opens, with evidence: greedy reproducibility on this server setup (above),
+  and the answer-language gap in the prompt (above). Both recorded as
+  things to fix before the `test`-split selection run, not fixed now.
+- Still not done: a third candidate; a quantization comparison (Phi-4-mini
+  at Q5/Q8); the `test` split (still correctly held out - there is still
+  no selection decision being made, and this run makes that clearer, not
+  less clear); a decoding-parameter run (repetition penalty / temperature)
+  for Qwen, which would be the only fair way to give this candidate a
+  second look.
+- Phi-4-mini's own Arabic result is unaffected by anything here except the
+  answer-language caveat, which applies to it equally.
+
+## Verification
+
+- `go run ./ai/eval/run` built and ran from the committed tree with no
+  source change (`git status` clean before and after, apart from this log
+  and the doc updates that cite it; `ai/eval/results/` is gitignored).
+- Every INVALID case's raw output was read, not just counted; the loop
+  claims above are from counting literal repeated substrings in the saved
+  `raw_tail`, and the budget-exhaustion claims from `llama-server`'s own
+  per-task token counters in its log.
+- The prompt-cache reuse claim is from the server's own
+  `n_past = 2127, task.n_tokens() = 2127` warning line, not inferred.
+- Disk: 21 GB free before starting; no download, no new model, no new
+  toolchain - nothing was added to the machine for these runs.
