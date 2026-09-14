@@ -120,6 +120,80 @@ jobs:
         if: failure()
         run: cat /tmp/netrewind-lab/recorder.log || true
 
+  desktop:
+    name: desktop typecheck, build, known vulnerabilities
+    # The Tauri/React app has its own dependency graphs - npm for the UI,
+    # Cargo for the Rust shell in desktop/src-tauri - neither of which the
+    # `check` job above touches. It gets its own job for the same reason
+    # `load` does: a different toolchain and a different question ("does the
+    # desktop app's supply chain and types check out?") than the Go job
+    # answers, not because it's slow.
+    #
+    # This does not attempt `cargo build`/`tauri build`: that needs system
+    # webview/GTK packages on Linux, is a bigger job on its own, and is
+    # explicitly out of scope here. Nothing below silently skips it - it is
+    # just not attempted.
+    #
+    # Deliberately left out of `release`'s `needs:`. That job ships the Go
+    # binaries `make release` produces, on a tag; the desktop app isn't part
+    # of that build, and a broken desktop typecheck is not a reason to hold
+    # back a recorder release.
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # The lockfile, exactly - not whatever `npm install` would resolve
+      # today.
+      - name: npm ci
+        run: npm ci
+
+      # package.json's build script is already `tsc && vite build`, so this
+      # typechecks before it bundles. A separate `tsc --noEmit` step would
+      # just run the first half of this command again for nothing.
+      - name: typecheck and build
+        run: npm run build
+
+      # No --omit=dev, on purpose, for the same reason the check job's
+      # govulncheck step runs unconditionally over everything: the dev
+      # dependencies here (vite, tsc, the Tauri CLI) run in this job and on
+      # every contributor's machine, so a vulnerability in one of them is not
+      # lower-stakes than a production one. Last manual run
+      # (docs/evidence/22-sbom-and-vulnerability-scan.log) found 0 either
+      # way; this is what makes that true on every push instead of once.
+      - name: known vulnerabilities (npm)
+        run: npm audit
+
+      # cargo-audit compiled from source (`cargo install cargo-audit
+      # --locked`) took over nine minutes on comparable hardware - see the
+      # same evidence log - which is too slow to pay on every push.
+      # taiki-e/install-action fetches a prebuilt binary instead of compiling
+      # one, which is the difference between this costing seconds and it
+      # costing more than the rest of the job combined.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      # desktop/src-tauri carries its own Cargo.lock, so this audits the
+      # dependency tree actually resolved, not Cargo.toml's version ranges.
+      # Last manual run: 0 vulnerabilities, 7 warnings, all upstream in
+      # Tauri's own GTK/webview chain on Linux. cargo-audit's exit code
+      # already reflects only real vulnerabilities, not warnings, so no
+      # extra flags are needed to keep those from failing the build.
+      - name: known vulnerabilities (cargo)
+        working-directory: desktop/src-tauri
+        run: cargo audit
+
   release:
     name: release artefacts build
     # Only on a tag. Building release tarballs on every push would be noise, and
