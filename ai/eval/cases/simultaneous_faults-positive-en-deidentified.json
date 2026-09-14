@@ -1,0 +1,25 @@
+{
+  "id": "simultaneous_faults-positive-en-deidentified",
+  "scenario": "simultaneous_faults",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ \u003cHOST_1\u003e، وما الذي سبّبه؟",
+  "question_en": "What happened to \u003cHOST_1\u003e, and what caused it?",
+  "input_event_ids": [
+    "01M2DNWHMF391THGA8MZH64JEV",
+    "01M2DNWKJN8ZK7EH89RPQRTQ62",
+    "01M2DNWKJN8ZK7EH89RTHHA0RK",
+    "01M2DNWMJ2X0MQQ6ZWN6TP0C2F",
+    "01M2DNWVD7RN6PJ060CX3XC17G"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNWKJN8ZK7EH89RTHHA0RK"
+    ],
+    "root_cause_kind": "l2.arp_binding_changed",
+    "root_cause_entity": "\u003cHOST_1\u003e",
+    "max_confidence": 90,
+    "rule_id": "gateway-hijack"
+  },
+  "note": "de-identified: real lab addresses replaced with placeholder host tokens"
+}

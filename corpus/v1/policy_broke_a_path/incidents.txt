@@ -1,0 +1,18 @@
+!! A path that was working stopped working
+   15:19:56 to 15:20:05  (9s)   rule change-broke-a-path, confidence 88%
+   affected: 10.99.0.11
+
+   1  15:19:56.194  policy.rule_changed  Dell
+      This is the last thing that changed on the path before it broke.
+      |  which caused
+   2  15:20:05.155  flow.first_failure_for_pair  10.99.0.11
+      Two machines that had been connecting successfully can no longer
+      complete a handshake. Whatever else is true, something between
+      them changed.
+
+   root cause: policy.rule_changed on Dell (confidence 88%)
+   next:
+      The change named here is the nearest one in time, not a proven
+      cause. Confirm it against your change record before acting: if it
+      was intended, the breakage is a side effect nobody planned; if it
+      was not, something changed the network without going through you.

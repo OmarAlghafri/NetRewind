@@ -1,0 +1,24 @@
+{
+  "id": "blind_gap-1-ambiguous-en",
+  "scenario": "blind_gap",
+  "kind": "ambiguous",
+  "question_ar": "ما السبب الجذري لمشكلة الاتصال في هذه النافذة الزمنية؟",
+  "question_en": "What is the root cause of the connectivity problem in this window?",
+  "input_event_ids": [
+    "01M2DNV5QCXFMQEHXW1J0KPBVH",
+    "01M2DNV8QK8CEFBG5H9VQPS9M0",
+    "01M2DNVWAGK6GNK03015KP24JA",
+    "01M2DNVWAHZ6JJDCECG4G7C3RY",
+    "01M2DNVWAVBY5QD0H93A5AKBXV"
+  ],
+  "expected": {
+    "refusal_expected": true,
+    "must_cite_event_ids": [
+      "01M2DNVWAVBY5QD0H93A5AKBXV"
+    ],
+    "root_cause_kind": "system.collector_down",
+    "root_cause_entity": "Dell",
+    "max_confidence": 100,
+    "rule_id": "collector-not-watching"
+  }
+}

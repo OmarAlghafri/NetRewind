@@ -1,0 +1,7 @@
+TIME          KIND                         SUBJECT     SEV     DETAIL
+15:19:51.185  system.start                 Dell        info    
+15:19:56.194  policy.rule_changed          Dell        warn    added=4 digest=df39e96009eb5654 removed=0 rules_now=4
+15:20:01.192  flow.rollup                  Dell        info    closed=2 distinct_peers=1 handshake_failures=0 known_pairs=1 mean_duration_ms=0 opened=1 tracked=0 window_seconds=10
+15:20:05.155  flow.first_failure_for_pair  10.99.0.11  warn    dport=9300 dst=10.99.0.11 last_success_ago_ms=11016 src=10.99.0.1
+15:20:06.195  policy.rule_changed          Dell        notice  added=0 digest=e3b0c44298fc1c14 removed=4 rules_now=0
+15:20:11.192  flow.rollup                  Dell        info    closed=0 distinct_peers=1 handshake_failures=1 known_pairs=1 opened=0 tracked=0 window_seconds=10

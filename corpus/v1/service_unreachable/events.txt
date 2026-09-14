@@ -1,0 +1,4 @@
+TIME          KIND                 SUBJECT     SEV     DETAIL
+15:18:49.484  system.start         Dell        info    
+15:18:51.450  flow.handshake_fail  10.99.0.11  notice  x4 dport=9999 dst=10.99.0.11 sport=40783 src=10.99.0.1
+15:18:59.491  flow.rollup          Dell        info    closed=1 distinct_peers=1 handshake_failures=4 known_pairs=0 mean_duration_ms=0 opened=0 tracked=0 window_seconds=10

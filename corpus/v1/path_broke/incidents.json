@@ -1,0 +1,94 @@
+[
+  {
+    "incident_id": "01M2DNM8PPVEA8QCPW0BTRN6CT",
+    "opened_at": 1789312770736406819,
+    "closed_at": 1789312770736406819,
+    "status": "closed",
+    "title": "An address moved to a different machine",
+    "severity": "warn",
+    "confidence": 75,
+    "root_cause": {
+      "kind": "l2.arp_binding_changed",
+      "entity": "10.99.1.11",
+      "event_id": "01M2DNM8NGCTZ0Z6KBJQ583JMW",
+      "confidence": 75
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNM8NGCTZ0Z6KBJQ583JMW",
+        "kind": "l2.arp_binding_changed",
+        "at": 1789312770736406819,
+        "subject": "10.99.1.11",
+        "relation": "",
+        "why": "This address is now answered by hardware that was not previously bound to it, so the machine behind it is a different machine.",
+        "evidence": {
+          "describe": "10.99.1.11 moved from 16:b2:7b:10:dd:36 to 02:00:00:00:00:de"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.1.11"
+    ],
+    "rule_id": "address-changed-hands",
+    "advice": "Normal after a DHCP lease expires. Worth a look if the address is a server, is statically assigned, or moved without a lease renewal near it."
+  },
+  {
+    "incident_id": "01M2DNMCKNPFY7KR4GBJPJ9GY8",
+    "opened_at": 1789312770736406819,
+    "closed_at": 1789312774742657872,
+    "status": "closed",
+    "title": "A path that was working stopped working",
+    "severity": "error",
+    "confidence": 88,
+    "root_cause": {
+      "kind": "l2.arp_binding_changed",
+      "entity": "10.99.1.11",
+      "event_id": "01M2DNM8NGCTZ0Z6KBJQ583JMW",
+      "confidence": 88
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNM8NGCTZ0Z6KBJQ583JMW",
+        "kind": "l2.arp_binding_changed",
+        "at": 1789312770736406819,
+        "subject": "10.99.1.11",
+        "relation": "",
+        "why": "This is the last thing that changed on the path before it broke.",
+        "evidence": {
+          "describe": "10.99.1.11 moved from 16:b2:7b:10:dd:36 to 02:00:00:00:00:de"
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2DNMCJMAK1193V24MCWYK8Q",
+        "kind": "flow.first_failure_for_pair",
+        "at": 1789312774740526351,
+        "subject": "10.99.1.11",
+        "relation": "causes",
+        "why": "Two machines that had been connecting successfully can no longer complete a handshake. Whatever else is true, something between them changed.",
+        "evidence": {
+          "describe": "10.99.1.1 can no longer reach 10.99.1.11 on port 9200 - it worked 5s ago"
+        }
+      },
+      {
+        "seq": 2,
+        "event_id": "01M2DNMCJPT3EPXBG8G3KJEV94",
+        "kind": "l2.neighbor_failed",
+        "at": 1789312774742657872,
+        "subject": "10.99.1.11",
+        "relation": "correlates",
+        "why": "Other connections started failing in the same window.",
+        "evidence": {
+          "describe": "10.99.1.11 stopped answering at layer 2"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.1.11"
+    ],
+    "rule_id": "change-broke-a-path",
+    "advice": "The change named here is the nearest one in time, not a proven cause. Confirm it against your change record before acting: if it was intended, the breakage is a side effect nobody planned; if it was not, something changed the network without going through you."
+  }
+]

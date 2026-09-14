@@ -1,0 +1,36 @@
+[
+  {
+    "incident_id": "01M2DNNZX1SA5FFX9XM6AKSH99",
+    "opened_at": 1789312827092613576,
+    "closed_at": 1789312827092613576,
+    "status": "closed",
+    "title": "A second DHCP server is answering on this segment",
+    "severity": "error",
+    "confidence": 92,
+    "root_cause": {
+      "kind": "dhcp.server_seen",
+      "entity": "10.99.0.99",
+      "event_id": "01M2DNNZPMJ75F1BMGB4YV3ETN",
+      "confidence": 92
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNNZPMJ75F1BMGB4YV3ETN",
+        "kind": "dhcp.server_seen",
+        "at": 1789312827092613576,
+        "subject": "10.99.0.99",
+        "relation": "",
+        "why": "A DHCP server answered on a segment that already had one. Every client that renews from here on gets whichever of them replies first.",
+        "evidence": {
+          "describe": "a second DHCP server appeared on 10.99.0.99, handing out 10.99.0.99 as the gateway"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.99"
+    ],
+    "rule_id": "rogue-dhcp-server",
+    "advice": "Find the switch port the new server's hardware address is learned on and shut it. Almost always a consumer router plugged in the wrong way round, with its LAN side facing the network. Until it is off, clients will keep taking its addresses and its gateway at random."
+  }
+]

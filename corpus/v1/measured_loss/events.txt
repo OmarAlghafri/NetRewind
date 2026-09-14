@@ -1,0 +1,9 @@
+TIME          KIND                 SUBJECT      SEV     DETAIL
+15:21:02.369  system.start         Dell         info    
+15:21:16.324  l2.neighbor_failed   10.99.0.11   notice  ip=10.99.0.11 mac=02:00:00:00:00:11
+15:21:16.324  l2.neighbor_failed   10.99.0.201  notice  ip=10.99.0.201 mac=02:00:00:00:00:01
+15:21:25.439  l3.icmp_unreachable  10.99.0.11   notice  x10 destination=10.99.0.11 dport=62102 reason=host unreachable reported_by=10.99.0.1 source=10.99.0.1
+15:21:25.439  metric.anomaly       10.99.0.11   error   answered=0 loss_percent=100 metric=unreachable probes=5 target=10.99.0.11
+15:21:30.328  link.up              nrlab0       notice  admin_up=true oper_state=up
+15:21:32.377  metric.anomaly       10.99.0.11   notice  answered=5 metric=recovered probes=5 target=10.99.0.11
+15:21:32.378  l2.arp_binding_new   10.99.0.11   info    ifindex=56 ip=10.99.0.11 is_gateway=false mac=02:00:00:00:00:11

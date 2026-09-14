@@ -1,0 +1,28 @@
+{
+  "id": "collector_down-ambiguous-en",
+  "scenario": "collector_down",
+  "kind": "ambiguous",
+  "question_ar": "ما السبب الجذري لمشكلة الاتصال في هذه النافذة الزمنية؟",
+  "question_en": "What is the root cause of the connectivity problem in this window?",
+  "input_event_ids": [
+    "01M2DP0TD08JNZC77Y3BM9MFPH",
+    "01M2DP0TD1Q9YGJ8KNWM95CYNV",
+    "01M2DP0TD1Q9YGJ8KNWMX5G8DB",
+    "01M2DP0TD1Q9YGJ8KNWP9C5EXR",
+    "01M2DP0TD24AKB1RZP20HVGFVX",
+    "01M2DP0TD24AKB1RZP1ZZQX6M7",
+    "01M2DP0TD24AKB1RZP2229NPCV",
+    "01M2DP0TD24AKB1RZP24MHMXAT",
+    "01M2DP0TD24AKB1RZP2847THDH"
+  ],
+  "expected": {
+    "refusal_expected": true,
+    "must_cite_event_ids": [
+      "01M2DP0TD1Q9YGJ8KNWM95CYNV"
+    ],
+    "root_cause_kind": "system.collector_down",
+    "root_cause_entity": "Dell",
+    "max_confidence": 100,
+    "rule_id": "collector-not-watching"
+  }
+}

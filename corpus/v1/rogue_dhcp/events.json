@@ -1,0 +1,162 @@
+[
+  {
+    "event_id": "01M2DNNVR5EDPW3MME2Z2EC0XP",
+    "schema_v": 1,
+    "ts_wall": 1789312823045296641,
+    "ts_mono": 4093619,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNNXQ3TQRNGD59HB8P3GRS",
+    "schema_v": 1,
+    "ts_wall": 1789312825059170299,
+    "ts_mono": 2017967259,
+    "observer_id": "Dell",
+    "source": "dhcp",
+    "kind": "dhcp.server_seen",
+    "severity": "notice",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "label": "10.99.0.1",
+      "attrs": {
+        "ip": "10.99.0.1",
+        "mac": "02:00:00:00:00:01"
+      }
+    },
+    "attrs": {
+      "first_seen": true,
+      "offers_gateway": "10.99.0.1",
+      "other_servers": 0,
+      "server": "10.99.0.1",
+      "server_mac": "02:00:00:00:00:01"
+    },
+    "evidence": {
+      "message": "ack"
+    },
+    "dedup_key": "dhcp.server_seen|10.99.0.1",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNNXQ3TQRNGD59HD5A43EY",
+    "schema_v": 1,
+    "ts_wall": 1789312825059236041,
+    "ts_mono": 2018033014,
+    "observer_id": "Dell",
+    "source": "dhcp",
+    "kind": "dhcp.ack",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "label": "10.99.0.50",
+      "attrs": {
+        "ip": "10.99.0.50",
+        "mac": "02:00:00:00:00:55"
+      }
+    },
+    "attrs": {
+      "address": "10.99.0.50",
+      "client_mac": "02:00:00:00:00:55",
+      "lease_seconds": 3600,
+      "server": "10.99.0.1"
+    },
+    "dedup_key": "dhcp.ack|02:00:00:00:00:55|10.99.0.50",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNNZPMJ75F1BMGB4YV3ETN",
+    "schema_v": 1,
+    "ts_wall": 1789312827092613576,
+    "ts_mono": 4051410545,
+    "observer_id": "Dell",
+    "source": "dhcp",
+    "kind": "dhcp.server_seen",
+    "severity": "error",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "label": "10.99.0.99",
+      "attrs": {
+        "ip": "10.99.0.99",
+        "mac": "02:00:00:00:00:99"
+      }
+    },
+    "attrs": {
+      "first_seen": true,
+      "offers_gateway": "10.99.0.99",
+      "other_servers": 1,
+      "server": "10.99.0.99",
+      "server_mac": "02:00:00:00:00:99"
+    },
+    "evidence": {
+      "message": "offer"
+    },
+    "dedup_key": "dhcp.server_seen|10.99.0.99",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNNZPMJ75F1BMGB6SG831A",
+    "schema_v": 1,
+    "ts_wall": 1789312827092682389,
+    "ts_mono": 4051479368,
+    "observer_id": "Dell",
+    "source": "dhcp",
+    "kind": "dhcp.offer",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "label": "10.99.0.77",
+      "attrs": {
+        "ip": "10.99.0.77",
+        "mac": "02:00:00:00:00:55"
+      }
+    },
+    "attrs": {
+      "address": "10.99.0.77",
+      "client_mac": "02:00:00:00:00:55",
+      "lease_seconds": 3600,
+      "server": "10.99.0.99"
+    },
+    "dedup_key": "dhcp.offer|02:00:00:00:00:55|10.99.0.77",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNP5GWY3BDEYDP54GF420K",
+    "schema_v": 1,
+    "ts_wall": 1789312833052547717,
+    "ts_mono": 10011344689,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.rollup",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "closed": 1,
+      "distinct_peers": 0,
+      "handshake_failures": 0,
+      "known_pairs": 0,
+      "mean_duration_ms": 0,
+      "opened": 0,
+      "tracked": 0,
+      "window_seconds": 10
+    },
+    "count": 1
+  }
+]

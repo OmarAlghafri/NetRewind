@@ -1,0 +1,11 @@
+!! The default route was re-pointed
+   15:18:16 to 15:18:16  (0s)   rule default-route-moved, confidence 85%
+
+   1  15:18:16.435  l3.default_route_changed  default
+      The route all outbound traffic follows now points somewhere else.
+
+   root cause: l3.default_route_changed on default (confidence 85%)
+   next:
+      Confirm this was intended. Compare the time against your change
+      record: an unplanned default route change means outbound traffic
+      is leaving through a path nobody chose.

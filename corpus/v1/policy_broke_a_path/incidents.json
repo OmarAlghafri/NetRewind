@@ -1,0 +1,48 @@
+[
+  {
+    "incident_id": "01M2DNNAA2JWRAYPCP9BGYWFXM",
+    "opened_at": 1789312796194980338,
+    "closed_at": 1789312805155741481,
+    "status": "closed",
+    "title": "A path that was working stopped working",
+    "severity": "error",
+    "confidence": 88,
+    "root_cause": {
+      "kind": "policy.rule_changed",
+      "entity": "Dell",
+      "event_id": "01M2DNN1H2FHDJAMX1WHSKRRAC",
+      "confidence": 88
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNN1H2FHDJAMX1WHSKRRAC",
+        "kind": "policy.rule_changed",
+        "at": 1789312796194980338,
+        "subject": "Dell",
+        "relation": "",
+        "why": "This is the last thing that changed on the path before it broke.",
+        "evidence": {
+          "describe": "4 filtering rule(s) were added"
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2DNNA93PN1DQAX7DGSFGKMK",
+        "kind": "flow.first_failure_for_pair",
+        "at": 1789312805155741481,
+        "subject": "10.99.0.11",
+        "relation": "causes",
+        "why": "Two machines that had been connecting successfully can no longer complete a handshake. Whatever else is true, something between them changed.",
+        "evidence": {
+          "describe": "10.99.0.1 can no longer reach 10.99.0.11 on port 9300 - it worked 11s ago"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "change-broke-a-path",
+    "advice": "The change named here is the nearest one in time, not a proven cause. Confirm it against your change record before acting: if it was intended, the breakage is a side effect nobody planned; if it was not, something changed the network without going through you."
+  }
+]

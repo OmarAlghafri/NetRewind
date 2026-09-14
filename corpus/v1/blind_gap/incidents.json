@@ -1,0 +1,64 @@
+[
+  {
+    "incident_id": "01M2DNVWKE09D2VREJEQDDTBW1",
+    "opened_at": 1789313020241624149,
+    "closed_at": 1789313020241624149,
+    "status": "closed",
+    "title": "The record has a hole in it",
+    "severity": "warn",
+    "confidence": 100,
+    "root_cause": {
+      "kind": "system.gap",
+      "entity": "Dell",
+      "event_id": "01M2DNVWAHZ6JJDCECG4G7C3RY",
+      "confidence": 100
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNVWAHZ6JJDCECG4G7C3RY",
+        "kind": "system.gap",
+        "at": 1789313020241624149,
+        "subject": "Dell",
+        "relation": "",
+        "why": "The recorder was not watching, or lost events it could not keep up with. An absence of events here does not mean an absence of problems.",
+        "evidence": {
+          "describe": "the recorder was not watching for 23s"
+        }
+      }
+    ],
+    "rule_id": "recorder-was-blind",
+    "advice": "Nothing can be concluded about this period from this recorder. If the outage being investigated falls inside it, look for another source before deciding what happened."
+  },
+  {
+    "incident_id": "01M2DNVWKE09D2VREJESB39VHT",
+    "opened_at": 1789313020251602644,
+    "closed_at": 1789313020251602644,
+    "status": "closed",
+    "title": "The recorder is running but one of its senses is not",
+    "severity": "error",
+    "confidence": 100,
+    "root_cause": {
+      "kind": "system.collector_down",
+      "entity": "Dell",
+      "event_id": "01M2DNVWAVBY5QD0H93A5AKBXV",
+      "confidence": 100
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNVWAVBY5QD0H93A5AKBXV",
+        "kind": "system.collector_down",
+        "at": 1789313020251602644,
+        "subject": "Dell",
+        "relation": "",
+        "why": "A source stopped feeding the record while the recorder kept running. This is the dangerous kind of blindness, because unlike a gap there is no interruption to notice - the timeline continues, with one family of events silently missing from it.",
+        "evidence": {
+          "describe": "the ebpf.flow source stopped feeding the record; nothing of what it watches was seen after this"
+        }
+      }
+    ],
+    "rule_id": "collector-not-watching",
+    "advice": "The recorder is still recording everything else, so the timeline looks healthy. It is not: nothing this source watches has been seen since, and an absence of those events proves nothing. Read the reason on the event. The usual causes are a kernel without BTF, which stops the connection collector loading, and missing capabilities, which stops the packet and netlink sources opening their sockets. Fix it or note the limitation before drawing conclusions from a quiet timeline."
+  }
+]

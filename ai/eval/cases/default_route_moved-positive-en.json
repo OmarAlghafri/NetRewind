@@ -1,0 +1,23 @@
+{
+  "id": "default_route_moved-positive-en",
+  "scenario": "default_route_moved",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ default، وما الذي سبّبه؟",
+  "question_en": "What happened to default, and what caused it?",
+  "input_event_ids": [
+    "01M2DNHY6AY0ZPV2JWW7Z0C25J",
+    "01M2DNJ03HJD0C6BGRVS2KK8BN",
+    "01M2DNJ03K0T3T2XMV9YP02JY9",
+    "01M2DNJ7Z2Y8N29YQHK0RK2JGZ"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNJ03K0T3T2XMV9YP02JY9"
+    ],
+    "root_cause_kind": "l3.default_route_changed",
+    "root_cause_entity": "default",
+    "max_confidence": 85,
+    "rule_id": "default-route-moved"
+  }
+}

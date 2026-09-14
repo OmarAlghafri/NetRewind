@@ -1,0 +1,4 @@
+TIME          KIND                    SUBJECT      SEV    DETAIL
+15:17:18.388  system.start            Dell         info   
+15:17:20.356  l2.arp_binding_changed  10.99.0.201  error  ip=10.99.0.201 is_gateway=true mac_new=02:00:00:00:00:ff mac_old=02:00:00:00:00:01
+15:17:28.396  flow.rollup             Dell         info   closed=1 distinct_peers=0 handshake_failures=0 known_pairs=0 mean_duration_ms=0 opened=0 tracked=0 window_seconds=10

@@ -1,0 +1,14 @@
+!! The default gateway is being answered by a different machine
+   15:17:20 to 15:17:20  (0s)   rule gateway-hijack, confidence 90%
+   affected: 10.99.0.201
+
+   1  15:17:20.356  l2.arp_binding_changed  10.99.0.201
+      The hardware address answering for the default gateway changed.
+      Every host on this segment now sends its outbound traffic to a
+      different machine.
+
+   root cause: l2.arp_binding_changed on 10.99.0.201 (confidence 90%)
+   next:
+      Find which switch port the new hardware address is learned on
+      before changing anything. A failover looks identical to an attack
+      from here; the port tells them apart.

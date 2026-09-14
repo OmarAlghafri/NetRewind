@@ -1,0 +1,109 @@
+[
+  {
+    "event_id": "01M2DNFPQZ7ZVNYTX1KST7JP0E",
+    "schema_v": 1,
+    "ts_wall": 1789312621311038881,
+    "ts_mono": 4326413,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNFRNBKV124AR4TZ0WR34M",
+    "schema_v": 1,
+    "ts_wall": 1789312623275242167,
+    "ts_mono": 1968529697,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l2.arp_binding_changed",
+    "severity": "warn",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "id": "01M2DNFRNBKV124AR4V1WPJW0X",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11",
+        "mac": "02:00:00:00:00:aa"
+      }
+    },
+    "attrs": {
+      "ip": "10.99.0.11",
+      "is_gateway": false,
+      "mac_new": "02:00:00:00:00:aa",
+      "mac_old": "02:00:00:00:00:11"
+    },
+    "evidence": {
+      "ifindex": 8,
+      "nud_state": "reachable"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNFVQZP8S8ESS7C9DD9ZZD",
+    "schema_v": 1,
+    "ts_wall": 1789312626431892444,
+    "ts_mono": 5125179977,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l2.arp_binding_changed",
+    "severity": "warn",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "id": "01M2DNFVQZP8S8ESS7CBA1079S",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11",
+        "mac": "02:00:00:00:00:11"
+      }
+    },
+    "attrs": {
+      "address_changed_hands": true,
+      "ip": "10.99.0.11",
+      "is_gateway": false,
+      "mac_new": "02:00:00:00:00:11",
+      "mac_old": "02:00:00:00:00:aa"
+    },
+    "evidence": {
+      "ifindex": 8,
+      "nud_state": "stale"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNG0GP8560SM7H2VK7PEJ6",
+    "schema_v": 1,
+    "ts_wall": 1789312631318152580,
+    "ts_mono": 10011440112,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.rollup",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "closed": 1,
+      "distinct_peers": 0,
+      "handshake_failures": 0,
+      "known_pairs": 0,
+      "mean_duration_ms": 0,
+      "opened": 0,
+      "tracked": 0,
+      "window_seconds": 10
+    },
+    "count": 1
+  }
+]

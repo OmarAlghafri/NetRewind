@@ -1,0 +1,195 @@
+[
+  {
+    "event_id": "01M2DP0TD08JNZC77Y3BM9MFPH",
+    "schema_v": 1,
+    "ts_wall": 1789313182112239400,
+    "ts_mono": 13787800,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DP0TD1Q9YGJ8KNWM95CYNV",
+    "schema_v": 1,
+    "ts_wall": 1789313182113566600,
+    "ts_mono": 15115000,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.collector_down",
+    "severity": "error",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "collector": "netlink.link",
+      "reason": "netlink: collectors require Linux"
+    },
+    "dedup_key": "system.collector_down|netlink.link",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DP0TD1Q9YGJ8KNWMX5G8DB",
+    "schema_v": 1,
+    "ts_wall": 1789313182113566600,
+    "ts_mono": 15115000,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.collector_down",
+    "severity": "error",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "collector": "netlink.neigh",
+      "reason": "netlink: collectors require Linux"
+    },
+    "dedup_key": "system.collector_down|netlink.neigh",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DP0TD1Q9YGJ8KNWP9C5EXR",
+    "schema_v": 1,
+    "ts_wall": 1789313182113566600,
+    "ts_mono": 15115000,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.collector_down",
+    "severity": "error",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "collector": "netlink.route",
+      "reason": "netlink: collectors require Linux"
+    },
+    "dedup_key": "system.collector_down|netlink.route",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DP0TD24AKB1RZP20HVGFVX",
+    "schema_v": 1,
+    "ts_wall": 1789313182114089500,
+    "ts_mono": 15637900,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.collector_down",
+    "severity": "error",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "collector": "wire",
+      "reason": "wire: raw packet capture requires Linux"
+    },
+    "dedup_key": "system.collector_down|wire",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DP0TD24AKB1RZP1ZZQX6M7",
+    "schema_v": 1,
+    "ts_wall": 1789313182114089500,
+    "ts_mono": 15637900,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.collector_down",
+    "severity": "error",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "collector": "netlink.addr",
+      "reason": "netlink: collectors require Linux"
+    },
+    "dedup_key": "system.collector_down|netlink.addr",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DP0TD24AKB1RZP2229NPCV",
+    "schema_v": 1,
+    "ts_wall": 1789313182114089500,
+    "ts_mono": 15637900,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.collector_down",
+    "severity": "error",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "collector": "ebpf.flow",
+      "reason": "flow: eBPF connection tracking requires Linux"
+    },
+    "dedup_key": "system.collector_down|ebpf.flow",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DP0TD24AKB1RZP24MHMXAT",
+    "schema_v": 1,
+    "ts_wall": 1789313182114089500,
+    "ts_mono": 15637900,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.collector_down",
+    "severity": "error",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "collector": "policy.nftables",
+      "reason": "policy: nftables is a Linux facility"
+    },
+    "dedup_key": "system.collector_down|policy.nftables",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DP0TD24AKB1RZP2847THDH",
+    "schema_v": 1,
+    "ts_wall": 1789313182114089500,
+    "ts_mono": 15637900,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.collector_down",
+    "severity": "error",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "collector": "probe.icmp",
+      "reason": "probe: ICMP probing requires Linux"
+    },
+    "dedup_key": "system.collector_down|probe.icmp",
+    "count": 1
+  }
+]

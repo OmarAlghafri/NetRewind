@@ -1,0 +1,250 @@
+[
+  {
+    "incident_id": "01M2DP0TNZKDZ862Q1WSJTA8ZC",
+    "opened_at": 1789313182113566600,
+    "closed_at": 1789313182113566600,
+    "status": "closed",
+    "title": "The recorder is running but one of its senses is not",
+    "severity": "error",
+    "confidence": 100,
+    "root_cause": {
+      "kind": "system.collector_down",
+      "entity": "Dell",
+      "event_id": "01M2DP0TD1Q9YGJ8KNWM95CYNV",
+      "confidence": 100
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DP0TD1Q9YGJ8KNWM95CYNV",
+        "kind": "system.collector_down",
+        "at": 1789313182113566600,
+        "subject": "Dell",
+        "relation": "",
+        "why": "A source stopped feeding the record while the recorder kept running. This is the dangerous kind of blindness, because unlike a gap there is no interruption to notice - the timeline continues, with one family of events silently missing from it.",
+        "evidence": {
+          "describe": "the netlink.link source stopped feeding the record; nothing of what it watches was seen after this"
+        }
+      }
+    ],
+    "rule_id": "collector-not-watching",
+    "advice": "The recorder is still recording everything else, so the timeline looks healthy. It is not: nothing this source watches has been seen since, and an absence of those events proves nothing. Read the reason on the event. The usual causes are a kernel without BTF, which stops the connection collector loading, and missing capabilities, which stops the packet and netlink sources opening their sockets. Fix it or note the limitation before drawing conclusions from a quiet timeline."
+  },
+  {
+    "incident_id": "01M2DP0TNZKDZ862Q1WWDCTWWE",
+    "opened_at": 1789313182113566600,
+    "closed_at": 1789313182113566600,
+    "status": "closed",
+    "title": "The recorder is running but one of its senses is not",
+    "severity": "error",
+    "confidence": 100,
+    "root_cause": {
+      "kind": "system.collector_down",
+      "entity": "Dell",
+      "event_id": "01M2DP0TD1Q9YGJ8KNWMX5G8DB",
+      "confidence": 100
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DP0TD1Q9YGJ8KNWMX5G8DB",
+        "kind": "system.collector_down",
+        "at": 1789313182113566600,
+        "subject": "Dell",
+        "relation": "",
+        "why": "A source stopped feeding the record while the recorder kept running. This is the dangerous kind of blindness, because unlike a gap there is no interruption to notice - the timeline continues, with one family of events silently missing from it.",
+        "evidence": {
+          "describe": "the netlink.neigh source stopped feeding the record; nothing of what it watches was seen after this"
+        }
+      }
+    ],
+    "rule_id": "collector-not-watching",
+    "advice": "The recorder is still recording everything else, so the timeline looks healthy. It is not: nothing this source watches has been seen since, and an absence of those events proves nothing. Read the reason on the event. The usual causes are a kernel without BTF, which stops the connection collector loading, and missing capabilities, which stops the packet and netlink sources opening their sockets. Fix it or note the limitation before drawing conclusions from a quiet timeline."
+  },
+  {
+    "incident_id": "01M2DP0TNZKDZ862Q1X094YACH",
+    "opened_at": 1789313182113566600,
+    "closed_at": 1789313182113566600,
+    "status": "closed",
+    "title": "The recorder is running but one of its senses is not",
+    "severity": "error",
+    "confidence": 100,
+    "root_cause": {
+      "kind": "system.collector_down",
+      "entity": "Dell",
+      "event_id": "01M2DP0TD1Q9YGJ8KNWP9C5EXR",
+      "confidence": 100
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DP0TD1Q9YGJ8KNWP9C5EXR",
+        "kind": "system.collector_down",
+        "at": 1789313182113566600,
+        "subject": "Dell",
+        "relation": "",
+        "why": "A source stopped feeding the record while the recorder kept running. This is the dangerous kind of blindness, because unlike a gap there is no interruption to notice - the timeline continues, with one family of events silently missing from it.",
+        "evidence": {
+          "describe": "the netlink.route source stopped feeding the record; nothing of what it watches was seen after this"
+        }
+      }
+    ],
+    "rule_id": "collector-not-watching",
+    "advice": "The recorder is still recording everything else, so the timeline looks healthy. It is not: nothing this source watches has been seen since, and an absence of those events proves nothing. Read the reason on the event. The usual causes are a kernel without BTF, which stops the connection collector loading, and missing capabilities, which stops the packet and netlink sources opening their sockets. Fix it or note the limitation before drawing conclusions from a quiet timeline."
+  },
+  {
+    "incident_id": "01M2DP0TNZKDZ862Q1X1XR77DP",
+    "opened_at": 1789313182114089500,
+    "closed_at": 1789313182114089500,
+    "status": "closed",
+    "title": "The recorder is running but one of its senses is not",
+    "severity": "error",
+    "confidence": 100,
+    "root_cause": {
+      "kind": "system.collector_down",
+      "entity": "Dell",
+      "event_id": "01M2DP0TD24AKB1RZP20HVGFVX",
+      "confidence": 100
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DP0TD24AKB1RZP20HVGFVX",
+        "kind": "system.collector_down",
+        "at": 1789313182114089500,
+        "subject": "Dell",
+        "relation": "",
+        "why": "A source stopped feeding the record while the recorder kept running. This is the dangerous kind of blindness, because unlike a gap there is no interruption to notice - the timeline continues, with one family of events silently missing from it.",
+        "evidence": {
+          "describe": "the wire source stopped feeding the record; nothing of what it watches was seen after this"
+        }
+      }
+    ],
+    "rule_id": "collector-not-watching",
+    "advice": "The recorder is still recording everything else, so the timeline looks healthy. It is not: nothing this source watches has been seen since, and an absence of those events proves nothing. Read the reason on the event. The usual causes are a kernel without BTF, which stops the connection collector loading, and missing capabilities, which stops the packet and netlink sources opening their sockets. Fix it or note the limitation before drawing conclusions from a quiet timeline."
+  },
+  {
+    "incident_id": "01M2DP0TNZKDZ862Q1X568PBSG",
+    "opened_at": 1789313182114089500,
+    "closed_at": 1789313182114089500,
+    "status": "closed",
+    "title": "The recorder is running but one of its senses is not",
+    "severity": "error",
+    "confidence": 100,
+    "root_cause": {
+      "kind": "system.collector_down",
+      "entity": "Dell",
+      "event_id": "01M2DP0TD24AKB1RZP1ZZQX6M7",
+      "confidence": 100
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DP0TD24AKB1RZP1ZZQX6M7",
+        "kind": "system.collector_down",
+        "at": 1789313182114089500,
+        "subject": "Dell",
+        "relation": "",
+        "why": "A source stopped feeding the record while the recorder kept running. This is the dangerous kind of blindness, because unlike a gap there is no interruption to notice - the timeline continues, with one family of events silently missing from it.",
+        "evidence": {
+          "describe": "the netlink.addr source stopped feeding the record; nothing of what it watches was seen after this"
+        }
+      }
+    ],
+    "rule_id": "collector-not-watching",
+    "advice": "The recorder is still recording everything else, so the timeline looks healthy. It is not: nothing this source watches has been seen since, and an absence of those events proves nothing. Read the reason on the event. The usual causes are a kernel without BTF, which stops the connection collector loading, and missing capabilities, which stops the packet and netlink sources opening their sockets. Fix it or note the limitation before drawing conclusions from a quiet timeline."
+  },
+  {
+    "incident_id": "01M2DP0TNZKDZ862Q1X7BEY0ZV",
+    "opened_at": 1789313182114089500,
+    "closed_at": 1789313182114089500,
+    "status": "closed",
+    "title": "The recorder is running but one of its senses is not",
+    "severity": "error",
+    "confidence": 100,
+    "root_cause": {
+      "kind": "system.collector_down",
+      "entity": "Dell",
+      "event_id": "01M2DP0TD24AKB1RZP2229NPCV",
+      "confidence": 100
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DP0TD24AKB1RZP2229NPCV",
+        "kind": "system.collector_down",
+        "at": 1789313182114089500,
+        "subject": "Dell",
+        "relation": "",
+        "why": "A source stopped feeding the record while the recorder kept running. This is the dangerous kind of blindness, because unlike a gap there is no interruption to notice - the timeline continues, with one family of events silently missing from it.",
+        "evidence": {
+          "describe": "the ebpf.flow source stopped feeding the record; nothing of what it watches was seen after this"
+        }
+      }
+    ],
+    "rule_id": "collector-not-watching",
+    "advice": "The recorder is still recording everything else, so the timeline looks healthy. It is not: nothing this source watches has been seen since, and an absence of those events proves nothing. Read the reason on the event. The usual causes are a kernel without BTF, which stops the connection collector loading, and missing capabilities, which stops the packet and netlink sources opening their sockets. Fix it or note the limitation before drawing conclusions from a quiet timeline."
+  },
+  {
+    "incident_id": "01M2DP0TNZKDZ862Q1X999W8R0",
+    "opened_at": 1789313182114089500,
+    "closed_at": 1789313182114089500,
+    "status": "closed",
+    "title": "The recorder is running but one of its senses is not",
+    "severity": "error",
+    "confidence": 100,
+    "root_cause": {
+      "kind": "system.collector_down",
+      "entity": "Dell",
+      "event_id": "01M2DP0TD24AKB1RZP24MHMXAT",
+      "confidence": 100
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DP0TD24AKB1RZP24MHMXAT",
+        "kind": "system.collector_down",
+        "at": 1789313182114089500,
+        "subject": "Dell",
+        "relation": "",
+        "why": "A source stopped feeding the record while the recorder kept running. This is the dangerous kind of blindness, because unlike a gap there is no interruption to notice - the timeline continues, with one family of events silently missing from it.",
+        "evidence": {
+          "describe": "the policy.nftables source stopped feeding the record; nothing of what it watches was seen after this"
+        }
+      }
+    ],
+    "rule_id": "collector-not-watching",
+    "advice": "The recorder is still recording everything else, so the timeline looks healthy. It is not: nothing this source watches has been seen since, and an absence of those events proves nothing. Read the reason on the event. The usual causes are a kernel without BTF, which stops the connection collector loading, and missing capabilities, which stops the packet and netlink sources opening their sockets. Fix it or note the limitation before drawing conclusions from a quiet timeline."
+  },
+  {
+    "incident_id": "01M2DP0TNZKDZ862Q1XAVEXQ0P",
+    "opened_at": 1789313182114089500,
+    "closed_at": 1789313182114089500,
+    "status": "closed",
+    "title": "The recorder is running but one of its senses is not",
+    "severity": "error",
+    "confidence": 100,
+    "root_cause": {
+      "kind": "system.collector_down",
+      "entity": "Dell",
+      "event_id": "01M2DP0TD24AKB1RZP2847THDH",
+      "confidence": 100
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DP0TD24AKB1RZP2847THDH",
+        "kind": "system.collector_down",
+        "at": 1789313182114089500,
+        "subject": "Dell",
+        "relation": "",
+        "why": "A source stopped feeding the record while the recorder kept running. This is the dangerous kind of blindness, because unlike a gap there is no interruption to notice - the timeline continues, with one family of events silently missing from it.",
+        "evidence": {
+          "describe": "the probe.icmp source stopped feeding the record; nothing of what it watches was seen after this"
+        }
+      }
+    ],
+    "rule_id": "collector-not-watching",
+    "advice": "The recorder is still recording everything else, so the timeline looks healthy. It is not: nothing this source watches has been seen since, and an absence of those events proves nothing. Read the reason on the event. The usual causes are a kernel without BTF, which stops the connection collector loading, and missing capabilities, which stops the packet and netlink sources opening their sockets. Fix it or note the limitation before drawing conclusions from a quiet timeline."
+  }
+]

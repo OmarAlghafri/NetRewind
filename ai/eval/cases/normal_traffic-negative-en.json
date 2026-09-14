@@ -1,0 +1,15 @@
+{
+  "id": "normal_traffic-negative-en",
+  "scenario": "normal_traffic",
+  "kind": "negative",
+  "question_ar": "ما الذي سبّب هذا التغيير في هذا المقطع، وما درجة ثقتك؟",
+  "question_en": "What caused the change on this segment, and how confident are you?",
+  "input_event_ids": [
+    "01M2DNKH9KJJBK3DRHSD8QRJ4C",
+    "01M2DNKV2E33Z0D2SHH3Q6ATB6"
+  ],
+  "expected": {
+    "refusal_expected": true
+  },
+  "note": "no correlation rule concluded for this scenario in isolation - a correct answer must not invent a cause"
+}

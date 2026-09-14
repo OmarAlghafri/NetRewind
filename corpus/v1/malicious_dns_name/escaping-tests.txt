@@ -1,0 +1,28 @@
+The correct evidence for this corpus entry (see corpus/v1/README.md §4 for why
+the resolver_change-based attempt in this same directory was not sufficient).
+
+$ CGO_ENABLED=0 go test ./internal/web/... -run "TestHostileStringsFromTheWireAreEscaped|TestHostileQueryParametersAreEscaped|TestPagesCarryAPolicyThatForbidsScript|TestTheInterfaceIsReadOnly" -v
+
+=== RUN   TestHostileStringsFromTheWireAreEscaped
+=== RUN   TestHostileStringsFromTheWireAreEscaped/script_tag
+=== RUN   TestHostileStringsFromTheWireAreEscaped/attribute_break-out
+=== RUN   TestHostileStringsFromTheWireAreEscaped/tag_injection
+=== RUN   TestHostileStringsFromTheWireAreEscaped/entity
+--- PASS: TestHostileStringsFromTheWireAreEscaped (0.11s)
+=== RUN   TestHostileQueryParametersAreEscaped
+--- PASS: TestHostileQueryParametersAreEscaped (0.04s)
+=== RUN   TestTheInterfaceIsReadOnly
+--- PASS: TestTheInterfaceIsReadOnly (0.06s)
+=== RUN   TestPagesCarryAPolicyThatForbidsScript
+--- PASS: TestPagesCarryAPolicyThatForbidsScript (0.17s)
+PASS
+ok  	github.com/OmarAlghafri/netrewind/internal/web	0.806s
+
+Static audit (grep for any escape hatch that would bypass html/template's
+automatic contextual escaping, across the whole internal/web tree):
+
+$ grep -rniE "template\.HTML|htmlTemplate\.HTML|SafeHTML|noescape|\.HTML\(" internal/web
+internal/web/escaping_test.go:21: // templates, and a single stray template.HTML anywhere would end it silently.
+
+No match outside the test's own comment explaining why the test exists - there
+is no template.HTML/SafeHTML escape hatch anywhere in the web package today.

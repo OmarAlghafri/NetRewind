@@ -1,0 +1,17 @@
+{
+  "id": "route_change-negative-en",
+  "scenario": "route_change",
+  "kind": "negative",
+  "question_ar": "ما الذي سبّب هذا التغيير في هذا المقطع، وما درجة ثقتك؟",
+  "question_en": "What caused the change on this segment, and how confident are you?",
+  "input_event_ids": [
+    "01M2DNHAPYRMS587VSTNW0DBG9",
+    "01M2DNHCMEJWKTAC55W17VQ2WA",
+    "01M2DNHDKTHZ79ZQDAFXBAZE89",
+    "01M2DNHMFNV5X8TBMH4YV8Q08N"
+  ],
+  "expected": {
+    "refusal_expected": true
+  },
+  "note": "no correlation rule concluded for this scenario in isolation - a correct answer must not invent a cause"
+}

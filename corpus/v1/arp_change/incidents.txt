@@ -1,0 +1,13 @@
+! An address moved to a different machine
+   15:17:06 to 15:17:06  (0s)   rule address-changed-hands, confidence 75%
+   affected: 10.99.0.11
+
+   1  15:17:06.431  l2.arp_binding_changed  10.99.0.11
+      This address is now answered by hardware that was not previously
+      bound to it, so the machine behind it is a different machine.
+
+   root cause: l2.arp_binding_changed on 10.99.0.11 (confidence 75%)
+   next:
+      Normal after a DHCP lease expires. Worth a look if the address is
+      a server, is statically assigned, or moved without a lease renewal
+      near it.

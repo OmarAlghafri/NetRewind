@@ -1,0 +1,26 @@
+{
+  "id": "rogue_dhcp-positive-en-deidentified",
+  "scenario": "rogue_dhcp",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ \u003cHOST_3\u003e، وما الذي سبّبه؟",
+  "question_en": "What happened to \u003cHOST_3\u003e, and what caused it?",
+  "input_event_ids": [
+    "01M2DNNVR5EDPW3MME2Z2EC0XP",
+    "01M2DNNXQ3TQRNGD59HB8P3GRS",
+    "01M2DNNXQ3TQRNGD59HD5A43EY",
+    "01M2DNNZPMJ75F1BMGB4YV3ETN",
+    "01M2DNNZPMJ75F1BMGB6SG831A",
+    "01M2DNP5GWY3BDEYDP54GF420K"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNNZPMJ75F1BMGB4YV3ETN"
+    ],
+    "root_cause_kind": "dhcp.server_seen",
+    "root_cause_entity": "\u003cHOST_3\u003e",
+    "max_confidence": 92,
+    "rule_id": "rogue-dhcp-server"
+  },
+  "note": "de-identified: real lab addresses replaced with placeholder host tokens"
+}

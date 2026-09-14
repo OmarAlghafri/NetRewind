@@ -1,0 +1,7 @@
+15:14:17 to 15:24:17 (10m0s)
+
+     15:24:02.063             the recorder started
+     15:24:04.053  +1.99s     route to 10.200.0.0/24 added via 10.99.0.11
+  !! 15:24:04.053  +0s        10.99.0.201 moved from 02:00:00:00:00:01 to 02:00:00:00:00:ff - this is the default gateway
+  -  15:24:05.058  +1.01s     route to 10.200.0.0/24 now goes via 10.99.1.11 (was 10.99.0.11)
+     15:24:12.071  +7.01s     0 connections opened, 1 closed, 0 unanswered

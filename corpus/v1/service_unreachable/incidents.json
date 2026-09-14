@@ -1,0 +1,38 @@
+[
+  {
+    "incident_id": "01M2DNK2AYHWDX6QV2RD3EQXMC",
+    "opened_at": 1789312731450546717,
+    "closed_at": 1789312731454166723,
+    "status": "closed",
+    "title": "A service stopped answering",
+    "severity": "warn",
+    "confidence": 80,
+    "root_cause": {
+      "kind": "flow.handshake_fail",
+      "entity": "10.99.0.11",
+      "event_id": "01M2DNK29TS7AB3YJGTCY9X8RN",
+      "confidence": 80
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNK29TS7AB3YJGTCY9X8RN",
+        "kind": "flow.handshake_fail",
+        "at": 1789312731450546717,
+        "subject": "10.99.0.11",
+        "relation": "",
+        "why": "Repeated connections to this service went from the opening SYN straight to closed without ever being answered. Something refused them, dropped them, or was not listening.",
+        "evidence": {
+          "describe": "connections to 10.99.0.11 port 9999 went unanswered",
+          "last_event_id": "01M2DNK29TS7AB3YJGTCY9X8RN",
+          "matched_count": 3
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "service-unreachable",
+    "advice": "Check whether the service is listening before blaming the network. If it is, look at the timeline for a filtering change or a route change just before the first failure - both look identical from the client."
+  }
+]

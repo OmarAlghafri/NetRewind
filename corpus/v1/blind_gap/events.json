@@ -1,0 +1,99 @@
+[
+  {
+    "event_id": "01M2DNV5QCXFMQEHXW1J0KPBVH",
+    "schema_v": 1,
+    "ts_wall": 1789312997100506766,
+    "ts_mono": 41437984,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNV8QK8CEFBG5H9VQPS9M0",
+    "schema_v": 1,
+    "ts_wall": 1789313000179723903,
+    "ts_mono": 3120655132,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.stop",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNVWAGK6GNK03015KP24JA",
+    "schema_v": 1,
+    "ts_wall": 1789313020240938764,
+    "ts_mono": 4587510,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNVWAHZ6JJDCECG4G7C3RY",
+    "schema_v": 1,
+    "ts_wall": 1789313020241624149,
+    "ts_mono": 5272878,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.gap",
+    "severity": "warn",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "gap_duration_ms": 23139,
+      "gap_start_ns": 1789312997102185693
+    },
+    "evidence": {
+      "last_heartbeat": "2026-09-13T15:23:17Z"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNVWAVBY5QD0H93A5AKBXV",
+    "schema_v": 1,
+    "ts_wall": 1789313020251602644,
+    "ts_mono": 15251413,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.collector_down",
+    "severity": "error",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "collector": "ebpf.flow",
+      "reason": "flow: attach sock/inet_sock_set_state (is tracefs mounted in this mount namespace?): neither debugfs nor tracefs are mounted"
+    },
+    "dedup_key": "system.collector_down|ebpf.flow",
+    "count": 1
+  }
+]

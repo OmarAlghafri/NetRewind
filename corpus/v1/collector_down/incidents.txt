@@ -1,0 +1,159 @@
+!! The recorder is running but one of its senses is not
+   19:26:22 to 19:26:22  (0s)   rule collector-not-watching, confidence 100%
+
+   1  19:26:22.113  system.collector_down  Dell
+      A source stopped feeding the record while the recorder kept
+      running. This is the dangerous kind of blindness, because unlike a
+      gap there is no interruption to notice - the timeline continues,
+      with one family of events silently missing from it.
+
+   root cause: system.collector_down on Dell (confidence 100%)
+   next:
+      The recorder is still recording everything else, so the timeline
+      looks healthy. It is not: nothing this source watches has been
+      seen since, and an absence of those events proves nothing. Read
+      the reason on the event. The usual causes are a kernel without
+      BTF, which stops the connection collector loading, and missing
+      capabilities, which stops the packet and netlink sources opening
+      their sockets. Fix it or note the limitation before drawing
+      conclusions from a quiet timeline.
+
+!! The recorder is running but one of its senses is not
+   19:26:22 to 19:26:22  (0s)   rule collector-not-watching, confidence 100%
+
+   1  19:26:22.113  system.collector_down  Dell
+      A source stopped feeding the record while the recorder kept
+      running. This is the dangerous kind of blindness, because unlike a
+      gap there is no interruption to notice - the timeline continues,
+      with one family of events silently missing from it.
+
+   root cause: system.collector_down on Dell (confidence 100%)
+   next:
+      The recorder is still recording everything else, so the timeline
+      looks healthy. It is not: nothing this source watches has been
+      seen since, and an absence of those events proves nothing. Read
+      the reason on the event. The usual causes are a kernel without
+      BTF, which stops the connection collector loading, and missing
+      capabilities, which stops the packet and netlink sources opening
+      their sockets. Fix it or note the limitation before drawing
+      conclusions from a quiet timeline.
+
+!! The recorder is running but one of its senses is not
+   19:26:22 to 19:26:22  (0s)   rule collector-not-watching, confidence 100%
+
+   1  19:26:22.113  system.collector_down  Dell
+      A source stopped feeding the record while the recorder kept
+      running. This is the dangerous kind of blindness, because unlike a
+      gap there is no interruption to notice - the timeline continues,
+      with one family of events silently missing from it.
+
+   root cause: system.collector_down on Dell (confidence 100%)
+   next:
+      The recorder is still recording everything else, so the timeline
+      looks healthy. It is not: nothing this source watches has been
+      seen since, and an absence of those events proves nothing. Read
+      the reason on the event. The usual causes are a kernel without
+      BTF, which stops the connection collector loading, and missing
+      capabilities, which stops the packet and netlink sources opening
+      their sockets. Fix it or note the limitation before drawing
+      conclusions from a quiet timeline.
+
+!! The recorder is running but one of its senses is not
+   19:26:22 to 19:26:22  (0s)   rule collector-not-watching, confidence 100%
+
+   1  19:26:22.114  system.collector_down  Dell
+      A source stopped feeding the record while the recorder kept
+      running. This is the dangerous kind of blindness, because unlike a
+      gap there is no interruption to notice - the timeline continues,
+      with one family of events silently missing from it.
+
+   root cause: system.collector_down on Dell (confidence 100%)
+   next:
+      The recorder is still recording everything else, so the timeline
+      looks healthy. It is not: nothing this source watches has been
+      seen since, and an absence of those events proves nothing. Read
+      the reason on the event. The usual causes are a kernel without
+      BTF, which stops the connection collector loading, and missing
+      capabilities, which stops the packet and netlink sources opening
+      their sockets. Fix it or note the limitation before drawing
+      conclusions from a quiet timeline.
+
+!! The recorder is running but one of its senses is not
+   19:26:22 to 19:26:22  (0s)   rule collector-not-watching, confidence 100%
+
+   1  19:26:22.114  system.collector_down  Dell
+      A source stopped feeding the record while the recorder kept
+      running. This is the dangerous kind of blindness, because unlike a
+      gap there is no interruption to notice - the timeline continues,
+      with one family of events silently missing from it.
+
+   root cause: system.collector_down on Dell (confidence 100%)
+   next:
+      The recorder is still recording everything else, so the timeline
+      looks healthy. It is not: nothing this source watches has been
+      seen since, and an absence of those events proves nothing. Read
+      the reason on the event. The usual causes are a kernel without
+      BTF, which stops the connection collector loading, and missing
+      capabilities, which stops the packet and netlink sources opening
+      their sockets. Fix it or note the limitation before drawing
+      conclusions from a quiet timeline.
+
+!! The recorder is running but one of its senses is not
+   19:26:22 to 19:26:22  (0s)   rule collector-not-watching, confidence 100%
+
+   1  19:26:22.114  system.collector_down  Dell
+      A source stopped feeding the record while the recorder kept
+      running. This is the dangerous kind of blindness, because unlike a
+      gap there is no interruption to notice - the timeline continues,
+      with one family of events silently missing from it.
+
+   root cause: system.collector_down on Dell (confidence 100%)
+   next:
+      The recorder is still recording everything else, so the timeline
+      looks healthy. It is not: nothing this source watches has been
+      seen since, and an absence of those events proves nothing. Read
+      the reason on the event. The usual causes are a kernel without
+      BTF, which stops the connection collector loading, and missing
+      capabilities, which stops the packet and netlink sources opening
+      their sockets. Fix it or note the limitation before drawing
+      conclusions from a quiet timeline.
+
+!! The recorder is running but one of its senses is not
+   19:26:22 to 19:26:22  (0s)   rule collector-not-watching, confidence 100%
+
+   1  19:26:22.114  system.collector_down  Dell
+      A source stopped feeding the record while the recorder kept
+      running. This is the dangerous kind of blindness, because unlike a
+      gap there is no interruption to notice - the timeline continues,
+      with one family of events silently missing from it.
+
+   root cause: system.collector_down on Dell (confidence 100%)
+   next:
+      The recorder is still recording everything else, so the timeline
+      looks healthy. It is not: nothing this source watches has been
+      seen since, and an absence of those events proves nothing. Read
+      the reason on the event. The usual causes are a kernel without
+      BTF, which stops the connection collector loading, and missing
+      capabilities, which stops the packet and netlink sources opening
+      their sockets. Fix it or note the limitation before drawing
+      conclusions from a quiet timeline.
+
+!! The recorder is running but one of its senses is not
+   19:26:22 to 19:26:22  (0s)   rule collector-not-watching, confidence 100%
+
+   1  19:26:22.114  system.collector_down  Dell
+      A source stopped feeding the record while the recorder kept
+      running. This is the dangerous kind of blindness, because unlike a
+      gap there is no interruption to notice - the timeline continues,
+      with one family of events silently missing from it.
+
+   root cause: system.collector_down on Dell (confidence 100%)
+   next:
+      The recorder is still recording everything else, so the timeline
+      looks healthy. It is not: nothing this source watches has been
+      seen since, and an absence of those events proves nothing. Read
+      the reason on the event. The usual causes are a kernel without
+      BTF, which stops the connection collector loading, and missing
+      capabilities, which stops the packet and netlink sources opening
+      their sockets. Fix it or note the limitation before drawing
+      conclusions from a quiet timeline.

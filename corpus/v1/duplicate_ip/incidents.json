@@ -1,0 +1,104 @@
+[
+  {
+    "incident_id": "01M2DNGV0FHMMK7TPTPGC0Y5Y5",
+    "opened_at": 1789312658390297453,
+    "closed_at": 1789312658390297453,
+    "status": "closed",
+    "title": "An address moved to a different machine",
+    "severity": "warn",
+    "confidence": 75,
+    "root_cause": {
+      "kind": "l2.arp_binding_changed",
+      "entity": "10.99.0.11",
+      "event_id": "01M2DNGTYPSSA3EZAG38NP2VM0",
+      "confidence": 75
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNGTYPSSA3EZAG38NP2VM0",
+        "kind": "l2.arp_binding_changed",
+        "at": 1789312658390297453,
+        "subject": "10.99.0.11",
+        "relation": "",
+        "why": "This address is now answered by hardware that was not previously bound to it, so the machine behind it is a different machine.",
+        "evidence": {
+          "describe": "10.99.0.11 moved from 02:00:00:00:00:bb to 02:00:00:00:00:aa"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "address-changed-hands",
+    "advice": "Normal after a DHCP lease expires. Worth a look if the address is a server, is statically assigned, or moved without a lease renewal near it."
+  },
+  {
+    "incident_id": "01M2DNGVZQX578W8K93SNZKP4V",
+    "opened_at": 1789312659395180837,
+    "closed_at": 1789312659395180837,
+    "status": "closed",
+    "title": "Two machines are claiming the same address",
+    "severity": "error",
+    "confidence": 80,
+    "root_cause": {
+      "kind": "l2.duplicate_ip",
+      "entity": "10.99.0.11",
+      "event_id": "01M2DNGVY3H6RDBNMWJYGHVPMY",
+      "confidence": 80
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNGVY3H6RDBNMWJYGHVPMY",
+        "kind": "l2.duplicate_ip",
+        "at": 1789312659395180837,
+        "subject": "10.99.0.11",
+        "relation": "",
+        "why": "The hardware address answering for this address kept changing between the same few machines, which is what an address conflict looks like from the neighbour table.",
+        "evidence": {
+          "describe": "10.99.0.11 is being claimed by more than one machine"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "contested-address",
+    "advice": "Check for a statically configured host inside the DHCP pool, or a second DHCP server. Both produce this, and both keep producing it until one is removed."
+  },
+  {
+    "incident_id": "01M2DNGX6RQW6DK1TGVPE3170C",
+    "opened_at": 1789312660479859417,
+    "closed_at": 1789312660479859417,
+    "status": "closed",
+    "title": "An address moved to a different machine",
+    "severity": "warn",
+    "confidence": 75,
+    "root_cause": {
+      "kind": "l2.arp_binding_changed",
+      "entity": "10.99.0.11",
+      "event_id": "01M2DNGWZZZ07FB4962H8MF091",
+      "confidence": 75
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNGWZZZ07FB4962H8MF091",
+        "kind": "l2.arp_binding_changed",
+        "at": 1789312660479859417,
+        "subject": "10.99.0.11",
+        "relation": "",
+        "why": "This address is now answered by hardware that was not previously bound to it, so the machine behind it is a different machine.",
+        "evidence": {
+          "describe": "10.99.0.11 moved from 02:00:00:00:00:bb to 02:00:00:00:00:11"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "address-changed-hands",
+    "advice": "Normal after a DHCP lease expires. Worth a look if the address is a server, is statically assigned, or moved without a lease renewal near it."
+  }
+]

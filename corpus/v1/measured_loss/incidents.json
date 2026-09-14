@@ -1,0 +1,48 @@
+[
+  {
+    "incident_id": "01M2DNQRVN4XD616G7WYGKJGVV",
+    "opened_at": 1789312885439993204,
+    "closed_at": 1789312892377551569,
+    "status": "closed",
+    "title": "A measured path stopped answering",
+    "severity": "error",
+    "confidence": 90,
+    "root_cause": {
+      "kind": "metric.anomaly",
+      "entity": "10.99.0.11",
+      "event_id": "01M2DNQRNZCFT66PYJ1EH1CZG7",
+      "confidence": 90
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNQRNZCFT66PYJ1EH1CZG7",
+        "kind": "metric.anomaly",
+        "at": 1789312885439993204,
+        "subject": "10.99.0.11",
+        "relation": "causes",
+        "why": "Probes to this address began going unanswered. Packet loss announces itself to nobody; it has to be measured, and it was.",
+        "evidence": {
+          "describe": "10.99.0.11 stopped answering entirely"
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2DNQZES7J4DYJ1MGAMASDM4",
+        "kind": "metric.anomaly",
+        "at": 1789312892377551569,
+        "subject": "10.99.0.11",
+        "relation": "precedes",
+        "why": "It later answered again, which bounds how long the outage lasted.",
+        "evidence": {
+          "describe": "10.99.0.11 is answering again"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "reachability-lost",
+    "advice": "This is measured, not reported: the recorder sent probes and they did not come back. If the change named above was intended, the loss is a side effect nobody planned. If there is no change above it, the fault is beyond what this recorder can see from where it sits."
+  }
+]

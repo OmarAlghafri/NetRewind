@@ -1,0 +1,5 @@
+TIME          KIND                      SUBJECT      SEV    DETAIL
+15:18:14.474  system.start              Dell         info   
+15:18:16.433  l2.arp_binding_new        10.99.0.202  info   ifindex=24 ip=10.99.0.202 is_gateway=false mac=02:00:00:00:00:02
+15:18:16.435  l3.default_route_changed  default      error  alternatives=1 gateway_new=10.99.0.202 gateway_old=10.99.0.201 ifindex_new=24 ifindex_old=24 is_default=true prefix=default
+15:18:24.482  flow.rollup               Dell         info   closed=1 distinct_peers=0 handshake_failures=0 known_pairs=0 mean_duration_ms=0 opened=0 tracked=0 window_seconds=10

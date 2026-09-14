@@ -1,0 +1,42 @@
+! An address moved to a different machine
+   15:17:38 to 15:17:38  (0s)   rule address-changed-hands, confidence 75%
+   affected: 10.99.0.11
+
+   1  15:17:38.390  l2.arp_binding_changed  10.99.0.11
+      This address is now answered by hardware that was not previously
+      bound to it, so the machine behind it is a different machine.
+
+   root cause: l2.arp_binding_changed on 10.99.0.11 (confidence 75%)
+   next:
+      Normal after a DHCP lease expires. Worth a look if the address is
+      a server, is statically assigned, or moved without a lease renewal
+      near it.
+
+!! Two machines are claiming the same address
+   15:17:39 to 15:17:39  (0s)   rule contested-address, confidence 80%
+   affected: 10.99.0.11
+
+   1  15:17:39.395  l2.duplicate_ip  10.99.0.11
+      The hardware address answering for this address kept changing
+      between the same few machines, which is what an address conflict
+      looks like from the neighbour table.
+
+   root cause: l2.duplicate_ip on 10.99.0.11 (confidence 80%)
+   next:
+      Check for a statically configured host inside the DHCP pool, or a
+      second DHCP server. Both produce this, and both keep producing it
+      until one is removed.
+
+! An address moved to a different machine
+   15:17:40 to 15:17:40  (0s)   rule address-changed-hands, confidence 75%
+   affected: 10.99.0.11
+
+   1  15:17:40.479  l2.arp_binding_changed  10.99.0.11
+      This address is now answered by hardware that was not previously
+      bound to it, so the machine behind it is a different machine.
+
+   root cause: l2.arp_binding_changed on 10.99.0.11 (confidence 75%)
+   next:
+      Normal after a DHCP lease expires. Worth a look if the address is
+      a server, is statically assigned, or moved without a lease renewal
+      near it.

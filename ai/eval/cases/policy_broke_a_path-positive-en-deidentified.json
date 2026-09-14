@@ -1,0 +1,30 @@
+{
+  "id": "policy_broke_a_path-positive-en-deidentified",
+  "scenario": "policy_broke_a_path",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ Dell، وما الذي سبّبه؟",
+  "question_en": "What happened to Dell, and what caused it?",
+  "input_event_ids": [
+    "01M2DNMWMHQHZP8SXCWRS784HK",
+    "01M2DNN1H2FHDJAMX1WHSKRRAC",
+    "01M2DNN6D866ABM8NX2ANXWK0N",
+    "01M2DNNA93PN1DQAX7DGSFGKMK",
+    "01M2DNNB9KH6KENC6ABBRE9XMC",
+    "01M2DNNG5RRW22ENH8BRB777PM"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNN1H2FHDJAMX1WHSKRRAC",
+      "01M2DNNA93PN1DQAX7DGSFGKMK"
+    ],
+    "root_cause_kind": "policy.rule_changed",
+    "root_cause_entity": "Dell",
+    "max_confidence": 88,
+    "relation_must_include": [
+      "causes"
+    ],
+    "rule_id": "change-broke-a-path"
+  },
+  "note": "de-identified: real lab addresses replaced with placeholder host tokens"
+}

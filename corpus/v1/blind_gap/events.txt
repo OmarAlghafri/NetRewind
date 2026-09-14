@@ -1,0 +1,6 @@
+TIME          KIND                   SUBJECT  SEV    DETAIL
+15:23:17.100  system.start           Dell     info   
+15:23:20.179  system.stop            Dell     info   
+15:23:40.240  system.start           Dell     info   
+15:23:40.241  system.gap             Dell     warn   gap_duration_ms=23139 gap_start_ns=1789312997102185693
+15:23:40.251  system.collector_down  Dell     error  collector=ebpf.flow reason=flow: attach sock/inet_sock_set_state (is tracefs mounted in this mount namespace?): neither debugfs nor tracefs are mounted

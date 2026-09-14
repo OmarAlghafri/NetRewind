@@ -1,0 +1,33 @@
+[
+  {
+    "incident_id": "01M2DNJ04V0TC3T3XB4M2MDEQQ",
+    "opened_at": 1789312696435826420,
+    "closed_at": 1789312696435826420,
+    "status": "closed",
+    "title": "The default route was re-pointed",
+    "severity": "error",
+    "confidence": 85,
+    "root_cause": {
+      "kind": "l3.default_route_changed",
+      "entity": "default",
+      "event_id": "01M2DNJ03K0T3T2XMV9YP02JY9",
+      "confidence": 85
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNJ03K0T3T2XMV9YP02JY9",
+        "kind": "l3.default_route_changed",
+        "at": 1789312696435826420,
+        "subject": "default",
+        "relation": "",
+        "why": "The route all outbound traffic follows now points somewhere else.",
+        "evidence": {
+          "describe": "the default route now goes via 10.99.0.202 (was 10.99.0.201)"
+        }
+      }
+    ],
+    "rule_id": "default-route-moved",
+    "advice": "Confirm this was intended. Compare the time against your change record: an unplanned default route change means outbound traffic is leaving through a path nobody chose."
+  }
+]

@@ -1,0 +1,33 @@
+{
+  "id": "measured_loss-positive-en-deidentified",
+  "scenario": "measured_loss",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ \u003cHOST_1\u003e، وما الذي سبّبه؟",
+  "question_en": "What happened to \u003cHOST_1\u003e, and what caused it?",
+  "input_event_ids": [
+    "01M2DNQ251A6VA37526K5J9QSD",
+    "01M2DNQFS4KM8K0CMEX6Q5XBTE",
+    "01M2DNQFS4KM8K0CMEX83FHMMX",
+    "01M2DNQRNZCFT66PYJ1465T4R8",
+    "01M2DNQRNZCFT66PYJ1EH1CZG7",
+    "01M2DNQXERNNMW9PP3MZXTAE22",
+    "01M2DNQZES7J4DYJ1MGAMASDM4",
+    "01M2DNQZETP4AAN094P7NNB2FX"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNQRNZCFT66PYJ1EH1CZG7",
+      "01M2DNQZES7J4DYJ1MGAMASDM4"
+    ],
+    "root_cause_kind": "metric.anomaly",
+    "root_cause_entity": "\u003cHOST_1\u003e",
+    "max_confidence": 90,
+    "relation_must_include": [
+      "causes",
+      "precedes"
+    ],
+    "rule_id": "reachability-lost"
+  },
+  "note": "de-identified: real lab addresses replaced with placeholder host tokens"
+}

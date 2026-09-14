@@ -1,0 +1,106 @@
+[
+  {
+    "event_id": "01M2DNHY6AY0ZPV2JWW7Z0C25J",
+    "schema_v": 1,
+    "ts_wall": 1789312694474494933,
+    "ts_mono": 3792904,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNJ03HJD0C6BGRVS2KK8BN",
+    "schema_v": 1,
+    "ts_wall": 1789312696433694641,
+    "ts_mono": 1962992608,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l2.arp_binding_new",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "id": "01M2DNJ03HJD0C6BGRVV8S19WJ",
+      "label": "10.99.0.202",
+      "attrs": {
+        "ip": "10.99.0.202",
+        "mac": "02:00:00:00:00:02"
+      }
+    },
+    "attrs": {
+      "ifindex": 24,
+      "ip": "10.99.0.202",
+      "is_gateway": false,
+      "mac": "02:00:00:00:00:02"
+    },
+    "dedup_key": "l2.arp_binding_new|10.99.0.202",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNJ03K0T3T2XMV9YP02JY9",
+    "schema_v": 1,
+    "ts_wall": 1789312696435826420,
+    "ts_mono": 1965124394,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l3.default_route_changed",
+    "severity": "error",
+    "confidence": 100,
+    "subject": {
+      "kind": "subnet",
+      "label": "default",
+      "attrs": {
+        "prefix": "default"
+      }
+    },
+    "attrs": {
+      "alternatives": 1,
+      "gateway_new": "10.99.0.202",
+      "gateway_old": "10.99.0.201",
+      "ifindex_new": 24,
+      "ifindex_old": 24,
+      "is_default": true,
+      "prefix": "default"
+    },
+    "evidence": {
+      "metric_new": 100,
+      "metric_old": 100
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNJ7Z2Y8N29YQHK0RK2JGZ",
+    "schema_v": 1,
+    "ts_wall": 1789312704482892545,
+    "ts_mono": 10012190532,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.rollup",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "closed": 1,
+      "distinct_peers": 0,
+      "handshake_failures": 0,
+      "known_pairs": 0,
+      "mean_duration_ms": 0,
+      "opened": 0,
+      "tracked": 0,
+      "window_seconds": 10
+    },
+    "count": 1
+  }
+]

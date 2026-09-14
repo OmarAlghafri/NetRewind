@@ -1,0 +1,15 @@
+! A service stopped answering
+   15:18:51 to 15:18:51  (0s)   rule service-unreachable, confidence 80%
+   affected: 10.99.0.11
+
+   1  15:18:51.450  flow.handshake_fail  10.99.0.11  (x3)
+      Repeated connections to this service went from the opening SYN
+      straight to closed without ever being answered. Something refused
+      them, dropped them, or was not listening.
+
+   root cause: flow.handshake_fail on 10.99.0.11 (confidence 80%)
+   next:
+      Check whether the service is listening before blaming the network.
+      If it is, look at the timeline for a filtering change or a route
+      change just before the first failure - both look identical from
+      the client.

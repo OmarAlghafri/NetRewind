@@ -1,0 +1,18 @@
+!! A measured path stopped answering
+   15:21:25 to 15:21:32  (7s)   rule reachability-lost, confidence 90%
+   affected: 10.99.0.11
+
+   1  15:21:25.439  metric.anomaly  10.99.0.11
+      Probes to this address began going unanswered. Packet loss
+      announces itself to nobody; it has to be measured, and it was.
+      |  and then, without a known link
+   2  15:21:32.377  metric.anomaly  10.99.0.11
+      It later answered again, which bounds how long the outage lasted.
+
+   root cause: metric.anomaly on 10.99.0.11 (confidence 90%)
+   next:
+      This is measured, not reported: the recorder sent probes and they
+      did not come back. If the change named above was intended, the
+      loss is a side effect nobody planned. If there is no change above
+      it, the fault is beyond what this recorder can see from where it
+      sits.

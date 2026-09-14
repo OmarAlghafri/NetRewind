@@ -1,0 +1,4 @@
+TIME          KIND                  SUBJECT     SEV   DETAIL
+15:20:43.141  system.start          Dell        info  
+15:20:46.121  dns.resolver_changed  10.99.0.11  warn  client=10.99.0.11 resolver_new=10.99.0.99 resolver_old=10.99.0.1
+15:20:53.146  flow.rollup           Dell        info  closed=1 distinct_peers=0 handshake_failures=0 known_pairs=0 mean_duration_ms=0 opened=0 tracked=0 window_seconds=10

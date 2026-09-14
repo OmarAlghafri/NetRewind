@@ -1,0 +1,16 @@
+!! A second DHCP server is answering on this segment
+   15:20:27 to 15:20:27  (0s)   rule rogue-dhcp-server, confidence 92%
+   affected: 10.99.0.99
+
+   1  15:20:27.092  dhcp.server_seen  10.99.0.99
+      A DHCP server answered on a segment that already had one. Every
+      client that renews from here on gets whichever of them replies
+      first.
+
+   root cause: dhcp.server_seen on 10.99.0.99 (confidence 92%)
+   next:
+      Find the switch port the new server's hardware address is learned
+      on and shut it. Almost always a consumer router plugged in the
+      wrong way round, with its LAN side facing the network. Until it is
+      off, clients will keep taking its addresses and its gateway at
+      random.

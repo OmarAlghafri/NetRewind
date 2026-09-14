@@ -1,0 +1,156 @@
+[
+  {
+    "event_id": "01M2DNMWMHQHZP8SXCWRS784HK",
+    "schema_v": 1,
+    "ts_wall": 1789312791185301681,
+    "ts_mono": 4755070,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNN1H2FHDJAMX1WHSKRRAC",
+    "schema_v": 1,
+    "ts_wall": 1789312796194980338,
+    "ts_mono": 5014433725,
+    "observer_id": "Dell",
+    "source": "nftables",
+    "kind": "policy.rule_changed",
+    "severity": "warn",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "added": 4,
+      "digest": "df39e96009eb5654",
+      "removed": 0,
+      "rules_now": 4
+    },
+    "evidence": {
+      "added_rules": "[table inet nrlab]\n[table inet nrlab / chain out]\ntable inet nrlab / chain out :: type filter hook output priority filter; policy accept;\ntable inet nrlab / chain out :: tcp dport 9300 drop",
+      "digest_before": "e3b0c44298fc1c14"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNN6D866ABM8NX2ANXWK0N",
+    "schema_v": 1,
+    "ts_wall": 1789312801192453346,
+    "ts_mono": 10011906725,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.rollup",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "closed": 2,
+      "distinct_peers": 1,
+      "handshake_failures": 0,
+      "known_pairs": 1,
+      "mean_duration_ms": 0,
+      "opened": 1,
+      "tracked": 0,
+      "window_seconds": 10
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNNA93PN1DQAX7DGSFGKMK",
+    "schema_v": 1,
+    "ts_wall": 1789312805155741481,
+    "ts_mono": 13975194864,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.first_failure_for_pair",
+    "severity": "warn",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11"
+      }
+    },
+    "attrs": {
+      "dport": 9300,
+      "dst": "10.99.0.11",
+      "last_success_ago_ms": 11016,
+      "src": "10.99.0.1"
+    },
+    "evidence": {
+      "previously_established": "2026-09-13T15:19:54Z",
+      "transition": "SYN_SENT -\u003e CLOSE"
+    },
+    "dedup_key": "flow.first_failure_for_pair|10.99.0.1|10.99.0.11|9300",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNNB9KH6KENC6ABBRE9XMC",
+    "schema_v": 1,
+    "ts_wall": 1789312806195670645,
+    "ts_mono": 15015124026,
+    "observer_id": "Dell",
+    "source": "nftables",
+    "kind": "policy.rule_changed",
+    "severity": "notice",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "added": 0,
+      "digest": "e3b0c44298fc1c14",
+      "removed": 4,
+      "rules_now": 0
+    },
+    "evidence": {
+      "digest_before": "df39e96009eb5654",
+      "removed_rules": "[table inet nrlab]\n[table inet nrlab / chain out]\ntable inet nrlab / chain out :: type filter hook output priority filter; policy accept;\ntable inet nrlab / chain out :: tcp dport 9300 drop"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNNG5RRW22ENH8BRB777PM",
+    "schema_v": 1,
+    "ts_wall": 1789312811192380020,
+    "ts_mono": 20011833416,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.rollup",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "closed": 0,
+      "distinct_peers": 1,
+      "handshake_failures": 1,
+      "known_pairs": 1,
+      "opened": 0,
+      "tracked": 0,
+      "window_seconds": 10
+    },
+    "count": 1
+  }
+]

@@ -1,0 +1,135 @@
+[
+  {
+    "event_id": "01M2DNWHMF391THGA8MZH64JEV",
+    "schema_v": 1,
+    "ts_wall": 1789313042063502308,
+    "ts_mono": 5601564,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNWKJN8ZK7EH89RPQRTQ62",
+    "schema_v": 1,
+    "ts_wall": 1789313044053503687,
+    "ts_mono": 1995602919,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l3.route_added",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "subnet",
+      "label": "10.200.0.0/24",
+      "attrs": {
+        "prefix": "10.200.0.0/24"
+      }
+    },
+    "attrs": {
+      "gateway": "10.99.0.11",
+      "ifindex": 68,
+      "is_default": false,
+      "prefix": "10.200.0.0/24"
+    },
+    "dedup_key": "l3.route_added|10.200.0.0/24",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNWKJN8ZK7EH89RTHHA0RK",
+    "schema_v": 1,
+    "ts_wall": 1789313044053760199,
+    "ts_mono": 1995859425,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l2.arp_binding_changed",
+    "severity": "error",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "id": "01M2DNWKJN8ZK7EH89RTMRW2YT",
+      "label": "10.99.0.201",
+      "attrs": {
+        "ip": "10.99.0.201",
+        "mac": "02:00:00:00:00:ff"
+      }
+    },
+    "attrs": {
+      "ip": "10.99.0.201",
+      "is_gateway": true,
+      "mac_new": "02:00:00:00:00:ff",
+      "mac_old": "02:00:00:00:00:01"
+    },
+    "evidence": {
+      "ifindex": 68,
+      "nud_state": "reachable"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNWMJ2X0MQQ6ZWN6TP0C2F",
+    "schema_v": 1,
+    "ts_wall": 1789313045058893755,
+    "ts_mono": 3000992976,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l3.route_changed",
+    "severity": "notice",
+    "confidence": 100,
+    "subject": {
+      "kind": "subnet",
+      "label": "10.200.0.0/24",
+      "attrs": {
+        "prefix": "10.200.0.0/24"
+      }
+    },
+    "attrs": {
+      "alternatives": 1,
+      "gateway_new": "10.99.1.11",
+      "gateway_old": "10.99.0.11",
+      "ifindex_new": 70,
+      "ifindex_old": 68,
+      "is_default": false,
+      "prefix": "10.200.0.0/24"
+    },
+    "evidence": {
+      "metric_new": 100,
+      "metric_old": 100
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNWVD7RN6PJ060CX3XC17G",
+    "schema_v": 1,
+    "ts_wall": 1789313052071781136,
+    "ts_mono": 10013880356,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.rollup",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "closed": 1,
+      "distinct_peers": 0,
+      "handshake_failures": 0,
+      "known_pairs": 0,
+      "mean_duration_ms": 0,
+      "opened": 0,
+      "tracked": 0,
+      "window_seconds": 10
+    },
+    "count": 1
+  }
+]

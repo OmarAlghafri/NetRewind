@@ -1,0 +1,74 @@
+[
+  {
+    "event_id": "01M2DNPFC5Y28K8Z78RKQA2QA2",
+    "schema_v": 1,
+    "ts_wall": 1789312843141056821,
+    "ts_mono": 4526416,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNPJ99A5ZR30SE2M1Z0R3M",
+    "schema_v": 1,
+    "ts_wall": 1789312846121602242,
+    "ts_mono": 2985071847,
+    "observer_id": "Dell",
+    "source": "dns",
+    "kind": "dns.resolver_changed",
+    "severity": "warn",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11"
+      }
+    },
+    "attrs": {
+      "client": "10.99.0.11",
+      "resolver_new": "10.99.0.99",
+      "resolver_old": "10.99.0.1"
+    },
+    "evidence": {
+      "last_used": "2026-09-13T15:20:45Z"
+    },
+    "dedup_key": "dns.resolver_changed|10.99.0.11",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNPS4TGWNYFSTB33VCGBNN",
+    "schema_v": 1,
+    "ts_wall": 1789312853146576727,
+    "ts_mono": 10010046323,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.rollup",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "closed": 1,
+      "distinct_peers": 0,
+      "handshake_failures": 0,
+      "known_pairs": 0,
+      "mean_duration_ms": 0,
+      "opened": 0,
+      "tracked": 0,
+      "window_seconds": 10
+    },
+    "count": 1
+  }
+]

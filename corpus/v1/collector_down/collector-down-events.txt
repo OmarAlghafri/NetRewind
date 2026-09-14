@@ -1,0 +1,9 @@
+TIME          KIND                   SUBJECT  SEV    DETAIL
+19:26:22.113  system.collector_down  Dell     error  collector=netlink.link reason=netlink: collectors require Linux
+19:26:22.113  system.collector_down  Dell     error  collector=netlink.neigh reason=netlink: collectors require Linux
+19:26:22.113  system.collector_down  Dell     error  collector=netlink.route reason=netlink: collectors require Linux
+19:26:22.114  system.collector_down  Dell     error  collector=wire reason=wire: raw packet capture requires Linux
+19:26:22.114  system.collector_down  Dell     error  collector=netlink.addr reason=netlink: collectors require Linux
+19:26:22.114  system.collector_down  Dell     error  collector=ebpf.flow reason=flow: eBPF connection tracking requires Linux
+19:26:22.114  system.collector_down  Dell     error  collector=policy.nftables reason=policy: nftables is a Linux facility
+19:26:22.114  system.collector_down  Dell     error  collector=probe.icmp reason=probe: ICMP probing requires Linux

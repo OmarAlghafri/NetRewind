@@ -1,0 +1,33 @@
+[
+  {
+    "incident_id": "01M2DNJHNWNTQSFCCS526VQHP7",
+    "opened_at": 1789312714396110290,
+    "closed_at": 1789312714396110290,
+    "status": "closed",
+    "title": "The default route disappeared",
+    "severity": "error",
+    "confidence": 95,
+    "root_cause": {
+      "kind": "l3.route_removed",
+      "entity": "default",
+      "event_id": "01M2DNJHMW8Q8H82SVA313N2CT",
+      "confidence": 95
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNJHMW8Q8H82SVA313N2CT",
+        "kind": "l3.route_removed",
+        "at": 1789312714396110290,
+        "subject": "default",
+        "relation": "",
+        "why": "The default route was withdrawn. Nothing beyond the local segment is reachable from here.",
+        "evidence": {
+          "describe": "the default route was removed - nothing beyond the local segment is reachable"
+        }
+      }
+    ],
+    "rule_id": "default-route-lost",
+    "advice": "Look at the timeline immediately before this. A default route rarely leaves on its own; it follows an interface going down, a DHCP lease expiring, or a routing daemon losing its peer. Fix that, not the route."
+  }
+]

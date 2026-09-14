@@ -1,0 +1,177 @@
+[
+  {
+    "event_id": "01M2DNGR2NZ7HB4FR1AWWP3WAP",
+    "schema_v": 1,
+    "ts_wall": 1789312655445401823,
+    "ts_mono": 4996738,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNGSZ95E2S72NE29FYK745",
+    "schema_v": 1,
+    "ts_wall": 1789312657385845227,
+    "ts_mono": 1945440141,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l2.arp_binding_changed",
+    "severity": "warn",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "id": "01M2DNGSZ95E2S72NE2AQRT0EV",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11",
+        "mac": "02:00:00:00:00:bb"
+      }
+    },
+    "attrs": {
+      "ip": "10.99.0.11",
+      "is_gateway": false,
+      "mac_new": "02:00:00:00:00:bb",
+      "mac_old": "02:00:00:00:00:11"
+    },
+    "evidence": {
+      "ifindex": 16,
+      "nud_state": "reachable"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNGTYPSSA3EZAG38NP2VM0",
+    "schema_v": 1,
+    "ts_wall": 1789312658390297453,
+    "ts_mono": 2949892401,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l2.arp_binding_changed",
+    "severity": "warn",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "id": "01M2DNGTYPSSA3EZAG3B2ZSCX3",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11",
+        "mac": "02:00:00:00:00:aa"
+      }
+    },
+    "attrs": {
+      "address_changed_hands": true,
+      "ip": "10.99.0.11",
+      "is_gateway": false,
+      "mac_new": "02:00:00:00:00:aa",
+      "mac_old": "02:00:00:00:00:bb"
+    },
+    "evidence": {
+      "ifindex": 16,
+      "nud_state": "reachable"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNGVY2V4ZAXTPWPZKQ0B0G",
+    "schema_v": 1,
+    "ts_wall": 1789312659394619351,
+    "ts_mono": 3954214272,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l2.arp_binding_changed",
+    "severity": "warn",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "id": "01M2DNGSZ95E2S72NE2AQRT0EV",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11",
+        "mac": "02:00:00:00:00:bb"
+      }
+    },
+    "attrs": {
+      "ip": "10.99.0.11",
+      "is_gateway": false,
+      "mac_new": "02:00:00:00:00:bb",
+      "mac_old": "02:00:00:00:00:aa"
+    },
+    "evidence": {
+      "ifindex": 16,
+      "nud_state": "reachable"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNGVY3H6RDBNMWJYGHVPMY",
+    "schema_v": 1,
+    "ts_wall": 1789312659395180837,
+    "ts_mono": 3954775752,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l2.duplicate_ip",
+    "severity": "error",
+    "confidence": 80,
+    "subject": {
+      "kind": "host",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11",
+        "mac": "02:00:00:00:00:bb"
+      }
+    },
+    "attrs": {
+      "changes_in_window": 3,
+      "claimants": [
+        "02:00:00:00:00:bb",
+        "02:00:00:00:00:aa"
+      ],
+      "ip": "10.99.0.11"
+    },
+    "evidence": {
+      "window_seconds": 60
+    },
+    "dedup_key": "l2.duplicate_ip|10.99.0.11",
+    "count": 2
+  },
+  {
+    "event_id": "01M2DNGWZZZ07FB4962H8MF091",
+    "schema_v": 1,
+    "ts_wall": 1789312660479859417,
+    "ts_mono": 5039454347,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l2.arp_binding_changed",
+    "severity": "warn",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "id": "01M2DNGWZZZ07FB4962MV1TGYF",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11",
+        "mac": "02:00:00:00:00:11"
+      }
+    },
+    "attrs": {
+      "address_changed_hands": true,
+      "ip": "10.99.0.11",
+      "is_gateway": false,
+      "mac_new": "02:00:00:00:00:11",
+      "mac_old": "02:00:00:00:00:bb"
+    },
+    "evidence": {
+      "ifindex": 16,
+      "nud_state": "stale"
+    },
+    "count": 1
+  }
+]

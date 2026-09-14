@@ -1,0 +1,218 @@
+[
+  {
+    "event_id": "01M2DNQ251A6VA37526K5J9QSD",
+    "schema_v": 1,
+    "ts_wall": 1789312862369205743,
+    "ts_mono": 4058480,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNQFS4KM8K0CMEX6Q5XBTE",
+    "schema_v": 1,
+    "ts_wall": 1789312876324032045,
+    "ts_mono": 13958884782,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l2.neighbor_failed",
+    "severity": "notice",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11",
+        "mac": "02:00:00:00:00:11"
+      }
+    },
+    "attrs": {
+      "ip": "10.99.0.11",
+      "mac": "02:00:00:00:00:11"
+    },
+    "evidence": {
+      "nud_state": "reachable"
+    },
+    "dedup_key": "l2.neighbor_failed|10.99.0.11",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNQFS4KM8K0CMEX83FHMMX",
+    "schema_v": 1,
+    "ts_wall": 1789312876324046244,
+    "ts_mono": 13958898986,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l2.neighbor_failed",
+    "severity": "notice",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "label": "10.99.0.201",
+      "attrs": {
+        "ip": "10.99.0.201",
+        "mac": "02:00:00:00:00:01"
+      }
+    },
+    "attrs": {
+      "ip": "10.99.0.201",
+      "mac": "02:00:00:00:00:01"
+    },
+    "evidence": {
+      "nud_state": "reachable"
+    },
+    "dedup_key": "l2.neighbor_failed|10.99.0.201",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNQRNZCFT66PYJ1465T4R8",
+    "schema_v": 1,
+    "ts_wall": 1789312885439704964,
+    "ts_mono": 23074557720,
+    "observer_id": "Dell",
+    "source": "probe",
+    "kind": "l3.icmp_unreachable",
+    "severity": "notice",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11"
+      }
+    },
+    "attrs": {
+      "destination": "10.99.0.11",
+      "dport": 62102,
+      "reason": "host unreachable",
+      "reported_by": "10.99.0.1",
+      "source": "10.99.0.1"
+    },
+    "dedup_key": "l3.icmp_unreachable|10.99.0.11|1",
+    "count": 10
+  },
+  {
+    "event_id": "01M2DNQRNZCFT66PYJ1EH1CZG7",
+    "schema_v": 1,
+    "ts_wall": 1789312885439993204,
+    "ts_mono": 23074845982,
+    "observer_id": "Dell",
+    "source": "probe",
+    "kind": "metric.anomaly",
+    "severity": "error",
+    "confidence": 90,
+    "subject": {
+      "kind": "host",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11"
+      }
+    },
+    "attrs": {
+      "answered": 0,
+      "loss_percent": 100,
+      "metric": "unreachable",
+      "probes": 5,
+      "target": "10.99.0.11"
+    },
+    "evidence": {
+      "summary": "5 of 5 probes went unanswered"
+    },
+    "dedup_key": "metric.anomaly|10.99.0.11|unreachable",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNQXERNNMW9PP3MZXTAE22",
+    "schema_v": 1,
+    "ts_wall": 1789312890328693029,
+    "ts_mono": 27963545774,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "link.up",
+    "severity": "notice",
+    "confidence": 100,
+    "subject": {
+      "kind": "iface",
+      "label": "nrlab0",
+      "attrs": {
+        "ifindex": "56",
+        "ifname": "nrlab0"
+      }
+    },
+    "attrs": {
+      "admin_up": true,
+      "ifname": "nrlab0",
+      "oper_state": "up"
+    },
+    "evidence": {
+      "oper_state_before": "down"
+    },
+    "dedup_key": "link.up|nrlab0",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNQZES7J4DYJ1MGAMASDM4",
+    "schema_v": 1,
+    "ts_wall": 1789312892377551569,
+    "ts_mono": 30012404303,
+    "observer_id": "Dell",
+    "source": "probe",
+    "kind": "metric.anomaly",
+    "severity": "notice",
+    "confidence": 90,
+    "subject": {
+      "kind": "host",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11"
+      }
+    },
+    "attrs": {
+      "answered": 5,
+      "metric": "recovered",
+      "probes": 5,
+      "target": "10.99.0.11"
+    },
+    "evidence": {
+      "summary": "unreachability ended; all 5 probes answered"
+    },
+    "dedup_key": "metric.anomaly|10.99.0.11|recovered",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNQZETP4AAN094P7NNB2FX",
+    "schema_v": 1,
+    "ts_wall": 1789312892378134484,
+    "ts_mono": 30012987235,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l2.arp_binding_new",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "id": "01M2DNQZETP4AAN094PB6MGDRG",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11",
+        "mac": "02:00:00:00:00:11"
+      }
+    },
+    "attrs": {
+      "ifindex": 56,
+      "ip": "10.99.0.11",
+      "is_gateway": false,
+      "mac": "02:00:00:00:00:11"
+    },
+    "dedup_key": "l2.arp_binding_new|10.99.0.11",
+    "count": 1
+  }
+]

@@ -1,0 +1,7 @@
+TIME          KIND              SUBJECT     SEV     DETAIL
+15:20:23.045  system.start      Dell        info    
+15:20:25.059  dhcp.server_seen  10.99.0.1   notice  first_seen=true offers_gateway=10.99.0.1 other_servers=0 server=10.99.0.1 server_mac=02:00:00:00:00:01
+15:20:25.059  dhcp.ack          10.99.0.50  info    address=10.99.0.50 client_mac=02:00:00:00:00:55 lease_seconds=3600 server=10.99.0.1
+15:20:27.092  dhcp.server_seen  10.99.0.99  error   first_seen=true offers_gateway=10.99.0.99 other_servers=1 server=10.99.0.99 server_mac=02:00:00:00:00:99
+15:20:27.092  dhcp.offer        10.99.0.77  info    address=10.99.0.77 client_mac=02:00:00:00:00:55 lease_seconds=3600 server=10.99.0.99
+15:20:33.052  flow.rollup       Dell        info    closed=1 distinct_peers=0 handshake_failures=0 known_pairs=0 mean_duration_ms=0 opened=0 tracked=0 window_seconds=10

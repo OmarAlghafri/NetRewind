@@ -1,0 +1,23 @@
+{
+  "id": "gateway_hijack-positive-en-deidentified",
+  "scenario": "gateway_hijack",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ \u003cHOST_1\u003e، وما الذي سبّبه؟",
+  "question_en": "What happened to \u003cHOST_1\u003e, and what caused it?",
+  "input_event_ids": [
+    "01M2DNG7DMA1GFXDE6PRSV75HP",
+    "01M2DNG9B46EKK7Q83SYPGC6KY",
+    "01M2DNGH6CDMJV027YARPM6732"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNG9B46EKK7Q83SYPGC6KY"
+    ],
+    "root_cause_kind": "l2.arp_binding_changed",
+    "root_cause_entity": "\u003cHOST_1\u003e",
+    "max_confidence": 90,
+    "rule_id": "gateway-hijack"
+  },
+  "note": "de-identified: real lab addresses replaced with placeholder host tokens"
+}

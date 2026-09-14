@@ -1,0 +1,25 @@
+{
+  "id": "duplicate_ip-1-positive-en",
+  "scenario": "duplicate_ip",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ 10.99.0.11، وما الذي سبّبه؟",
+  "question_en": "What happened to 10.99.0.11, and what caused it?",
+  "input_event_ids": [
+    "01M2DNGR2NZ7HB4FR1AWWP3WAP",
+    "01M2DNGSZ95E2S72NE29FYK745",
+    "01M2DNGTYPSSA3EZAG38NP2VM0",
+    "01M2DNGVY2V4ZAXTPWPZKQ0B0G",
+    "01M2DNGVY3H6RDBNMWJYGHVPMY",
+    "01M2DNGWZZZ07FB4962H8MF091"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNGVY3H6RDBNMWJYGHVPMY"
+    ],
+    "root_cause_kind": "l2.duplicate_ip",
+    "root_cause_entity": "10.99.0.11",
+    "max_confidence": 80,
+    "rule_id": "contested-address"
+  }
+}

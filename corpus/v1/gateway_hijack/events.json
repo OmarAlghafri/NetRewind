@@ -1,0 +1,77 @@
+[
+  {
+    "event_id": "01M2DNG7DMA1GFXDE6PRSV75HP",
+    "schema_v": 1,
+    "ts_wall": 1789312638388626222,
+    "ts_mono": 3746910,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNG9B46EKK7Q83SYPGC6KY",
+    "schema_v": 1,
+    "ts_wall": 1789312640356216741,
+    "ts_mono": 1971337429,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l2.arp_binding_changed",
+    "severity": "error",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "id": "01M2DNG9B46EKK7Q83SZQ9PKV6",
+      "label": "10.99.0.201",
+      "attrs": {
+        "ip": "10.99.0.201",
+        "mac": "02:00:00:00:00:ff"
+      }
+    },
+    "attrs": {
+      "ip": "10.99.0.201",
+      "is_gateway": true,
+      "mac_new": "02:00:00:00:00:ff",
+      "mac_old": "02:00:00:00:00:01"
+    },
+    "evidence": {
+      "ifindex": 12,
+      "nud_state": "reachable"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNGH6CDMJV027YARPM6732",
+    "schema_v": 1,
+    "ts_wall": 1789312648396539791,
+    "ts_mono": 10011660488,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.rollup",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "closed": 1,
+      "distinct_peers": 0,
+      "handshake_failures": 0,
+      "known_pairs": 0,
+      "mean_duration_ms": 0,
+      "opened": 0,
+      "tracked": 0,
+      "window_seconds": 10
+    },
+    "count": 1
+  }
+]

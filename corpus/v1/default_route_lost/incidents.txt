@@ -1,0 +1,13 @@
+!! The default route disappeared
+   15:18:34 to 15:18:34  (0s)   rule default-route-lost, confidence 95%
+
+   1  15:18:34.396  l3.route_removed  default
+      The default route was withdrawn. Nothing beyond the local segment
+      is reachable from here.
+
+   root cause: l3.route_removed on default (confidence 95%)
+   next:
+      Look at the timeline immediately before this. A default route
+      rarely leaves on its own; it follows an interface going down, a
+      DHCP lease expiring, or a routing daemon losing its peer. Fix
+      that, not the route.

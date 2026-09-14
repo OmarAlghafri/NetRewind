@@ -1,0 +1,75 @@
+[
+  {
+    "event_id": "01M2DNK0CCJFGW1YKM728CNESD",
+    "schema_v": 1,
+    "ts_wall": 1789312729484701996,
+    "ts_mono": 5189998,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNK29TS7AB3YJGTCY9X8RN",
+    "schema_v": 1,
+    "ts_wall": 1789312731450546717,
+    "ts_mono": 1971034718,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.handshake_fail",
+    "severity": "notice",
+    "confidence": 100,
+    "subject": {
+      "kind": "host",
+      "label": "10.99.0.11",
+      "attrs": {
+        "ip": "10.99.0.11"
+      }
+    },
+    "attrs": {
+      "dport": 9999,
+      "dst": "10.99.0.11",
+      "sport": 40783,
+      "src": "10.99.0.1"
+    },
+    "evidence": {
+      "transition": "SYN_SENT -\u003e CLOSE"
+    },
+    "dedup_key": "flow.handshake_fail|10.99.0.11|9999",
+    "count": 4
+  },
+  {
+    "event_id": "01M2DNKA53E0WYNYE78ZYCG2RG",
+    "schema_v": 1,
+    "ts_wall": 1789312739491164097,
+    "ts_mono": 10011652115,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.rollup",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "closed": 1,
+      "distinct_peers": 1,
+      "handshake_failures": 4,
+      "known_pairs": 0,
+      "mean_duration_ms": 0,
+      "opened": 0,
+      "tracked": 0,
+      "window_seconds": 10
+    },
+    "count": 1
+  }
+]

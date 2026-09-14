@@ -1,0 +1,17 @@
+{
+  "id": "link_flap-negative-en",
+  "scenario": "link_flap",
+  "kind": "negative",
+  "question_ar": "ما الذي سبّب هذا التغيير في هذا المقطع، وما درجة ثقتك؟",
+  "question_en": "What caused the change on this segment, and how confident are you?",
+  "input_event_ids": [
+    "01M2DNF46N0NFHAG3NG5P7C0VK",
+    "01M2DNF5ZXZA2YR0AHRNKJN5WN",
+    "01M2DNF7YJKNHQZP82JHDASS92",
+    "01M2DNFDZG1NS4DBWWBM0R8RXK"
+  ],
+  "expected": {
+    "refusal_expected": true
+  },
+  "note": "no correlation rule concluded for this scenario in isolation - a correct answer must not invent a cause"
+}

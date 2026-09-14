@@ -1,0 +1,25 @@
+{
+  "id": "rogue_dhcp-positive-en",
+  "scenario": "rogue_dhcp",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ 10.99.0.99، وما الذي سبّبه؟",
+  "question_en": "What happened to 10.99.0.99, and what caused it?",
+  "input_event_ids": [
+    "01M2DNNVR5EDPW3MME2Z2EC0XP",
+    "01M2DNNXQ3TQRNGD59HB8P3GRS",
+    "01M2DNNXQ3TQRNGD59HD5A43EY",
+    "01M2DNNZPMJ75F1BMGB4YV3ETN",
+    "01M2DNNZPMJ75F1BMGB6SG831A",
+    "01M2DNP5GWY3BDEYDP54GF420K"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNNZPMJ75F1BMGB4YV3ETN"
+    ],
+    "root_cause_kind": "dhcp.server_seen",
+    "root_cause_entity": "10.99.0.99",
+    "max_confidence": 92,
+    "rule_id": "rogue-dhcp-server"
+  }
+}

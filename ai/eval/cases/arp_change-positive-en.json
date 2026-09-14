@@ -1,0 +1,23 @@
+{
+  "id": "arp_change-positive-en",
+  "scenario": "arp_change",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ 10.99.0.11، وما الذي سبّبه؟",
+  "question_en": "What happened to 10.99.0.11, and what caused it?",
+  "input_event_ids": [
+    "01M2DNFPQZ7ZVNYTX1KST7JP0E",
+    "01M2DNFRNBKV124AR4TZ0WR34M",
+    "01M2DNFVQZP8S8ESS7C9DD9ZZD",
+    "01M2DNG0GP8560SM7H2VK7PEJ6"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNFVQZP8S8ESS7C9DD9ZZD"
+    ],
+    "root_cause_kind": "l2.arp_binding_changed",
+    "root_cause_entity": "10.99.0.11",
+    "max_confidence": 75,
+    "rule_id": "address-changed-hands"
+  }
+}

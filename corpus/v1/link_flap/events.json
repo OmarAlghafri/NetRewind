@@ -1,0 +1,107 @@
+[
+  {
+    "event_id": "01M2DNF46N0NFHAG3NG5P7C0VK",
+    "schema_v": 1,
+    "ts_wall": 1789312602325465663,
+    "ts_mono": 64948421,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNF5ZXZA2YR0AHRNKJN5WN",
+    "schema_v": 1,
+    "ts_wall": 1789312604157734519,
+    "ts_mono": 1897217255,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "link.down",
+    "severity": "warn",
+    "confidence": 100,
+    "subject": {
+      "kind": "iface",
+      "label": "nrlab1",
+      "attrs": {
+        "ifindex": "6",
+        "ifname": "nrlab1"
+      }
+    },
+    "attrs": {
+      "admin_up": false,
+      "cause": "administrative",
+      "ifname": "nrlab1",
+      "oper_state": "down"
+    },
+    "evidence": {
+      "oper_state_before": "up",
+      "raw_flags": 4098
+    },
+    "dedup_key": "link.down|nrlab1",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNF7YJKNHQZP82JHDASS92",
+    "schema_v": 1,
+    "ts_wall": 1789312606162079163,
+    "ts_mono": 3901561913,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "link.up",
+    "severity": "notice",
+    "confidence": 100,
+    "subject": {
+      "kind": "iface",
+      "label": "nrlab1",
+      "attrs": {
+        "ifindex": "6",
+        "ifname": "nrlab1"
+      }
+    },
+    "attrs": {
+      "admin_up": true,
+      "down_duration_ms": 2004,
+      "ifname": "nrlab1",
+      "oper_state": "up"
+    },
+    "evidence": {
+      "oper_state_before": "down"
+    },
+    "dedup_key": "link.up|nrlab1",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNFDZG1NS4DBWWBM0R8RXK",
+    "schema_v": 1,
+    "ts_wall": 1789312612336179780,
+    "ts_mono": 10075662529,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.rollup",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "closed": 1,
+      "distinct_peers": 1,
+      "handshake_failures": 0,
+      "known_pairs": 1,
+      "mean_duration_ms": 235,
+      "opened": 1,
+      "tracked": 0,
+      "window_seconds": 10
+    },
+    "count": 1
+  }
+]

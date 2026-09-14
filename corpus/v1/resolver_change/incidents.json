@@ -1,0 +1,36 @@
+[
+  {
+    "incident_id": "01M2DNPJ9YK77S0F4SSA7YJXGW",
+    "opened_at": 1789312846121602242,
+    "closed_at": 1789312846121602242,
+    "status": "closed",
+    "title": "A machine's resolver changed under it",
+    "severity": "warn",
+    "confidence": 80,
+    "root_cause": {
+      "kind": "dns.resolver_changed",
+      "entity": "10.99.0.11",
+      "event_id": "01M2DNPJ99A5ZR30SE2M1Z0R3M",
+      "confidence": 80
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNPJ99A5ZR30SE2M1Z0R3M",
+        "kind": "dns.resolver_changed",
+        "at": 1789312846121602242,
+        "subject": "10.99.0.11",
+        "relation": "causes",
+        "why": "This machine started sending its lookups somewhere else. Every name it resolves from here on is answered by a different party.",
+        "evidence": {
+          "describe": "10.99.0.11 started asking 10.99.0.99 instead of 10.99.0.1"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "resolver-hijacked",
+    "advice": "Compare against your DHCP scope. A client that changed resolver without a lease renewal near it did not choose to; something told it to. Check for a second DHCP server and for the gateway's hardware address changing at about the same time."
+  }
+]

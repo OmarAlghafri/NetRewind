@@ -1,0 +1,4 @@
+TIME          KIND                  SUBJECT     SEV   DETAIL
+15:23:49.245  system.start          Dell        info  
+15:23:52.278  dns.resolver_changed  10.99.0.11  warn  client=10.99.0.11 resolver_new=10.99.0.99 resolver_old=10.99.0.1
+15:23:54.325  dns.resolver_changed  10.99.0.12  warn  client=10.99.0.12 resolver_new=10.99.0.99 resolver_old=10.99.0.1

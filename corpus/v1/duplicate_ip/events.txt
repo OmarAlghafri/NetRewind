@@ -1,0 +1,7 @@
+TIME          KIND                    SUBJECT     SEV    DETAIL
+15:17:35.445  system.start            Dell        info   
+15:17:37.385  l2.arp_binding_changed  10.99.0.11  warn   ip=10.99.0.11 is_gateway=false mac_new=02:00:00:00:00:bb mac_old=02:00:00:00:00:11
+15:17:38.390  l2.arp_binding_changed  10.99.0.11  warn   address_changed_hands=true ip=10.99.0.11 is_gateway=false mac_new=02:00:00:00:00:aa mac_old=02:00:00:00:00:bb
+15:17:39.394  l2.arp_binding_changed  10.99.0.11  warn   ip=10.99.0.11 is_gateway=false mac_new=02:00:00:00:00:bb mac_old=02:00:00:00:00:aa
+15:17:39.395  l2.duplicate_ip         10.99.0.11  error  x2 changes_in_window=3 claimants=[02:00:00:00:00:bb 02:00:00:00:00:aa] ip=10.99.0.11
+15:17:40.479  l2.arp_binding_changed  10.99.0.11  warn   address_changed_hands=true ip=10.99.0.11 is_gateway=false mac_new=02:00:00:00:00:11 mac_old=02:00:00:00:00:bb

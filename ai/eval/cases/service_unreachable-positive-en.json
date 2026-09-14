@@ -1,0 +1,22 @@
+{
+  "id": "service_unreachable-positive-en",
+  "scenario": "service_unreachable",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ 10.99.0.11، وما الذي سبّبه؟",
+  "question_en": "What happened to 10.99.0.11, and what caused it?",
+  "input_event_ids": [
+    "01M2DNK0CCJFGW1YKM728CNESD",
+    "01M2DNK29TS7AB3YJGTCY9X8RN",
+    "01M2DNKA53E0WYNYE78ZYCG2RG"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNK29TS7AB3YJGTCY9X8RN"
+    ],
+    "root_cause_kind": "flow.handshake_fail",
+    "root_cause_entity": "10.99.0.11",
+    "max_confidence": 80,
+    "rule_id": "service-unreachable"
+  }
+}

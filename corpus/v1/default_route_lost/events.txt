@@ -1,0 +1,4 @@
+TIME          KIND              SUBJECT  SEV    DETAIL
+15:18:32.426  system.start      Dell     info   
+15:18:34.396  l3.route_removed  default  error  gateway=10.99.0.201 is_default=true prefix=default
+15:18:42.434  flow.rollup       Dell     info   closed=1 distinct_peers=0 handshake_failures=0 known_pairs=0 mean_duration_ms=0 opened=0 tracked=0 window_seconds=10

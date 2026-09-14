@@ -1,0 +1,4 @@
+no incidents in this window
+
+note: no incident is not the same as no problem. Correlation only
+reports shapes it has a rule for; check the timeline as well.

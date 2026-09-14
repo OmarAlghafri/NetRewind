@@ -1,0 +1,35 @@
+! An address moved to a different machine
+   15:19:30 to 15:19:30  (0s)   rule address-changed-hands, confidence 75%
+   affected: 10.99.1.11
+
+   1  15:19:30.736  l2.arp_binding_changed  10.99.1.11
+      This address is now answered by hardware that was not previously
+      bound to it, so the machine behind it is a different machine.
+
+   root cause: l2.arp_binding_changed on 10.99.1.11 (confidence 75%)
+   next:
+      Normal after a DHCP lease expires. Worth a look if the address is
+      a server, is statically assigned, or moved without a lease renewal
+      near it.
+
+!! A path that was working stopped working
+   15:19:30 to 15:19:34  (4s)   rule change-broke-a-path, confidence 88%
+   affected: 10.99.1.11
+
+   1  15:19:30.736  l2.arp_binding_changed  10.99.1.11
+      This is the last thing that changed on the path before it broke.
+      |  which caused
+   2  15:19:34.740  flow.first_failure_for_pair  10.99.1.11
+      Two machines that had been connecting successfully can no longer
+      complete a handshake. Whatever else is true, something between
+      them changed.
+      |  and at the same time
+   3  15:19:34.742  l2.neighbor_failed  10.99.1.11
+      Other connections started failing in the same window.
+
+   root cause: l2.arp_binding_changed on 10.99.1.11 (confidence 88%)
+   next:
+      The change named here is the nearest one in time, not a proven
+      cause. Confirm it against your change record before acting: if it
+      was intended, the breakage is a side effect nobody planned; if it
+      was not, something changed the network without going through you.

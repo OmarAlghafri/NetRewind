@@ -1,0 +1,26 @@
+{
+  "id": "resolver_change-positive-en-deidentified",
+  "scenario": "resolver_change",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ \u003cHOST_1\u003e، وما الذي سبّبه؟",
+  "question_en": "What happened to \u003cHOST_1\u003e, and what caused it?",
+  "input_event_ids": [
+    "01M2DNPFC5Y28K8Z78RKQA2QA2",
+    "01M2DNPJ99A5ZR30SE2M1Z0R3M",
+    "01M2DNPS4TGWNYFSTB33VCGBNN"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNPJ99A5ZR30SE2M1Z0R3M"
+    ],
+    "root_cause_kind": "dns.resolver_changed",
+    "root_cause_entity": "\u003cHOST_1\u003e",
+    "max_confidence": 80,
+    "relation_must_include": [
+      "causes"
+    ],
+    "rule_id": "resolver-hijacked"
+  },
+  "note": "de-identified: real lab addresses replaced with placeholder host tokens"
+}

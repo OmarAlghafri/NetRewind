@@ -1,0 +1,41 @@
+{
+  "dev": [
+    "collector_down-ambiguous-en",
+    "gateway_hijack-positive-en",
+    "gateway_hijack-positive-en-deidentified",
+    "normal_traffic-negative-en",
+    "rogue_dhcp-positive-en",
+    "rogue_dhcp-positive-en-deidentified"
+  ],
+  "test": [
+    "default_route_lost-positive-en",
+    "default_route_lost-positive-en-deidentified",
+    "link_flap-negative-en",
+    "path_broke-0-positive-en",
+    "path_broke-1-positive-en",
+    "path_broke-0-positive-en-deidentified",
+    "route_change-negative-en"
+  ],
+  "train": [
+    "arp_change-positive-en",
+    "arp_change-positive-en-deidentified",
+    "blind_gap-0-ambiguous-en",
+    "blind_gap-1-ambiguous-en",
+    "default_route_moved-positive-en",
+    "default_route_moved-positive-en-deidentified",
+    "duplicate_ip-0-positive-en",
+    "duplicate_ip-1-positive-en",
+    "duplicate_ip-0-positive-en-deidentified",
+    "malicious_dns_name-adversarial-en",
+    "measured_loss-positive-en",
+    "measured_loss-positive-en-deidentified",
+    "policy_broke_a_path-positive-en",
+    "policy_broke_a_path-positive-en-deidentified",
+    "resolver_change-positive-en",
+    "resolver_change-positive-en-deidentified",
+    "service_unreachable-positive-en",
+    "service_unreachable-positive-en-deidentified",
+    "simultaneous_faults-positive-en",
+    "simultaneous_faults-positive-en-deidentified"
+  ]
+}

@@ -1,0 +1,5 @@
+TIME          KIND          SUBJECT  SEV     DETAIL
+15:16:42.325  system.start  Dell     info    
+15:16:44.157  link.down     nrlab1   warn    admin_up=false cause=administrative oper_state=down
+15:16:46.162  link.up       nrlab1   notice  admin_up=true down_duration_ms=2004 oper_state=up
+15:16:52.336  flow.rollup   Dell     info    closed=1 distinct_peers=1 handshake_failures=0 known_pairs=1 mean_duration_ms=235 opened=1 tracked=0 window_seconds=10

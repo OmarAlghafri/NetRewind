@@ -1,0 +1,70 @@
+[
+  {
+    "incident_id": "01M2DNW89H82SX4GS5PV1SEKB9",
+    "opened_at": 1789313032278077029,
+    "closed_at": 1789313032278077029,
+    "status": "closed",
+    "title": "A machine's resolver changed under it",
+    "severity": "warn",
+    "confidence": 80,
+    "root_cause": {
+      "kind": "dns.resolver_changed",
+      "entity": "10.99.0.11",
+      "event_id": "01M2DNW82P18W411XG5ZKSK08Y",
+      "confidence": 80
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNW82P18W411XG5ZKSK08Y",
+        "kind": "dns.resolver_changed",
+        "at": 1789313032278077029,
+        "subject": "10.99.0.11",
+        "relation": "causes",
+        "why": "This machine started sending its lookups somewhere else. Every name it resolves from here on is answered by a different party.",
+        "evidence": {
+          "describe": "10.99.0.11 started asking 10.99.0.99 instead of 10.99.0.1"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "resolver-hijacked",
+    "advice": "Compare against your DHCP scope. A client that changed resolver without a lease renewal near it did not choose to; something told it to. Check for a second DHCP server and for the gateway's hardware address changing at about the same time."
+  },
+  {
+    "incident_id": "01M2DNWA81BC22P5AAP84A2PYM",
+    "opened_at": 1789313034325022123,
+    "closed_at": 1789313034325022123,
+    "status": "closed",
+    "title": "A machine's resolver changed under it",
+    "severity": "warn",
+    "confidence": 80,
+    "root_cause": {
+      "kind": "dns.resolver_changed",
+      "entity": "10.99.0.12",
+      "event_id": "01M2DNWA2NCNDHPF78MNNFMTJF",
+      "confidence": 80
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DNWA2NCNDHPF78MNNFMTJF",
+        "kind": "dns.resolver_changed",
+        "at": 1789313034325022123,
+        "subject": "10.99.0.12",
+        "relation": "causes",
+        "why": "This machine started sending its lookups somewhere else. Every name it resolves from here on is answered by a different party.",
+        "evidence": {
+          "describe": "10.99.0.12 started asking 10.99.0.99 instead of 10.99.0.1"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.12"
+    ],
+    "rule_id": "resolver-hijacked",
+    "advice": "Compare against your DHCP scope. A client that changed resolver without a lease renewal near it did not choose to; something told it to. Check for a second DHCP server and for the gateway's hardware address changing at about the same time."
+  }
+]

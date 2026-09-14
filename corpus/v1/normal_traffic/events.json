@@ -1,0 +1,46 @@
+[
+  {
+    "event_id": "01M2DNKH9KJJBK3DRHSD8QRJ4C",
+    "schema_v": 1,
+    "ts_wall": 1789312746803299888,
+    "ts_mono": 3550115,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNKV2E33Z0D2SHH3Q6ATB6",
+    "schema_v": 1,
+    "ts_wall": 1789312756814452371,
+    "ts_mono": 10014702603,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.rollup",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "closed": 4,
+      "distinct_peers": 1,
+      "handshake_failures": 0,
+      "known_pairs": 1,
+      "mean_duration_ms": 0,
+      "opened": 3,
+      "tracked": 0,
+      "window_seconds": 10
+    },
+    "count": 1
+  }
+]

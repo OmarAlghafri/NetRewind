@@ -1,0 +1,104 @@
+[
+  {
+    "event_id": "01M2DNHAPYRMS587VSTNW0DBG9",
+    "schema_v": 1,
+    "ts_wall": 1789312674526913704,
+    "ts_mono": 4969078,
+    "observer_id": "Dell",
+    "source": "internal",
+    "kind": "system.start",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNHCMEJWKTAC55W17VQ2WA",
+    "schema_v": 1,
+    "ts_wall": 1789312676494859284,
+    "ts_mono": 1972914670,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l3.route_added",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "subnet",
+      "label": "10.200.0.0/24",
+      "attrs": {
+        "prefix": "10.200.0.0/24"
+      }
+    },
+    "attrs": {
+      "gateway": "10.99.0.11",
+      "ifindex": 20,
+      "is_default": false,
+      "prefix": "10.200.0.0/24"
+    },
+    "dedup_key": "l3.route_added|10.200.0.0/24",
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNHDKTHZ79ZQDAFXBAZE89",
+    "schema_v": 1,
+    "ts_wall": 1789312677498613903,
+    "ts_mono": 2976669279,
+    "observer_id": "Dell",
+    "source": "netlink",
+    "kind": "l3.route_changed",
+    "severity": "notice",
+    "confidence": 100,
+    "subject": {
+      "kind": "subnet",
+      "label": "10.200.0.0/24",
+      "attrs": {
+        "prefix": "10.200.0.0/24"
+      }
+    },
+    "attrs": {
+      "alternatives": 1,
+      "gateway_new": "10.99.1.11",
+      "gateway_old": "10.99.0.11",
+      "ifindex_new": 22,
+      "ifindex_old": 20,
+      "is_default": false,
+      "prefix": "10.200.0.0/24"
+    },
+    "evidence": {
+      "metric_new": 100,
+      "metric_old": 100
+    },
+    "count": 1
+  },
+  {
+    "event_id": "01M2DNHMFNV5X8TBMH4YV8Q08N",
+    "schema_v": 1,
+    "ts_wall": 1789312684533913753,
+    "ts_mono": 10011969118,
+    "observer_id": "Dell",
+    "source": "ebpf",
+    "kind": "flow.rollup",
+    "severity": "info",
+    "confidence": 100,
+    "subject": {
+      "kind": "observer",
+      "id": "Dell",
+      "label": "Dell"
+    },
+    "attrs": {
+      "closed": 1,
+      "distinct_peers": 0,
+      "handshake_failures": 0,
+      "known_pairs": 0,
+      "mean_duration_ms": 0,
+      "opened": 0,
+      "tracked": 0,
+      "window_seconds": 10
+    },
+    "count": 1
+  }
+]

@@ -1,0 +1,25 @@
+{
+  "id": "path_broke-0-positive-en",
+  "scenario": "path_broke",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ 10.99.1.11، وما الذي سبّبه؟",
+  "question_en": "What happened to 10.99.1.11, and what caused it?",
+  "input_event_ids": [
+    "01M2DNM4SKHWAZ0T0ZV5PHAPHX",
+    "01M2DNM7P4KASK56M3PWSR9GF2",
+    "01M2DNM8NGCTZ0Z6KBJQ583JMW",
+    "01M2DNMCJMAK1193V24MCWYK8Q",
+    "01M2DNMCJPT3EPXBG8G3KJEV94",
+    "01M2DNMEJBXHZY962K3NHHR770"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNM8NGCTZ0Z6KBJQ583JMW"
+    ],
+    "root_cause_kind": "l2.arp_binding_changed",
+    "root_cause_entity": "10.99.1.11",
+    "max_confidence": 75,
+    "rule_id": "address-changed-hands"
+  }
+}

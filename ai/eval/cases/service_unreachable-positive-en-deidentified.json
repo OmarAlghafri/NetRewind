@@ -1,0 +1,23 @@
+{
+  "id": "service_unreachable-positive-en-deidentified",
+  "scenario": "service_unreachable",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ \u003cHOST_1\u003e، وما الذي سبّبه؟",
+  "question_en": "What happened to \u003cHOST_1\u003e, and what caused it?",
+  "input_event_ids": [
+    "01M2DNK0CCJFGW1YKM728CNESD",
+    "01M2DNK29TS7AB3YJGTCY9X8RN",
+    "01M2DNKA53E0WYNYE78ZYCG2RG"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNK29TS7AB3YJGTCY9X8RN"
+    ],
+    "root_cause_kind": "flow.handshake_fail",
+    "root_cause_entity": "\u003cHOST_1\u003e",
+    "max_confidence": 80,
+    "rule_id": "service-unreachable"
+  },
+  "note": "de-identified: real lab addresses replaced with placeholder host tokens"
+}

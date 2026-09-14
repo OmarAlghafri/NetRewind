@@ -1,0 +1,23 @@
+{
+  "id": "default_route_lost-positive-en-deidentified",
+  "scenario": "default_route_lost",
+  "kind": "positive",
+  "question_ar": "ماذا حدث لـ default، وما الذي سبّبه؟",
+  "question_en": "What happened to default, and what caused it?",
+  "input_event_ids": [
+    "01M2DNJFQAABBBJRD6W0E3Y59A",
+    "01M2DNJHMW8Q8H82SVA313N2CT",
+    "01M2DNJSG2CN9MNQGN2DF7DF20"
+  ],
+  "expected": {
+    "refusal_expected": false,
+    "must_cite_event_ids": [
+      "01M2DNJHMW8Q8H82SVA313N2CT"
+    ],
+    "root_cause_kind": "l3.route_removed",
+    "root_cause_entity": "default",
+    "max_confidence": 95,
+    "rule_id": "default-route-lost"
+  },
+  "note": "de-identified: real lab addresses replaced with placeholder host tokens"
+}
