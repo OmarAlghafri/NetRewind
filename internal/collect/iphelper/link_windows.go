@@ -9,11 +9,24 @@ import (
 	"github.com/OmarAlghafri/netrewind/internal/collect"
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/ports"
+	"golang.org/x/sys/windows"
 )
 
 // statsInterval is how often interface counters are re-read for the error
 // rate check; the kernel does not notify on a counter moving.
 const statsInterval = 30 * time.Second
+
+// recheckDelays are how long after a notification the interface row is read
+// again. A notification is delivered while the change is still being
+// applied: re-reading the row at that moment frequently returns the state
+// from before the change, and no further notification arrives once it has
+// settled. Two later reads - one after the change has had time to land, one
+// after a slow driver has had more - catch the settled state; the analyzer
+// ignores a re-read that shows nothing new.
+var recheckDelays = []time.Duration{500 * time.Millisecond, 2500 * time.Millisecond}
+
+// recheckTick is how often due re-reads are performed.
+const recheckTick = 250 * time.Millisecond
 
 // LinkCollector records interfaces appearing, disappearing, and changing
 // administrative or operational state, plus error-rate degradation from the
@@ -57,6 +70,11 @@ func (c *LinkCollector) Run(ctx context.Context, out chan<- *event.Event) error 
 
 	stats := time.NewTicker(statsInterval)
 	defer stats.Stop()
+	recheck := time.NewTicker(recheckTick)
+	defer recheck.Stop()
+	// pending holds, per interface, the moments at which its row is due to
+	// be read again (see recheckDelays).
+	pending := make(map[uint64][]time.Time)
 
 	for {
 		select {
@@ -68,11 +86,40 @@ func (c *LinkCollector) Run(ctx context.Context, out chan<- *event.Event) error 
 					return nil
 				}
 			}
+		case now := <-recheck.C:
+			for luid, due := range pending {
+				var later []time.Time
+				fire := false
+				for _, t := range due {
+					if now.Before(t) {
+						later = append(later, t)
+					} else {
+						fire = true
+					}
+				}
+				if len(later) == 0 {
+					delete(pending, luid)
+				} else {
+					pending[luid] = later
+				}
+				if !fire {
+					continue
+				}
+				for _, e := range c.handle(notification{kind: windows.MibParameterNotification, luid: luid}, now) {
+					if !collect.Emit(ctx, out, e) {
+						return nil
+					}
+				}
+			}
 		case n := <-sub.ch:
 			if !reportDrops(ctx, out, c.b, c.log, c.Name(), sub) {
 				return nil
 			}
-			for _, e := range c.handle(n, time.Now()) {
+			now := time.Now()
+			for _, d := range recheckDelays {
+				pending[n.luid] = append(pending[n.luid], now.Add(d))
+			}
+			for _, e := range c.handle(n, now) {
 				if !collect.Emit(ctx, out, e) {
 					return nil
 				}
