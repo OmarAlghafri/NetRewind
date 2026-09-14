@@ -176,6 +176,13 @@ jobs:
       - name: install the shell's build dependencies
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
         working-directory: .
+      # tauri.conf.json names build/desktop-resources/recorder as a bundle
+      # resource, and Tauri's build script refuses to compile - tests
+      # included - when that path is missing. The Makefile target stages it
+      # (on Linux, just a note: the recorder comes from its own package).
+      - name: stage the bundle resources
+        run: make desktop-resources
+        working-directory: .
       - name: rust unit tests (desktop shell)
         run: cargo test --lib --manifest-path src-tauri/Cargo.toml
 

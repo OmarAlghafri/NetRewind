@@ -301,7 +301,7 @@ cannot show the evidence for.
 make vet test                                             # Go, this platform (and a Linux cross-vet)
 CGO_ENABLED=1 go test -race ./...                         # Go, on Linux
 cd desktop && npm test                                    # the UI
-cargo test --lib --manifest-path desktop/src-tauri/Cargo.toml   # the desktop shell
+make desktop-resources && cargo test --lib --manifest-path desktop/src-tauri/Cargo.toml   # the desktop shell
 sudo make lab                                             # the fourteen-fault lab (Linux)
 ```
 

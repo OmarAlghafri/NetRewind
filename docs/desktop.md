@@ -119,5 +119,6 @@ Needs Node 22+, Rust stable, and on Linux the WebKitGTK development packages
 (`libwebkit2gtk-4.1-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`,
 `patchelf`). Installers land in `desktop/src-tauri/target/release/bundle/`.
 `cd desktop && npm run dev` serves the UI at `http://localhost:1420` in demo
-mode for design work; `npm test` runs the UI's unit tests and
-`cargo test --lib --manifest-path desktop/src-tauri/Cargo.toml` the shell's.
+mode for design work; `npm test` runs the UI's unit tests and, after
+`make desktop-resources`, `cargo test --lib --manifest-path desktop/src-tauri/Cargo.toml`
+the shell's.
