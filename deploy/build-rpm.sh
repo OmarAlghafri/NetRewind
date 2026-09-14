@@ -47,6 +47,10 @@ Summary: Network black-box recorder
 License: AGPL-3.0-only
 URL: https://github.com/OmarAlghafri/NetRewind
 BuildArch: $ARCH
+# Weak dependency, same reasoning as deploy/build-deb.sh's Recommends: the
+# policy collector needs nft(8), the rest of the recorder does not, and a
+# host without it gets a collector-not-watching incident, not a dead unit.
+Recommends: nftables
 # The Go binaries are already static and built without debug info by the
 # real release path (Makefile's -ldflags "-s -w"); rpm's own post-build
 # stripping/debug-package machinery assumes a GNU userland (file, xargs -d)
@@ -90,9 +94,19 @@ fi
 %preun
 # The event store under /var/lib/netrewind is never touched here, on any
 # removal: it is the record. Same rule as deploy/install.sh and
-# deploy/build-deb.sh's postrm.
+# deploy/build-deb.sh's postrm. %preun runs while the unit file still
+# exists, so "disable --now" works here (unlike a dpkg postrm).
 if [ "\$1" = 0 ] && [ -d /run/systemd/system ]; then
     systemctl disable --now netrewindd 2>/dev/null || true
+fi
+
+%postun
+# \$1 >= 1 is an upgrade: the new binary is on disk but the old process is
+# still running it. Restart only if it was running (same as the .deb's
+# postinst); a final removal (\$1 = 0) was already handled in %preun.
+if [ "\$1" -ge 1 ] && [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+    systemctl try-restart netrewindd 2>/dev/null || true
 fi
 EOF
 

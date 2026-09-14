@@ -71,6 +71,11 @@ install -m 0644 deploy/systemd/netrewindd.service "$PKGROOT/etc/systemd/system/n
 
 SIZE_KB=$(du -sk "$PKGROOT" | cut -f1)
 
+# The policy collector shells out to nft(8). Without it the recorder still
+# starts and records everything else, and raises a collector-not-watching
+# incident for the missing sense - seen for real on a systemd host with no
+# nftables package. So the control file below carries a Recommends (apt
+# installs it by default, dpkg -i alone does not), not a hard Depends.
 cat > "$PKGROOT/DEBIAN/control" <<EOF
 Package: netrewind
 Version: $VERSION
@@ -78,6 +83,7 @@ Section: net
 Priority: optional
 Architecture: $ARCH
 Installed-Size: $SIZE_KB
+Recommends: nftables
 Maintainer: NetRewind <https://github.com/OmarAlghafri/NetRewind>
 Homepage: https://github.com/OmarAlghafri/NetRewind
 Description: Network black-box recorder
@@ -92,11 +98,36 @@ cat > "$PKGROOT/DEBIAN/postinst" <<'EOF'
 set -e
 if [ "$1" = configure ] && [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true
-    echo "netrewindd installed. Review /etc/netrewind/netrewindd.yaml, then:"
-    echo "  systemctl enable --now netrewindd"
+    if [ -n "$2" ]; then
+        # Upgrade: the binary on disk is new but the running process is still
+        # the old one (and its executable is now "(deleted)"). try-restart
+        # only acts if the service is running, so a stopped recorder stays
+        # stopped and an enabled one picks up the new build without the
+        # operator having to remember to restart it.
+        systemctl try-restart netrewindd || true
+    else
+        echo "netrewindd installed. Review /etc/netrewind/netrewindd.yaml, then:"
+        echo "  systemctl enable --now netrewindd"
+    fi
 fi
 EOF
 chmod 0755 "$PKGROOT/DEBIAN/postinst"
+
+# Stopping has to happen in prerm, while the unit file still exists: by the
+# time postrm runs, dpkg has already deleted /etc/systemd/system/netrewindd.service
+# and "systemctl disable --now" fails with "Unit file does not exist" - which
+# leaves the old process running, its executable unlinked, and a dangling
+# multi-user.target.wants symlink behind. Found by actually removing the
+# package on a systemd host, not by reading the script.
+cat > "$PKGROOT/DEBIAN/prerm" <<'EOF'
+#!/bin/sh
+set -e
+if [ "$1" = remove ] && [ -d /run/systemd/system ]; then
+    systemctl stop netrewindd 2>/dev/null || true
+    systemctl disable netrewindd 2>/dev/null || true
+fi
+EOF
+chmod 0755 "$PKGROOT/DEBIAN/prerm"
 
 cat > "$PKGROOT/DEBIAN/postrm" <<'EOF'
 #!/bin/sh
@@ -107,8 +138,10 @@ cat > "$PKGROOT/DEBIAN/postrm" <<'EOF'
 set -e
 if [ "$1" = purge ] || [ "$1" = remove ]; then
     if [ -d /run/systemd/system ]; then
-        systemctl disable --now netrewindd 2>/dev/null || true
+        # prerm already stopped and disabled the unit; this only tidies up.
+        rm -f /etc/systemd/system/multi-user.target.wants/netrewindd.service
         systemctl daemon-reload || true
+        systemctl reset-failed netrewindd 2>/dev/null || true
     fi
 fi
 EOF

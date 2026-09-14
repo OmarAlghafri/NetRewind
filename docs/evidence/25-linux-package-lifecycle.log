@@ -1,0 +1,158 @@
+Closes the part of Phase 4 that docs/evidence/15 could not: the real
+install / enable / upgrade / remove / purge / reboot-survival lifecycle of
+the .deb and .rpm packages on hosts that actually run systemd. Log 15 only
+built the packages and extracted them into temp directories, because the
+project's own lab distro is Alpine/OpenRC and had to stay untouched.
+
+## Where this ran
+
+A separate test machine, reached over SSH (key auth, admin): Windows 11 Home
+26200, Intel i5-10300H, 32 GB, WSL 2.6.3. Two WSL2 distros there, both
+with systemd as PID 1, kernel 6.6.87.2-microsoft-standard-WSL2, BTF present
+(`/sys/kernel/btf/vmlinux`) so the eBPF flow collector loads for real:
+
+- Ubuntu 24.04.4 LTS, systemd 255 — already present, `systemd=true` in its
+  `/etc/wsl.conf`, `systemctl is-system-running` = `running`. Used for .deb.
+- AlmaLinux 9.8, systemd 252, rpm 4.16.1.3 — installed for this test from
+  the official WSL catalog (`wsl --install -d AlmaLinux-9 --no-launch`),
+  systemd already enabled in its image, `is-system-running` = `degraded`
+  (normal in WSL: a couple of hardware units fail). Used for .rpm.
+  Unregistered again afterwards.
+
+Nothing else on that machine was touched, and everything this test added
+(package, event store, work directory, the 12 apt packages `apt-get install
+rpm` pulled in for rpmbuild, the AlmaLinux distro) was removed at the end,
+verified by re-checking each item. Every command and every check's result
+was streamed to a progress log the operator could watch live; the full
+731-line transcript is kept with the raw results (not committed).
+
+## What was built and how
+
+Binaries cross-compiled on the build machine from the working tree
+(`CGO_ENABLED=0 GOOS=linux GOARCH=amd64`, static, `-X main.version=...`),
+in TWO versions so the upgrade path is a real version step, not a
+reinstall: `0.9.2-test1` and `0.9.2-test2`. Packages built ON the target
+Ubuntu with the tree's own scripts, unchanged from the working tree at the
+time (`deploy/build-deb.sh` with its prerm/postinst-upgrade handling,
+`deploy/build-rpm.sh` with `%preun`/`%postun`):
+
+    netrewind_0.9.2-test1_amd64.deb   20,450,132 bytes   conffiles: 20, scripts: postinst prerm postrm
+    netrewind_0.9.2-test2_amd64.deb   20,450,024 bytes
+    netrewind-0.9.2_test1-1.x86_64.rpm 22,250,669 bytes   scriptlets: post preun postun
+    netrewind-0.9.2_test2-1.x86_64.rpm 22,250,661 bytes
+
+## .deb lifecycle on Ubuntu 24.04 — 44/44 checks + reboot 9/9
+
+Each step below is an assertion the script made and the result it saw;
+nothing here is "it printed OK so it must be fine".
+
+1. Fresh `dpkg -i` (test1): exit 0; `Status: install ok installed`;
+   `netrewindd --version` = `0.9.2-test1 (schema v1)`; `--check-config`
+   passes against the packaged config + 19 rules; config 0640 root, rules
+   dir 0750; exactly 20 conffiles registered; **service not auto-started**
+   (postinst prints the enable hint instead — operator opt-in, as designed).
+2. `systemctl enable --now`: enabled, active after 4 s, `NRestarts=0`,
+   `StateDirectory=` created `/var/lib/netrewind`, store file present.
+   Journal shows every collector starting under the hardened unit
+   (`ProtectSystem=strict`, ambient caps only, `NoNewPrivileges`):
+   netlink link/addr/route/neigh, wire (DHCP/DNS/ICMP), ebpf.flow, probe.
+   **It records for real**: a dummy interface (`ip link add nrtest0 type
+   dummy`, up, `10.77.0.1/24`) produced, within 3 s:
+
+       08:50:39.894  link.up         nrtest0       admin_up=true oper_state=unknown
+       08:50:39.896  l3.addr_added   10.77.0.1     address=10.77.0.1/24 ifindex=3
+       08:50:39.896  l3.route_added  10.77.0.0/24  ifindex=3 is_default=false
+       08:50:42.924  link.down       nrtest0       admin_up=false cause=administrative
+
+   read back through the packaged CLI (`netrewind --db ... events`).
+3. Operator edits two conffiles (a trailing comment in `netrewindd.yaml`
+   and in `rules/gateway-hijack.yaml`); `--check-config` still passes.
+4. **Upgrade** `dpkg -i` test2 over the running test1: exit 0; dpkg version
+   `0.9.2-test2`; binary on disk reports test2; service still active;
+   `MainPID` changed 576 -> 747 (the postinst `try-restart` did its job);
+   `/proc/<pid>/exe` is `/usr/local/bin/netrewindd`, not `(deleted)` — the
+   new build is what's running; both edited conffiles byte-identical
+   (md5); no `.dpkg-dist`/`.dpkg-old` litter; test1-era events still
+   readable from the store.
+5. **Remove** `dpkg -r`: exit 0; no `netrewindd` process; unit file gone;
+   no dangling `multi-user.target.wants` symlink (this is the case the
+   working-tree prerm was written for); `is-enabled` no longer `enabled`;
+   no failed unit left; binaries gone; conffiles KEPT (dpkg semantics);
+   `/var/lib/netrewind/events.db` KEPT (by design — it is the record);
+   `Status: deinstall ok config-files`.
+6. **Purge** `dpkg -P`: exit 0; `/etc/netrewind` gone; the event store is
+   STILL there (dpkg warns "directory not empty so not removed" — exactly
+   the intended behaviour, the package never owns the record).
+7. Reinstall test2 + enable, then from Windows `wsl --terminate Ubuntu`
+   and relaunch (the closest thing to a reboot a WSL distro has — PID 1
+   really does start over): service `active` with nobody starting it,
+   still `enabled`, new `MainPID` 204, `NRestarts=0`, no integrity error
+   in the journal, events from BEFORE the purge+reboot still readable, a
+   fresh `system.start` recorded — and the recorder itself raised
+   **"The record has a hole in it" (recorder-was-blind)** for the gap,
+   which is the correct reading of what just happened to it.
+
+## .rpm lifecycle on AlmaLinux 9.8 — 39/39 checks + reboot 8/8
+
+Same shape, rpm/dnf semantics asserted instead of dpkg's:
+
+1. `dnf -y install ./test1.rpm` (real dependency resolution, not `rpm -i
+   --nodeps`): exit 0; `rpm -q` = `netrewind-0.9.2_test1-1.x86_64`; 20
+   files flagged `%config`; `rpm -V` clean right after install; not
+   auto-started.
+2. enable --now: active, `NRestarts=0`; dummy-interface `link.up` /
+   `l3.addr_added` / `l3.route_added` / `l3.addr_removed` recorded, same as
+   on Ubuntu.
+3. Two `%config(noreplace)` files edited; `rpm -V` reports exactly those
+   two as `S.5` (size + md5 changed).
+4. **Upgrade** `dnf -y install ./test2.rpm`: dnf reports `Upgraded:`; only
+   one version installed; `MainPID` 253 -> 370 via `%postun`'s
+   `try-restart`; exe not `(deleted)`; both edited configs preserved; no
+   `.rpmnew`/`.rpmsave` litter; old events readable.
+5. **Remove** `dnf -y remove`: `%preun`'s `disable --now` ran while the
+   unit still existed — no process, no unit, no wants symlink, no failed
+   unit; the two MODIFIED configs saved as `.rpmsave` and the unmodified
+   rule files removed (rpm's `%config(noreplace)` erase semantics, as
+   expected); event store kept.
+6. Reinstall + enable, `wsl --terminate AlmaLinux-9`, relaunch: active by
+   itself, new `MainPID` 52, store intact, pre-reboot events readable.
+   One check in the reboot script FAILED here and is a harness bug, not a
+   product one: it asserted `/proc/uptime < 120s` to prove a fresh boot,
+   but `/proc/uptime` in WSL2 is the shared utility VM's, not the
+   distro's. The fresh PID 52 and `journalctl -b` are the real proof.
+
+## Findings
+
+1. **Neither package declared its dependency on nft(8).** Both test hosts
+   had no `nftables` package, so on every start the policy collector
+   failed (`exec: "nft": executable file not found in $PATH`) and the
+   recorder correctly raised the `collector-not-watching` incident. The
+   recorder is fine without it — everything else records — so this is a
+   weak dependency. **Fixed in the working tree**: `Recommends: nftables`
+   added to `deploy/build-deb.sh`'s control file and to
+   `deploy/build-rpm.sh`'s spec (rpm >= 4.12 weak dep; AlmaLinux 9 has
+   4.16). Rebuilt on the target and verified: `dpkg-deb -f ... Recommends`
+   = `nftables`, `rpm -qp --recommends` = `nftables`, and an
+   `apt-get -s install ./netrewind_*.deb` simulation shows apt would pull
+   `nftables`, `libnftables1` and `libnftnl11` alongside it. A first
+   attempt put the explanatory comment INSIDE the control heredoc, which
+   dpkg-deb rejected (`field name '#' must be followed by colon`) — moved
+   above it; the rebuild is what was verified.
+2. The working-tree prerm/postinst/%postun changes (stop+disable in prerm
+   while the unit file still exists; `try-restart` on upgrade) are what
+   made steps 4 and 5 pass on both families. They are now proven on real
+   systemd hosts, not reasoned about.
+3. `dpkg -P` and `dnf remove` both leave `/var/lib/netrewind/events.db`
+   in place. Intended (the record outlives the package), and now observed
+   — worth stating in the runbook so an operator who wants a true wipe
+   knows to `rm -rf /var/lib/netrewind` themselves.
+
+## Not tested here, and why
+
+- An actual kernel reboot: WSL distros do not reboot, they are terminated
+  and relaunched; PID 1 restarts, the kernel does not. Reboot-survival of
+  the unit is proven; boot-ordering against `network-pre.target` on a real
+  boot is not.
+- AppImage: still not attempted, unchanged from log 15.
+- Repository (apt/dnf repo) signing and metadata: no key exists for that
+  yet (see the release-signing notes in `docs/releasing.md`).
