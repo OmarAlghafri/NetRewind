@@ -91,7 +91,22 @@ const (
 // evidence lives without either of them being configured.
 func DefaultPath() string {
 	if os.PathSeparator == '\\' {
-		return filepath.Join(os.TempDir(), "netrewind", "events.db")
+		return filepath.Join(DataDir(), "events.db")
 	}
 	return "/var/lib/netrewind/events.db"
+}
+
+// DataDir is where the recorder keeps machine-local state on this platform:
+// /var/lib/netrewind on Linux; on Windows %ProgramData%\NetRewind (the
+// per-machine location a LocalSystem service and an interactive user can
+// both reach), falling back to the temp directory only if ProgramData is
+// somehow unset.
+func DataDir() string {
+	if os.PathSeparator == '\\' {
+		if base := os.Getenv("ProgramData"); base != "" {
+			return filepath.Join(base, "NetRewind")
+		}
+		return filepath.Join(os.TempDir(), "netrewind")
+	}
+	return "/var/lib/netrewind"
 }

@@ -50,13 +50,22 @@ type interfaceState struct {
 // parameter, so a test can drive years of flapping in a few lines with no
 // sleeping and no flakiness.
 type InterfaceAnalyzer struct {
-	b     *event.Builder
-	state map[int]*interfaceState
+	b      *event.Builder
+	source event.Source
+	state  map[int]*interfaceState
 }
 
 // NewInterfaceAnalyzer returns an analyzer with no interfaces known yet.
 func NewInterfaceAnalyzer(b *event.Builder) *InterfaceAnalyzer {
-	return &InterfaceAnalyzer{b: b, state: make(map[int]*interfaceState)}
+	return &InterfaceAnalyzer{b: b, source: event.SourceNetlink, state: make(map[int]*interfaceState)}
+}
+
+// WithSource sets the event source stamped on everything this analyzer
+// emits. The default is netlink; a Windows adapter passes event.SourceIPHelper
+// so a reader always knows which platform API a fact came through.
+func (a *InterfaceAnalyzer) WithSource(s event.Source) *InterfaceAnalyzer {
+	a.source = s
+	return a
 }
 
 // Seed records an interface's current state without emitting anything. An
@@ -90,7 +99,7 @@ func (a *InterfaceAnalyzer) Observe(obs ports.InterfaceObservation, at time.Time
 			return nil
 		}
 		return []*event.Event{
-			a.b.New(event.SourceNetlink, event.KindLinkDown, event.SevWarn, subject).
+			a.b.New(a.source, event.KindLinkDown, event.SevWarn, subject).
 				WithAttr("ifname", obs.Name).
 				WithAttr("cause", "removed").
 				WithDedup("link.down|"+obs.Name).
@@ -141,7 +150,7 @@ func (a *InterfaceAnalyzer) Observe(obs ports.InterfaceObservation, at time.Time
 			cause = "administrative"
 		}
 		events = append(events,
-			a.b.New(event.SourceNetlink, event.KindLinkDown, event.SevWarn, subject).
+			a.b.New(a.source, event.KindLinkDown, event.SevWarn, subject).
 				WithAttr("ifname", obs.Name).
 				WithAttr("cause", cause).
 				WithAttr("admin_up", obs.AdminUp).
@@ -157,7 +166,7 @@ func (a *InterfaceAnalyzer) Observe(obs ports.InterfaceObservation, at time.Time
 			if len(cur.downs) >= FlapTransitions && !cur.flapped {
 				cur.flapped = true
 				events = append(events,
-					a.b.New(event.SourceNetlink, event.KindLinkFlap, event.SevError, subject).
+					a.b.New(a.source, event.KindLinkFlap, event.SevError, subject).
 						WithAttr("ifname", obs.Name).
 						WithAttr("transitions", len(cur.downs)).
 						WithAttr("window_seconds", int(FlapWindow.Seconds())).
@@ -172,7 +181,7 @@ func (a *InterfaceAnalyzer) Observe(obs ports.InterfaceObservation, at time.Time
 			cur.flapped = false
 			cur.downs = nil
 		}
-		e := a.b.New(event.SourceNetlink, event.KindLinkUp, event.SevNotice, subject).
+		e := a.b.New(a.source, event.KindLinkUp, event.SevNotice, subject).
 			WithAttr("ifname", obs.Name).
 			WithAttr("admin_up", obs.AdminUp).
 			WithDedup("link.up|" + obs.Name)
@@ -189,7 +198,7 @@ func (a *InterfaceAnalyzer) Observe(obs ports.InterfaceObservation, at time.Time
 	// guards the very first reading, which is a baseline, not a change.
 	if prev.MTU != obs.MTU && prev.MTU != 0 {
 		events = append(events,
-			a.b.New(event.SourceNetlink, event.KindLinkMTUChanged, event.SevNotice, subject).
+			a.b.New(a.source, event.KindLinkMTUChanged, event.SevNotice, subject).
 				WithAttr("ifname", obs.Name).
 				WithAttr("mtu_old", prev.MTU).
 				WithAttr("mtu_new", obs.MTU).
@@ -237,7 +246,7 @@ func (a *InterfaceAnalyzer) CompareCounters(index int, name string, counters por
 	}
 
 	return []*event.Event{
-		a.b.New(event.SourceNetlink, event.KindLinkErrorRate, event.SevWarn, event.Iface(name, index)).
+		a.b.New(a.source, event.KindLinkErrorRate, event.SevWarn, event.Iface(name, index)).
 			WithAttr("ifname", name).
 			WithAttr("error_rate_percent", round2(rate*100)).
 			WithAttr("errors", errs).

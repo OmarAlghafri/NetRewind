@@ -1,6 +1,7 @@
 package ipc
 
 import (
+	"context"
 	"io"
 	"path/filepath"
 	"testing"
@@ -30,7 +31,7 @@ func TestListenAcceptsAConnection(t *testing.T) {
 		conn.Write([]byte("hello"))
 	}()
 
-	conn, err := dial(t, path)
+	conn, err := Dial(context.Background(), path)
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}

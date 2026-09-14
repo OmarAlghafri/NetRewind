@@ -13,10 +13,13 @@ package v1
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/OmarAlghafri/netrewind/internal/bundle"
+	"github.com/OmarAlghafri/netrewind/internal/correlate"
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/incident"
 	"github.com/OmarAlghafri/netrewind/internal/registry"
@@ -40,6 +43,16 @@ const DefaultQueryWindow = time.Hour
 type Server struct {
 	Store    store.Store
 	Registry *registry.Registry
+
+	// Version, ObserverID, StorePath and StartedAt describe the daemon
+	// serving this API; all optional (health reports what is set).
+	Version    string
+	ObserverID string
+	StorePath  string
+	StartedAt  time.Time
+	// Rules is the loaded correlation catalogue, so a client can show what
+	// the recorder is able to conclude, not only what it has concluded.
+	Rules []*correlate.Rule
 }
 
 // Handler returns the routed API. Every route requires GET: this interface
@@ -53,6 +66,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/capabilities", s.handleCapabilities)
 	mux.HandleFunc("GET /v1/events", s.handleEvents)
 	mux.HandleFunc("GET /v1/incidents", s.handleIncidents)
+	mux.HandleFunc("GET /v1/rules", s.handleRules)
+	mux.HandleFunc("GET /v1/bundle", s.handleBundle)
 	return mux
 }
 
@@ -119,10 +134,148 @@ type paramError struct{ param, reason string }
 func (e paramError) Error() string           { return e.param + ": " + e.reason }
 func errBadParam(param, reason string) error { return paramError{param, reason} }
 
+// healthResponse is what a client shows on its overview page: who is
+// serving, since when, and how much record there is. "status" stays "ok"
+// whenever the API answers at all - a store that cannot be counted is
+// reported in store.error rather than by refusing the request, so a client
+// can still tell a reachable-but-unhealthy recorder from an absent one.
+type healthResponse struct {
+	Status        string `json:"status"`
+	Version       string `json:"version"`
+	SchemaVersion int    `json:"schema_version"`
+	APIVersion    int    `json:"api_version"`
+	ObserverID    string `json:"observer_id"`
+	StartedAt     string `json:"started_at,omitempty"`
+	UptimeSeconds int64  `json:"uptime_seconds"`
+	Store         struct {
+		Path   string `json:"path,omitempty"`
+		Events int64  `json:"events"`
+		Error  string `json:"error,omitempty"`
+	} `json:"store"`
+	Collectors struct {
+		Up          int `json:"up"`
+		Down        int `json:"down"`
+		Unsupported int `json:"unsupported"`
+	} `json:"collectors"`
+}
+
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, struct {
-		Status string `json:"status"`
-	}{Status: "ok"})
+	resp := healthResponse{
+		Status:        "ok",
+		Version:       s.Version,
+		SchemaVersion: event.SchemaVersion,
+		APIVersion:    1,
+		ObserverID:    s.ObserverID,
+	}
+	if !s.StartedAt.IsZero() {
+		resp.StartedAt = s.StartedAt.UTC().Format(time.RFC3339)
+		resp.UptimeSeconds = int64(time.Since(s.StartedAt).Seconds())
+	}
+	resp.Store.Path = s.StorePath
+	if s.Store != nil {
+		if n, err := s.Store.CountEvents(r.Context()); err != nil {
+			resp.Store.Error = err.Error()
+		} else {
+			resp.Store.Events = n
+		}
+	}
+	if s.Registry != nil {
+		for _, c := range s.Registry.Snapshot() {
+			switch c.Status {
+			case registry.StatusUp:
+				resp.Collectors.Up++
+			case registry.StatusDown:
+				resp.Collectors.Down++
+			case registry.StatusUnsupported:
+				resp.Collectors.Unsupported++
+			}
+		}
+	}
+	writeJSON(w, resp)
+}
+
+// ruleSummary is the client-facing shape of one correlation rule: enough
+// to explain an incident's rule_id and to list what the recorder can
+// conclude, without the match clauses, which are an implementation detail
+// of the engine and not something a user acts on.
+type ruleSummary struct {
+	ID         string `json:"id"`
+	Title      string `json:"title"`
+	Severity   string `json:"severity"`
+	Confidence uint8  `json:"confidence"`
+	Window     string `json:"window"`
+	RootCause  string `json:"root_cause"`
+	Advice     string `json:"advice"`
+}
+
+type rulesResponse struct {
+	Rules []ruleSummary `json:"rules"`
+}
+
+func (s *Server) handleRules(w http.ResponseWriter, r *http.Request) {
+	out := make([]ruleSummary, 0, len(s.Rules))
+	for _, rule := range s.Rules {
+		if rule == nil {
+			continue
+		}
+		out = append(out, ruleSummary{
+			ID:         rule.ID,
+			Title:      rule.Title,
+			Severity:   rule.Severity,
+			Confidence: rule.Confidence,
+			Window:     rule.Window.String(),
+			RootCause:  rule.RootCause,
+			Advice:     rule.Advice,
+		})
+	}
+	writeJSON(w, rulesResponse{Rules: out})
+}
+
+// handleBundle streams an evidence bundle (bundle.Export's tar.gz) for the
+// requested window. It is still a read of the record - nothing is written
+// anywhere - which is why it stays a GET on this read-only API. Redaction
+// is on unless include_secrets=true is passed, matching bundle.Export's
+// own safe default; the client is expected to ask the user before passing
+// it.
+func (s *Server) handleBundle(w http.ResponseWriter, r *http.Request) {
+	since, until, limit, err := parseWindow(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_param", err.Error())
+		return
+	}
+	if r.URL.Query().Get("limit") == "" {
+		limit = 0 // bundle.DefaultExportLimit, not the interactive query default
+	}
+	includeSecrets := false
+	if v := r.URL.Query().Get("include_secrets"); v != "" {
+		includeSecrets, err = strconv.ParseBool(v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "bad_param", "include_secrets: must be true or false")
+			return
+		}
+	}
+	var caps []registry.Snapshot
+	if s.Registry != nil {
+		caps = s.Registry.Snapshot()
+	}
+	name := fmt.Sprintf("netrewind-%s-%s.tar.gz", s.ObserverID, until.UTC().Format("20060102T150405Z"))
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+	_, err = bundle.Export(r.Context(), s.Store, w, bundle.ExportOptions{
+		From:           since,
+		To:             until,
+		AppVersion:     s.Version,
+		ObserverID:     s.ObserverID,
+		Capabilities:   caps,
+		IncludeSecrets: includeSecrets,
+		Limit:          limit,
+	})
+	if err != nil {
+		// Headers may already be out; the archive is then truncated and its
+		// checksum file absent, so an importer rejects it rather than
+		// trusting a partial record.
+		writeError(w, http.StatusInternalServerError, "export_failed", err.Error())
+	}
 }
 
 // capabilitiesResponse wraps registry.Snapshot rather than returning the

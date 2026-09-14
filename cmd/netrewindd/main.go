@@ -22,15 +22,12 @@ import (
 	"syscall"
 	"time"
 
+	apiv1 "github.com/OmarAlghafri/netrewind/internal/api/v1"
 	"github.com/OmarAlghafri/netrewind/internal/collect"
-	"github.com/OmarAlghafri/netrewind/internal/collect/flow"
-	"github.com/OmarAlghafri/netrewind/internal/collect/netlink"
-	"github.com/OmarAlghafri/netrewind/internal/collect/policy"
-	"github.com/OmarAlghafri/netrewind/internal/collect/probe"
-	"github.com/OmarAlghafri/netrewind/internal/collect/wire"
 	"github.com/OmarAlghafri/netrewind/internal/correlate"
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/identity"
+	"github.com/OmarAlghafri/netrewind/internal/ipc"
 	"github.com/OmarAlghafri/netrewind/internal/metrics"
 	"github.com/OmarAlghafri/netrewind/internal/otel"
 	"github.com/OmarAlghafri/netrewind/internal/registry"
@@ -60,6 +57,16 @@ const (
 )
 
 func main() {
+	// "netrewindd service ..." manages the Windows service registration and
+	// needs no configuration; elsewhere it is not a command at all.
+	if handled, err := serviceCommand(os.Args[1:]); handled {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "netrewindd: %v\n", err)
+			os.Exit(2)
+		}
+		return
+	}
+
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	cfg, err := loadConfig(fs, os.Args[1:])
 	if err != nil {
@@ -81,13 +88,34 @@ func main() {
 	}
 
 	log := newLogger(cfg.LogLevel)
-	if err := run(log, cfg); err != nil {
+
+	// Under a service manager that has its own stop protocol (a Windows
+	// service), runService owns the process; everywhere else the process
+	// runs until it is signalled.
+	if handled, err := runService(log, cfg); handled {
+		if err != nil {
+			log.Error("netrewindd stopped", "err", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := run(ctx, log, cfg); err != nil {
 		log.Error("netrewindd stopped", "err", err)
 		os.Exit(1)
 	}
 }
 
-func run(log *slog.Logger, cfg config) error {
+// run is the recorder: it returns when ctx is done and everything has been
+// flushed, or with the error that made recording impossible.
+func run(ctx context.Context, log *slog.Logger, cfg config) error {
+	// The updater ends the process to hand over to the new binary; give it a
+	// cancel that stops this run the same way a signal would.
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
+
 	if err := os.MkdirAll(filepath.Dir(cfg.DBPath), 0o755); err != nil {
 		return fmt.Errorf("create store directory: %w", err)
 	}
@@ -120,9 +148,6 @@ func run(log *slog.Logger, cfg config) error {
 	// Metrics exist whether or not anyone is scraping them, so the CLI and the
 	// logs can report the same numbers as a dashboard would.
 	meter := metrics.NewRecorder(version, observerID)
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	if cfg.MetricsAddr != "" {
 		srv, err := meter.Serve(cfg.MetricsAddr, log)
@@ -180,15 +205,10 @@ func run(log *slog.Logger, cfg config) error {
 		return err
 	}
 
-	collectors := []collect.Collector{
-		netlink.NewLinkCollector(builder, log),
-		netlink.NewNeighCollector(builder, log, ids),
-		netlink.NewRouteCollector(builder, log),
-		netlink.NewAddrCollector(builder, log),
-		flow.NewCollector(builder, log),
-		policy.NewCollector(builder, log),
-		wire.NewCollector(builder, log, cfg.WireIface, cfg.RecordDNSNames),
-		probe.NewCollector(builder, log, cfg.ProbeTargets),
+	// The collectors this platform can run, plus the one that runs anywhere.
+	// What this platform cannot run is still declared in the registry below,
+	// as unsupported, so a capability report says so rather than omitting it.
+	collectors := append(platformCollectors(cfg, builder, log, ids),
 		update.New(update.Config{
 			Check:     cfg.Update.Check,
 			Apply:     cfg.Update.Apply,
@@ -197,17 +217,56 @@ func run(log *slog.Logger, cfg config) error {
 			Token:     cfg.Update.Token,
 			PublicKey: cfg.Update.PublicKey,
 			RulesDir:  cfg.RulesDir,
-		}, version, builder, log, stop),
-	}
+		}, version, builder, log, stop))
 
-	// The registry is a capability report waiting to be read (by the CLI, and
-	// later by a local API), not something the collectors themselves consult -
-	// it is fed the same up/down facts metrics already gets, alongside it
-	// rather than instead of it, so nothing already relying on
-	// netrewind_collector_up changes shape.
+	// The registry is the capability report the local API serves, not
+	// something the collectors themselves consult - it is fed the same
+	// up/down facts metrics already gets, alongside it rather than instead
+	// of it, so nothing already relying on netrewind_collector_up changes
+	// shape.
 	reg := registry.New(nil)
+	running := make(map[string]bool, len(collectors))
+	for _, c := range collectors {
+		running[c.Name()] = true
+	}
 	for _, d := range collectorDescriptors {
 		reg.Register(d)
+		if !running[d.Name] {
+			reg.Unsupported(d.Name, "requires "+d.Platform)
+		}
+	}
+
+	// The local API answers the desktop application over the local-only
+	// transport. It serves the same store and registry the CLI reads; it is
+	// started before the collectors so a client can see them come up.
+	if cfg.API.enabled() {
+		apiPath := cfg.API.Path
+		if apiPath == "" {
+			apiPath = ipc.DefaultPath()
+		}
+		l, err := ipc.ListenWith(apiPath, ipc.Options{Group: cfg.API.Group, AllowSIDs: cfg.API.AllowUsers})
+		if err != nil {
+			return err
+		}
+		var rules []*correlate.Rule
+		if engine != nil {
+			rules = engine.Rules()
+		}
+		api := &http.Server{Handler: (&apiv1.Server{
+			Store: st, Registry: reg, Version: version, ObserverID: observerID,
+			StorePath: dbPath, StartedAt: time.Now(), Rules: rules,
+		}).Handler()}
+		go func() {
+			log.Info("serving the local API", "endpoint", apiPath)
+			if err := api.Serve(l); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Error("local API stopped", "err", err)
+			}
+		}()
+		defer func() {
+			shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			api.Shutdown(shutdown)
+		}()
 	}
 
 	for _, c := range collectors {

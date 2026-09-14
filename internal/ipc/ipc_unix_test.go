@@ -3,17 +3,11 @@
 package ipc
 
 import (
-	"net"
 	"os"
 	"testing"
 )
 
 const usesFilesystemPath = true
-
-func dial(t *testing.T, path string) (net.Conn, error) {
-	t.Helper()
-	return net.Dial("unix", path)
-}
 
 // TestSocketIsRestrictedToTheOwner is the actual security property this
 // package exists to provide, checked directly rather than assumed from the

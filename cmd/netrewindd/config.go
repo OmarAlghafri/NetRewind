@@ -8,6 +8,8 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -17,12 +19,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DefaultConfigPath is read when it exists and no other path was given.
+// DefaultConfigPath is read when it exists and no other path was given:
+// /etc/netrewind/netrewindd.yaml on Linux, %ProgramData%\NetRewind\netrewindd.yaml
+// on Windows.
 //
 // A missing file there is not an error: the defaults are a working recorder,
 // and an appliance that refuses to start because nobody wrote a config file
 // would be a recorder that is not recording.
-const DefaultConfigPath = "/etc/netrewind/netrewindd.yaml"
+var DefaultConfigPath = defaultConfigPath()
+
+func defaultConfigPath() string {
+	if runtime.GOOS == "windows" {
+		return filepath.Join(store.DataDir(), "netrewindd.yaml")
+	}
+	return "/etc/netrewind/netrewindd.yaml"
+}
 
 // config is everything the recorder needs to be told.
 //
@@ -49,6 +60,9 @@ type config struct {
 	// Update controls whether the recorder looks for, and installs, new
 	// releases of itself.
 	Update updateConfig `yaml:"update"`
+
+	// API is the local-only endpoint the desktop application reads from.
+	API apiConfig `yaml:"api"`
 
 	// CheckOnly comes from --check-config and never from the file. It is what
 	// the systemd unit runs before starting, so a configuration the recorder
@@ -81,6 +95,28 @@ type updateConfig struct {
 	// SHA256SUMS is not signed by it is refused rather than installed.
 	PublicKey string `yaml:"public_key"`
 }
+
+// apiConfig describes the versioned local API (internal/api/v1) served over
+// the local-only transport in internal/ipc: a Unix socket on Linux, a named
+// pipe on Windows. Never a TCP port.
+type apiConfig struct {
+	// Enabled is on by default: the desktop application has nothing to read
+	// without it. Off means the recorder records and answers nobody.
+	Enabled *bool `yaml:"enabled"`
+	// Path is the socket path (Linux) or pipe name (Windows). Empty means
+	// the platform default next to the event store.
+	Path string `yaml:"path"`
+	// Group (Linux) additionally lets members of this group read the API,
+	// for a recorder running as root under systemd while the desktop runs as
+	// an ordinary user. Empty means the listening user only.
+	Group string `yaml:"group"`
+	// AllowUsers (Windows) additionally lets these SIDs (S-1-5-21-...) open
+	// the pipe, for a recorder running as a LocalSystem service. The service
+	// installer fills this in with the installing user's SID.
+	AllowUsers []string `yaml:"allow_users"`
+}
+
+func (a apiConfig) enabled() bool { return a.Enabled == nil || *a.Enabled }
 
 // duration is a time.Duration the config file can write the way the flag does.
 //
@@ -143,6 +179,7 @@ func loadConfig(fs *flag.FlagSet, args []string) (config, error) {
 		recordDNSNames = fs.Bool("record-dns-names", false, "store the names looked up. Off by default: there are networks where recording them is not permitted")
 		probeTargets   = fs.String("probe", "", "addresses to measure reachability to; empty follows the default gateway")
 		otlpEndpoint   = fs.String("otlp-endpoint", "", "copy the record to this OpenTelemetry collector, e.g. http://localhost:4318; empty disables it")
+		apiPath        = fs.String("api", "", `serve the local API on this socket path (Linux) or pipe name (Windows); "off" disables it; empty means the platform default`)
 		updateCheck    = fs.Bool("update-check", true, "look for newer releases")
 		updateApply    = fs.Bool("update-apply", false, "install newer releases automatically")
 	)
@@ -185,6 +222,13 @@ func loadConfig(fs *flag.FlagSet, args []string) (config, error) {
 			cfg.ProbeTargets = *probeTargets
 		case "otlp-endpoint":
 			cfg.OTLPEndpoint = *otlpEndpoint
+		case "api":
+			if *apiPath == "off" {
+				off := false
+				cfg.API.Enabled = &off
+			} else {
+				cfg.API.Path = *apiPath
+			}
 		case "update-check":
 			cfg.Update.Check = *updateCheck
 		case "update-apply":
@@ -328,6 +372,18 @@ func (c *config) validate() error {
 				"otlp_endpoint: %q must start with http:// or https://. This is OTLP over HTTP; the gRPC port (4317) will not answer it - use 4318", c.OTLPEndpoint))
 		case u.Host == "":
 			problems = append(problems, fmt.Sprintf("otlp_endpoint: %q names no host", c.OTLPEndpoint))
+		}
+	}
+	if c.API.enabled() {
+		if runtime.GOOS == "windows" {
+			if c.API.Group != "" {
+				problems = append(problems, "api.group: applies to Linux only; use api.allow_users (SIDs) on Windows")
+			}
+			if p := c.API.Path; p != "" && !strings.HasPrefix(p, `\\.\pipe\`) {
+				problems = append(problems, fmt.Sprintf(`api.path: %q must be a named pipe, \\.\pipe\<name>`, p))
+			}
+		} else if len(c.API.AllowUsers) > 0 {
+			problems = append(problems, "api.allow_users: applies to Windows only; use api.group on Linux")
 		}
 	}
 	if c.MetricsAddr != "" {

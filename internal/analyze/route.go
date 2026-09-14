@@ -26,12 +26,20 @@ func (r routeEntry) id() string {
 // internal/collect/netlink since "which table is main" is a Linux concept.
 type RouteAnalyzer struct {
 	b      *event.Builder
+	source event.Source
 	routes map[string][]routeEntry
 }
 
 // NewRouteAnalyzer returns an analyzer with no routes known yet.
 func NewRouteAnalyzer(b *event.Builder) *RouteAnalyzer {
-	return &RouteAnalyzer{b: b, routes: make(map[string][]routeEntry)}
+	return &RouteAnalyzer{b: b, source: event.SourceNetlink, routes: make(map[string][]routeEntry)}
+}
+
+// WithSource sets the event source stamped on emitted route events (default
+// netlink; event.SourceIPHelper on Windows).
+func (a *RouteAnalyzer) WithSource(s event.Source) *RouteAnalyzer {
+	a.source = s
+	return a
 }
 
 // Seed records a route entry as part of the table's initial state, without
@@ -70,7 +78,7 @@ func (a *RouteAnalyzer) Observe(obs ports.RouteObservation) []*event.Event {
 	switch {
 	case !hadAny && hasAny:
 		return []*event.Event{
-			a.b.New(event.SourceNetlink, event.KindRouteAdded, event.SevInfo, subject).
+			a.b.New(a.source, event.KindRouteAdded, event.SevInfo, subject).
 				WithAttr("prefix", key).
 				WithAttr("gateway", after.gw).
 				WithAttr("ifindex", after.linkIndex).
@@ -87,7 +95,7 @@ func (a *RouteAnalyzer) Observe(obs ports.RouteObservation) []*event.Event {
 			sev = event.SevError
 		}
 		return []*event.Event{
-			a.b.New(event.SourceNetlink, event.KindRouteRemoved, sev, subject).
+			a.b.New(a.source, event.KindRouteRemoved, sev, subject).
 				WithAttr("prefix", key).
 				WithAttr("gateway", before.gw).
 				WithAttr("is_default", obs.IsDefault).
@@ -103,7 +111,7 @@ func (a *RouteAnalyzer) Observe(obs ports.RouteObservation) []*event.Event {
 			kind, sev = event.KindDefaultRouteChanged, event.SevError
 		}
 		return []*event.Event{
-			a.b.New(event.SourceNetlink, kind, sev, subject).
+			a.b.New(a.source, kind, sev, subject).
 				WithAttr("prefix", key).
 				WithAttr("gateway_old", before.gw).
 				WithAttr("gateway_new", after.gw).
@@ -179,11 +187,17 @@ func removeRoute(entries []routeEntry, e routeEntry) []routeEntry {
 // diff against - an address either arrived or left, and the notification
 // already says which.
 func ObserveAddress(b *event.Builder, obs ports.AddressObservation) *event.Event {
+	return ObserveAddressFrom(b, event.SourceNetlink, obs)
+}
+
+// ObserveAddressFrom is ObserveAddress with an explicit source, for adapters
+// on platforms where the fact does not come through netlink.
+func ObserveAddressFrom(b *event.Builder, source event.Source, obs ports.AddressObservation) *event.Event {
 	kind, sev := event.KindAddrRemoved, event.SevNotice
 	if !obs.Removed {
 		kind, sev = event.KindAddrAdded, event.SevInfo
 	}
-	return b.New(event.SourceNetlink, kind, sev, event.Host(obs.IP, "")).
+	return b.New(source, kind, sev, event.Host(obs.IP, "")).
 		WithAttr("address", obs.CIDR).
 		WithAttr("ifindex", obs.LinkIndex).
 		WithDedup(fmt.Sprintf("%s|%s", kind, obs.CIDR))

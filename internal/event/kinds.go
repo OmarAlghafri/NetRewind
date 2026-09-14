@@ -8,7 +8,10 @@ import "strings"
 type Source string
 
 const (
-	SourceNetlink   Source = "netlink"
+	SourceNetlink Source = "netlink"
+	// SourceIPHelper is the Windows IP Helper API (iphlpapi): the same
+	// interface, address and route facts netlink provides on Linux.
+	SourceIPHelper  Source = "iphelper"
 	SourceEBPF      Source = "ebpf"
 	SourceConntrack Source = "conntrack"
 	SourceNftables  Source = "nftables"

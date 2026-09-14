@@ -255,6 +255,57 @@ type ImportOptions struct {
 	PublicKey string
 }
 
+// Contents is a verified, parsed bundle held in memory: what Inspect returns
+// and what Import promotes into a store.
+type Contents struct {
+	Manifest  Manifest
+	Events    []*event.Event
+	Incidents []*incident.Incident
+	// Signed reports whether the archive carried a signature that verified
+	// against the key given to Inspect. False with no key given means
+	// "not checked", not "unsigned".
+	Signed bool
+}
+
+// Inspect reads a bundle written by Export, verifies every member against
+// the checksum file, verifies the signature when publicKey is set (and
+// refuses an unsigned bundle in that case), and returns the parsed
+// contents without writing anything anywhere. It is the read-only half of
+// Import, for a viewer that wants to show a bundle rather than restore it.
+func Inspect(r io.Reader, publicKey string) (Contents, error) {
+	members, err := readTarGz(r)
+	if err != nil {
+		return Contents{}, fmt.Errorf("bundle: read archive: %w", err)
+	}
+	if err := verifyChecksums(members); err != nil {
+		return Contents{}, fmt.Errorf("bundle: %w", err)
+	}
+	if err := verifySignatureIfRequired(members, publicKey); err != nil {
+		return Contents{}, fmt.Errorf("bundle: %w", err)
+	}
+
+	var c Contents
+	c.Signed = publicKey != "" && len(members[signatureFile]) > 0
+	if err := json.Unmarshal(members[manifestFile], &c.Manifest); err != nil {
+		return Contents{}, fmt.Errorf("bundle: manifest.json does not parse: %w", err)
+	}
+	if c.Manifest.FormatVersion > FormatVersion {
+		return Contents{}, fmt.Errorf("bundle: format v%d, this build only understands up to v%d - "+
+			"open it with a newer NetRewind", c.Manifest.FormatVersion, FormatVersion)
+	}
+	if c.Manifest.SchemaVersion > event.SchemaVersion {
+		return Contents{}, fmt.Errorf("bundle: event schema v%d, this build only understands up to v%d - "+
+			"open it with a newer NetRewind", c.Manifest.SchemaVersion, event.SchemaVersion)
+	}
+	if err := json.Unmarshal(members[eventsFile], &c.Events); err != nil {
+		return Contents{}, fmt.Errorf("bundle: events.json does not parse: %w", err)
+	}
+	if err := json.Unmarshal(members[incidentsFile], &c.Incidents); err != nil {
+		return Contents{}, fmt.Errorf("bundle: incidents.json does not parse: %w", err)
+	}
+	return c, nil
+}
+
 // Import verifies a bundle written by Export and, only if every check
 // passes, produces a new, independent SQLite store at opts.DestPath
 // containing exactly its events and incidents. It never opens, modifies, or
@@ -269,39 +320,11 @@ func Import(r io.Reader, opts ImportOptions) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("bundle: import: %s already exists; refusing to overwrite it", opts.DestPath)
 	}
 
-	members, err := readTarGz(r)
+	contents, err := Inspect(r, opts.PublicKey)
 	if err != nil {
-		return Manifest{}, fmt.Errorf("bundle: read archive: %w", err)
+		return Manifest{}, err
 	}
-
-	if err := verifyChecksums(members); err != nil {
-		return Manifest{}, fmt.Errorf("bundle: %w", err)
-	}
-	if err := verifySignatureIfRequired(members, opts.PublicKey); err != nil {
-		return Manifest{}, fmt.Errorf("bundle: %w", err)
-	}
-
-	var manifest Manifest
-	if err := json.Unmarshal(members[manifestFile], &manifest); err != nil {
-		return Manifest{}, fmt.Errorf("bundle: manifest.json does not parse: %w", err)
-	}
-	if manifest.FormatVersion > FormatVersion {
-		return Manifest{}, fmt.Errorf("bundle: format v%d, this build only understands up to v%d - "+
-			"open it with a newer NetRewind", manifest.FormatVersion, FormatVersion)
-	}
-	if manifest.SchemaVersion > event.SchemaVersion {
-		return Manifest{}, fmt.Errorf("bundle: event schema v%d, this build only understands up to v%d - "+
-			"open it with a newer NetRewind", manifest.SchemaVersion, event.SchemaVersion)
-	}
-
-	var events []*event.Event
-	if err := json.Unmarshal(members[eventsFile], &events); err != nil {
-		return Manifest{}, fmt.Errorf("bundle: events.json does not parse: %w", err)
-	}
-	var incidents []*incident.Incident
-	if err := json.Unmarshal(members[incidentsFile], &incidents); err != nil {
-		return Manifest{}, fmt.Errorf("bundle: incidents.json does not parse: %w", err)
-	}
+	manifest, events, incidents := contents.Manifest, contents.Events, contents.Incidents
 
 	tmp := opts.DestPath + ".importing"
 	os.Remove(tmp)

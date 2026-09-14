@@ -4,9 +4,11 @@ import (
 	"context"
 	"log/slog"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/OmarAlghafri/netrewind/internal/collect/flow"
+	"github.com/OmarAlghafri/netrewind/internal/collect/iphelper"
 	"github.com/OmarAlghafri/netrewind/internal/collect/netlink"
 	"github.com/OmarAlghafri/netrewind/internal/collect/policy"
 	"github.com/OmarAlghafri/netrewind/internal/collect/probe"
@@ -45,6 +47,10 @@ func TestDescriptorNamesMatchTheRealCollectors(t *testing.T) {
 		policy.NewCollector(b, log).Name():                           true,
 		wire.NewCollector(b, log, "", false).Name():                  true,
 		probe.NewCollector(b, log, "").Name():                        true,
+		iphelper.NewLinkCollector(b, log).Name():                     true,
+		iphelper.NewAddrCollector(b, log).Name():                     true,
+		iphelper.NewRouteCollector(b, log).Name():                    true,
+		iphelper.NewNeighCollector(b, log, ids).Name():               true,
 		update.New(update.Config{}, "dev", b, log, func() {}).Name(): true,
 	}
 
@@ -100,3 +106,34 @@ func TestRegistrationCoversEveryDescriptor(t *testing.T) {
 type noopWriter struct{}
 
 func (noopWriter) Write(p []byte) (int, error) { return len(p), nil }
+
+// TestPlatformCollectorsAreAllDescribed pins that every collector this
+// platform actually starts has a descriptor whose Platform is this platform
+// (or "any"), so nothing runs while being reported as unsupported.
+func TestPlatformCollectorsAreAllDescribed(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(noopWriter{}, nil))
+	b := event.NewBuilder("test", nil)
+	st, err := store.OpenSQLite(filepath.Join(t.TempDir(), "events.db"))
+	if err != nil {
+		t.Fatalf("OpenSQLite: %v", err)
+	}
+	defer st.Close()
+	ids, err := identity.New(context.Background(), st)
+	if err != nil {
+		t.Fatalf("identity.New: %v", err)
+	}
+	byName := map[string]registry.Descriptor{}
+	for _, d := range collectorDescriptors {
+		byName[d.Name] = d
+	}
+	for _, c := range platformCollectors(defaultConfig(), b, log, ids) {
+		d, ok := byName[c.Name()]
+		if !ok {
+			t.Errorf("%s runs on %s but has no descriptor", c.Name(), runtime.GOOS)
+			continue
+		}
+		if d.Platform != runtime.GOOS && d.Platform != "any" {
+			t.Errorf("%s runs on %s but its descriptor says platform %q", c.Name(), runtime.GOOS, d.Platform)
+		}
+	}
+}

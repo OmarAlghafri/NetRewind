@@ -42,16 +42,24 @@ type neighborChange struct {
 // nothing here for an adapter to translate. A nil resolver means events are
 // recorded without a stable host identity, matching the original collector.
 type NeighborAnalyzer struct {
-	b   *event.Builder
-	log *slog.Logger
-	ids *identity.Resolver
+	b      *event.Builder
+	source event.Source
+	log    *slog.Logger
+	ids    *identity.Resolver
 
 	state map[string]*neighborState // keyed by IP; single-goroutine access, same as the collector this replaces
 }
 
 // NewNeighborAnalyzer returns an analyzer with no bindings known yet.
 func NewNeighborAnalyzer(b *event.Builder, log *slog.Logger, ids *identity.Resolver) *NeighborAnalyzer {
-	return &NeighborAnalyzer{b: b, log: log, ids: ids, state: make(map[string]*neighborState)}
+	return &NeighborAnalyzer{b: b, source: event.SourceNetlink, log: log, ids: ids, state: make(map[string]*neighborState)}
+}
+
+// WithSource sets the event source stamped on emitted neighbour events
+// (default netlink; event.SourceIPHelper on Windows).
+func (a *NeighborAnalyzer) WithSource(s event.Source) *NeighborAnalyzer {
+	a.source = s
+	return a
 }
 
 // Seed records a binding's current state without emitting anything.
@@ -72,7 +80,7 @@ func (a *NeighborAnalyzer) Observe(ctx context.Context, obs ports.NeighborObserv
 		}
 		delete(a.state, obs.IP)
 		return []*event.Event{
-			a.b.New(event.SourceNetlink, event.KindNeighborFailed, event.SevNotice,
+			a.b.New(a.source, event.KindNeighborFailed, event.SevNotice,
 				event.Host(obs.IP, prev.mac)).
 				WithAttr("ip", obs.IP).
 				WithAttr("mac", prev.mac).
@@ -84,7 +92,7 @@ func (a *NeighborAnalyzer) Observe(ctx context.Context, obs ports.NeighborObserv
 	prev, known := a.state[obs.IP]
 	if !known {
 		a.state[obs.IP] = &neighborState{mac: obs.MAC, linkIndex: obs.LinkIndex}
-		e := a.b.New(event.SourceNetlink, event.KindARPBindingNew, event.SevInfo,
+		e := a.b.New(a.source, event.KindARPBindingNew, event.SevInfo,
 			event.Host(obs.IP, obs.MAC)).
 			WithAttr("ip", obs.IP).
 			WithAttr("mac", obs.MAC).
@@ -110,7 +118,7 @@ func (a *NeighborAnalyzer) Observe(ctx context.Context, obs ports.NeighborObserv
 			// is either a failover or an attack. Both need looking at now.
 			sev = event.SevError
 		}
-		e := a.b.New(event.SourceNetlink, event.KindARPBindingChanged, sev,
+		e := a.b.New(a.source, event.KindARPBindingChanged, sev,
 			event.Host(obs.IP, obs.MAC)).
 			WithAttr("ip", obs.IP).
 			WithAttr("mac_old", prev.mac).
@@ -124,7 +132,7 @@ func (a *NeighborAnalyzer) Observe(ctx context.Context, obs ports.NeighborObserv
 		prev.changes = appendNeighborChange(prev.changes, neighborChange{at: at, mac: obs.MAC})
 		if dup, macs := looksDuplicated(prev.changes); dup {
 			events = append(events,
-				a.b.New(event.SourceNetlink, event.KindDuplicateIP, event.SevError,
+				a.b.New(a.source, event.KindDuplicateIP, event.SevError,
 					event.Host(obs.IP, obs.MAC)).
 					WithAttr("ip", obs.IP).
 					WithAttr("claimants", macs).
@@ -139,7 +147,7 @@ func (a *NeighborAnalyzer) Observe(ctx context.Context, obs ports.NeighborObserv
 	// means the machine moved, or something is impersonating it.
 	if prev.mac == obs.MAC && prev.linkIndex != obs.LinkIndex && prev.linkIndex != 0 {
 		events = append(events,
-			a.b.New(event.SourceNetlink, event.KindMACMoved, event.SevWarn,
+			a.b.New(a.source, event.KindMACMoved, event.SevWarn,
 				event.Host(obs.IP, obs.MAC)).
 				WithAttr("mac", obs.MAC).
 				WithAttr("ifindex_old", prev.linkIndex).

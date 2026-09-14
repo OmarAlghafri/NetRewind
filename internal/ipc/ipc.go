@@ -12,24 +12,39 @@
 // stronger guarantee than "not listening on 0.0.0.0" - there is no port to
 // scan and no firewall rule that would matter either way.
 //
-// Access control is deliberately restricted to exactly the user who started
-// the listener, matching a single desktop machine where the same person
-// runs the agent and the UI. A deployment where the agent runs as a separate
-// service account and a different interactive user needs to reach it (see
-// deploy/systemd/netrewindd.service's AmbientCapabilities, which already
-// implies the recorder can run unprivileged-but-capable rather than as the
-// desktop user) needs a real group-ownership and installer decision that
-// belongs in deploy/, not a default this package should guess at.
+// Access control defaults to exactly the user who started the listener,
+// matching a single desktop machine where the same person runs the agent
+// and the UI. When the agent runs as a service account (root under systemd,
+// LocalSystem as a Windows service) and a different interactive user needs
+// the desktop to reach it, Options widens that deliberately and visibly:
+// a group on Linux, extra SIDs on Windows. Nothing widens by accident.
 package ipc
 
 import "net"
+
+// Options controls who, beyond the listening user, may connect.
+type Options struct {
+	// Group (Linux) makes the socket group-owned by this group name and
+	// readable/writable by it (mode 0660 instead of 0600). Empty keeps the
+	// owner-only default.
+	Group string
+	// AllowSIDs (Windows) grants each listed SID (S-1-5-21-...) access to
+	// the pipe in addition to the listening user. Empty keeps the
+	// owner-only default.
+	AllowSIDs []string
+}
 
 // Listen opens the local IPC endpoint at path, restricted to the current
 // user, and returns a net.Listener ready for http.Serve or any other
 // net.Listener consumer. path is a filesystem path on Linux (see
 // DefaultPath) and a named pipe path (\\.\pipe\...) on Windows.
 func Listen(path string) (net.Listener, error) {
-	return listen(path)
+	return listen(path, Options{})
+}
+
+// ListenWith is Listen with explicit access options.
+func ListenWith(path string, opts Options) (net.Listener, error) {
+	return listen(path, opts)
 }
 
 // DefaultPath returns the platform-appropriate default endpoint location,

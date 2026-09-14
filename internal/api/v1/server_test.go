@@ -1,14 +1,18 @@
 package v1
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/OmarAlghafri/netrewind/internal/bundle"
+	"github.com/OmarAlghafri/netrewind/internal/correlate"
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/incident"
 	"github.com/OmarAlghafri/netrewind/internal/registry"
@@ -211,5 +215,107 @@ func TestCapabilitiesWithNoRegistryStillAnswers(t *testing.T) {
 	rec := get(t, srv.Handler(), "/v1/capabilities")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200 even with no registry configured", rec.Code)
+	}
+}
+
+func TestHealthDescribesTheDaemonAndItsStore(t *testing.T) {
+	srv, st := newTestServer(t)
+	srv.Version = "1.2.3"
+	srv.ObserverID = "obs-1"
+	srv.StorePath = "/var/lib/netrewind/events.db"
+	srv.StartedAt = time.Now().Add(-90 * time.Second)
+	seedEvent(t, st, event.KindLinkDown, time.Now())
+	seedEvent(t, st, event.KindLinkUp, time.Now())
+
+	var body healthResponse
+	if err := json.NewDecoder(get(t, srv.Handler(), "/v1/health").Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Status != "ok" || body.Version != "1.2.3" || body.ObserverID != "obs-1" {
+		t.Errorf("health = %+v", body)
+	}
+	if body.SchemaVersion != event.SchemaVersion || body.APIVersion != 1 {
+		t.Errorf("versions: schema=%d api=%d", body.SchemaVersion, body.APIVersion)
+	}
+	if body.Store.Events != 2 || body.Store.Path == "" {
+		t.Errorf("store = %+v, want 2 events and a path", body.Store)
+	}
+	if body.UptimeSeconds < 89 || body.StartedAt == "" {
+		t.Errorf("uptime = %d started_at = %q", body.UptimeSeconds, body.StartedAt)
+	}
+	if body.Collectors.Up != 1 {
+		t.Errorf("collectors = %+v, want 1 up", body.Collectors)
+	}
+}
+
+func TestRulesListsTheCatalogueWithoutMatchClauses(t *testing.T) {
+	srv, _ := newTestServer(t)
+	srv.Rules = []*correlate.Rule{
+		{ID: "gateway-hijack", Title: "Gateway hijack", Severity: "error", Confidence: 90, Window: 2 * time.Minute, RootCause: "l2.arp_binding_changed", Advice: "check the switch"},
+		nil, // a nil entry must not panic the listing
+	}
+	rec := get(t, srv.Handler(), "/v1/rules")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	var body rulesResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Rules) != 1 || body.Rules[0].ID != "gateway-hijack" || body.Rules[0].Window != "2m0s" {
+		t.Fatalf("rules = %+v", body.Rules)
+	}
+	if strings.Contains(rec.Body.String(), "match") {
+		t.Errorf("match clauses leaked into the API: %s", rec.Body.String())
+	}
+}
+
+func TestRulesWithNoCatalogueIsAnEmptyArray(t *testing.T) {
+	srv, _ := newTestServer(t)
+	if got := strings.TrimSpace(get(t, srv.Handler(), "/v1/rules").Body.String()); got != `{"rules":[]}` {
+		t.Errorf("body = %s", got)
+	}
+}
+
+func TestBundleStreamsAVerifiableArchiveOfTheWindow(t *testing.T) {
+	srv, st := newTestServer(t)
+	srv.Version = "1.2.3"
+	srv.ObserverID = "obs-1"
+	seedEvent(t, st, event.KindLinkDown, time.Now().Add(-10*time.Minute))
+	seedEvent(t, st, event.KindLinkUp, time.Now().Add(-48*time.Hour)) // outside the default window
+
+	rec := get(t, srv.Handler(), "/v1/bundle")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/gzip" {
+		t.Errorf("content-type = %q", ct)
+	}
+	if cd := rec.Header().Get("Content-Disposition"); !strings.Contains(cd, "netrewind-obs-1-") {
+		t.Errorf("content-disposition = %q", cd)
+	}
+	contents, err := bundle.Inspect(bytes.NewReader(rec.Body.Bytes()), "")
+	if err != nil {
+		t.Fatalf("the streamed bundle does not verify: %v", err)
+	}
+	if contents.Manifest.AppVersion != "1.2.3" || contents.Manifest.ObserverID != "obs-1" {
+		t.Errorf("manifest = %+v", contents.Manifest)
+	}
+	if len(contents.Events) != 1 || contents.Events[0].Kind != event.KindLinkDown {
+		t.Errorf("events = %+v, want only the one inside the default window", contents.Events)
+	}
+	if !contents.Manifest.Redacted {
+		t.Errorf("bundle must be redacted unless include_secrets=true is passed")
+	}
+	if len(contents.Manifest.Capabilities) != 1 {
+		t.Errorf("capabilities = %+v, want the registry snapshot", contents.Manifest.Capabilities)
+	}
+}
+
+func TestBundleRejectsABadIncludeSecretsValue(t *testing.T) {
+	srv, _ := newTestServer(t)
+	rec := get(t, srv.Handler(), "/v1/bundle?include_secrets=maybe")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
 	}
 }

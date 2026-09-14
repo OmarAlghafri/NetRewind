@@ -24,6 +24,10 @@ const (
 	StatusUnknown Status = "unknown" // registered, has not reported in yet
 	StatusUp      Status = "up"
 	StatusDown    Status = "down"
+	// StatusUnsupported means this build cannot run the collector on this
+	// platform at all - it was never started and never will be, which a
+	// reader must be able to tell apart from one that started and failed.
+	StatusUnsupported Status = "unsupported"
 )
 
 // Descriptor is what is known about a collector before it ever runs: fixed
@@ -35,22 +39,22 @@ type Descriptor struct {
 	// system.collector_down events. The two must never drift apart, which is
 	// why callers should derive both from one constant rather than typing the
 	// string twice.
-	Name string
+	Name string `json:"name"`
 	// Platform is what this collector needs to do anything at all: "linux",
 	// "windows", or "any". A stub compiled in for a platform it does not
 	// support belongs here with its real requirement, not "any" - the point
 	// of this field is to say why a collector is down, not to hide that it
 	// is platform-bound.
-	Platform string
+	Platform string `json:"platform"`
 	// Privilege names the capability or permission the collector needs, in
 	// terms an operator can act on: "CAP_NET_ADMIN", "CAP_NET_RAW",
 	// "administrator", or "none".
-	Privilege string
+	Privilege string `json:"privilege"`
 	// Coverage lists the event kind families this collector is the source
 	// of, e.g. "link.*", "l2.*". It is what lets a UI explain an absence:
 	// no events of this family were recorded because nothing was watching
 	// for them, which reads very differently from nothing having happened.
-	Coverage []string
+	Coverage []string `json:"coverage"`
 }
 
 type trackedEntry struct {
@@ -105,6 +109,12 @@ func (r *Registry) Down(name, reason string) {
 	r.mark(name, StatusDown, reason)
 }
 
+// Unsupported marks a collector as impossible on this platform, with the
+// reason a capability report should show (e.g. "requires Linux").
+func (r *Registry) Unsupported(name, reason string) {
+	r.mark(name, StatusUnsupported, reason)
+}
+
 func (r *Registry) mark(name string, s Status, reason string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -130,10 +140,10 @@ func (r *Registry) mark(name string, s Status, reason string) {
 // Snapshot is one collector's descriptor plus its live state, for reporting.
 type Snapshot struct {
 	Descriptor
-	Status     Status
-	Reason     string
-	LastChange time.Time
-	LastSeen   time.Time
+	Status     Status    `json:"status"`
+	Reason     string    `json:"reason,omitempty"`
+	LastChange time.Time `json:"last_change"`
+	LastSeen   time.Time `json:"last_seen"`
 }
 
 // Snapshot returns every registered collector's current state, in
