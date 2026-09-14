@@ -1,0 +1,62 @@
+A real defect found via new test coverage while doing PRODUCT_RELEASE_PLAN_AR.md
+Phase 1 (moving netlink.link's decision logic behind internal/ports +
+internal/analyze, per §4.1).
+
+THE DEFECT (in the shipped internal/collect/netlink/link_linux.go, before this
+change): the down-transition required BOTH admin_up and oper_up to already be
+false:
+
+    case (prev.adminUp || prevOperUp) && !cur.adminUp && !curOperUp:
+
+A real NIC (or, as it turns out, a veth whose peer goes down) losing carrier
+while remaining administratively enabled - admin_up stays true, only oper_up
+drops - could never satisfy this condition, so no link.down event, no flap
+detection, and no severity distinction ever fired for it. Every existing lab
+scenario and every prior test toggles interfaces with "ip link set ... down",
+which changes admin state too, so this was never exercised - the project's own
+comment describing this feature ("Administrative state is distinguished from
+operational state... reporting both as 'interface down' is what makes
+existing tools useless") was not actually true for the most realistic real-
+world case it names.
+
+THE FIX: internal/analyze/interface.go now compares "effectively up"
+(admin_up AND oper_up) symmetrically in both directions, so either signal
+alone going down is sufficient to report link.down (with the correct cause),
+and either alone recovering is sufficient to report link.up. Full unit
+coverage in internal/analyze/interface_test.go, including
+TestCarrierLossWithAdminStillUpIsCauseCarrier, which fails against the old
+logic and passes against the fix.
+
+LIVE PROOF, not just a unit test: re-running the existing, unmodified
+lab/inject.sh all gate (the same 14-scenario run used throughout
+docs/evidence/) with the fixed binaries produced a SECOND link.down event that
+never appeared in any prior run of this exact gate:
+
+$ netrewind events --db /tmp/netrewind-lab/events.db --last 20m --kind link.down
+TIME          KIND       SUBJECT  SEV   DETAIL
+15:52:46.402  link.down  nrlab1   warn  admin_up=false cause=administrative oper_state=down
+15:53:52.653  link.down  nrlab0   warn  admin_up=true  cause=carrier       oper_state=down
+
+The second row is real and organic, not constructed for this test: it comes
+from the existing measured_loss scenario, which brings down H1's nrp0 - the
+veth peer of nrlab0. That leaves nrlab0's own admin_up untouched (true) while
+its oper state follows its peer down, which is exactly the carrier-loss shape
+the old code could not see. Every previous run of this same gate
+(docs/evidence/04-full-lab-gate.log) recorded only ONE link.down for this
+scenario set; this run recorded two, and the second one is real information
+that was previously and silently lost, from a scenario this project already
+runs on every commit.
+
+Full re-run of the gate: PASS, all 14 event kinds recorded, all 8 correlation
+rules concluded - no regression, only the additional, previously-missing
+event.
+
+Full test suites, both platforms, after this change:
+- Windows: gofmt clean, go vet clean, go test ./... all pass.
+- Linux (WSL2 netrewind-lab): gofmt clean, go vet clean,
+  CGO_ENABLED=1 go test -race ./... all pass, including a coverage test
+  (internal/event/coverage_test.go: TestEveryKindIsProducedOrReserved) that
+  had to be told about the new internal/analyze package - its whole purpose
+  is catching an event kind quietly becoming unproduced, and moving the
+  producing code without updating its scan list would have been exactly
+  that failure mode.

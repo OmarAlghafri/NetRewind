@@ -1,0 +1,43 @@
+PRODUCT_RELEASE_PLAN_AR.md §4.1: "أضف migration runner: backup قابل للتحقق،
+migration idempotent، نسخة schema، rollback/restore مجرّب، وفتح نسخة
+أحدث/أقدم بسلوك صريح."
+
+Added internal/store/migrate.go, wired into OpenSQLite before the existing
+CREATE TABLE/INDEX IF NOT EXISTS schemaDDL - which is safe only for additive
+changes and would otherwise silently leave an old structure in place for
+anything a real future migration needs to restructure.
+
+Behaviour, each one covered by a real test in migrate_test.go:
+- A brand-new database: no-op, no backup file created.
+- A database already at the current schema version: no-op, idempotent
+  (re-running it a second time does not re-run any migration step).
+- A database at a newer version than the running binary understands:
+  refused outright, file untouched, explicit error naming both versions.
+- A database behind the current version with no registered path forward:
+  refused, file untouched, explicit error naming the gap.
+- A database behind the current version WITH a registered path: WAL is
+  checkpointed, a verified backup (opened read-only and checked with SQLite's
+  own PRAGMA integrity_check) is taken before anything is touched, every step
+  runs inside one transaction, and only commits (bumping the recorded
+  version) if every step succeeded.
+- A migration step that fails partway: the whole transaction rolls back, the
+  file is provably unchanged (asserted directly against the data a step
+  partially wrote before failing), and the error names the verified backup's
+  path.
+- RestoreBackup: copies a backup over a target, verifying both the source and
+  the restored copy before touching the target, replacing it with a single
+  rename (never a partially-written file). Tested both for a real round trip
+  and for refusing a corrupt backup outright.
+
+No real migration exists yet - event.SchemaVersion has only ever been 1, so
+there is nothing to migrate from. The runner is proven with a synthetic
+migration registered only inside the test (withMigrations), specifically so
+the mechanism is trustworthy before it is ever needed for real, per the
+plan's own instruction not to start capabilities the code cannot yet prove.
+
+Verification: full test suite (Windows and Linux, the latter with -race)
+clean; the real 14-scenario lab gate (lab/inject.sh all) re-run against
+binaries built with this change: PASS, identical to every prior run - the
+migration check runs on every single store open and adds no observable
+change to normal operation, which is exactly what it should do when there is
+nothing to migrate.

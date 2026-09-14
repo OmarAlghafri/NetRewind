@@ -1,0 +1,32 @@
+Final validation: the full test suite, with the race detector, run natively
+on Linux (WSL2 netrewind-lab) against the same source tree - this is what
+CI's "check" job actually runs (go test -race ./...), not merely the
+Windows-side go test ./... already captured in 01-baseline-windows-build.log.
+
+$ CGO_ENABLED=1 go test -race ./...
+ok  	github.com/OmarAlghafri/netrewind/cmd/netrewind	12.982s
+ok  	github.com/OmarAlghafri/netrewind/cmd/netrewindd	2.359s
+?   	github.com/OmarAlghafri/netrewind/internal/collect	[no test files]
+ok  	github.com/OmarAlghafri/netrewind/internal/collect/flow	1.042s
+ok  	github.com/OmarAlghafri/netrewind/internal/collect/netlink	1.065s
+ok  	github.com/OmarAlghafri/netrewind/internal/collect/policy	1.035s
+ok  	github.com/OmarAlghafri/netrewind/internal/collect/probe	1.044s
+ok  	github.com/OmarAlghafri/netrewind/internal/collect/wire	1.060s
+ok  	github.com/OmarAlghafri/netrewind/internal/correlate	3.815s
+ok  	github.com/OmarAlghafri/netrewind/internal/event	1.665s
+ok  	github.com/OmarAlghafri/netrewind/internal/identity	1.031s
+?   	github.com/OmarAlghafri/netrewind/internal/incident	[no test files]
+ok  	github.com/OmarAlghafri/netrewind/internal/listen	1.029s
+ok  	github.com/OmarAlghafri/netrewind/internal/metrics	1.039s
+ok  	github.com/OmarAlghafri/netrewind/internal/otel	1.864s
+ok  	github.com/OmarAlghafri/netrewind/internal/store	16.340s
+ok  	github.com/OmarAlghafri/netrewind/internal/update	1.249s
+?   	github.com/OmarAlghafri/netrewind/internal/update/cmd/verifysig	[no test files]
+ok  	github.com/OmarAlghafri/netrewind/internal/web	17.588s
+?   	github.com/OmarAlghafri/netrewind/lab/inject	[no test files]
+
+No data races, no failures. (Note: `go test -race` needs cgo; CGO_ENABLED=1
+here only for this run, matching what CI does - the static CGO_ENABLED=0
+build used for the actual binaries is exercised separately in
+01-baseline-windows-build.log and by the lab run, which used the
+CGO_ENABLED=0 cross-compiled Linux binaries.)

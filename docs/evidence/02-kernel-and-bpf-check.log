@@ -1,0 +1,28 @@
+Environment: WSL2 distro "netrewind-lab" (Alpine Linux 3.24.1), kernel
+6.6.87.2-microsoft-standard-WSL2. This is the project's own documented "fast"
+Linux environment (docs/dev-environment.md), already present on this machine
+with a history of prior release/build work - used as-is, nothing new created
+except a path-safe junction C:\netrewind-src -> "C:\My project\NetRewind"
+(also documented) so paths do not have to be quoted through three shells.
+
+$ wsl -d netrewind-lab -u root -- sh /mnt/c/netrewind-src/lab/check-kernel.sh
+kernel:  6.6.87.2-microsoft-standard-WSL2
+btf:     present (5908 KiB) - CO-RE will work
+clang:   Alpine clang version 22.1.3
+tp:      OK   sock/inet_sock_set_state
+tp:      OK   tcp/tcp_retransmit_skb
+tp:      OK   tcp/tcp_probe
+tool:    OK   nft
+tool:    MISS iptables
+tool:    OK   ss
+
+Result: BTF present, all three tracepoints the eBPF flow collector needs are
+present, nft is installed. iptables is absent but not required (the policy
+collector shells out to nft). This kernel can run the real collectors,
+including eBPF, not just the netlink-only stubs.
+
+$ wsl -d netrewind-lab -u root -- sh -c 'cd /mnt/c/netrewind-src && make bpf-check'
+internal/collect/flow/bpf/flow.bpf.o matches internal/collect/flow/bpf/flow.bpf.c, and the source compiles
+
+Result: the committed eBPF object is still faithful to its source, and the
+source still compiles with the clang available here.

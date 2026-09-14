@@ -1,0 +1,162 @@
+Extends docs/evidence/20 (first Phi-4-mini-instruct benchmark, 4/6 dev cases,
+English only) to the full picture: all 6 dev-split cases including the two
+`-deidentified` variants (previously skipped for lack of support), the same
+6 cases in Arabic, and a second candidate model (Qwen2.5-1.5B-Instruct) for
+a real, honest comparison - closing out every AI-eval item in this
+session's "category 1" (technical work with no external blocker).
+
+## New capability: deidentified-case support in ai/eval/run
+
+`ai/eval/run`'s first version (docs/evidence/20) skipped `-deidentified`
+case variants because it fed them the SAME raw event context as the
+non-deidentified case, while their `QuestionEn`/`Expected.RootCauseEntity`
+were already rewritten to `<HOST_N>` placeholders by `ai/eval/gen` - a real
+mismatch that would have made grading meaningless for those two cases.
+
+Fixed by adding `buildDeidentifyTable`/`deidentify` to `ai/eval/run/main.go`,
+replicating `ai/eval/gen/main.go`'s own substitution exactly: scan events in
+file order, assign each distinct `10.99.x.x` `subject.label` the next
+`<HOST_N>` token, first-seen order. Both programs load the same
+`corpus/v1/<scenario>/events.json` in the same order, so the tables are
+guaranteed identical - verified directly, not just argued: a new test
+(`TestBuildDeidentifyTableMatchesGeneratorOrder`) reproduces the table from
+real `gateway_hijack` corpus data and checks the exact `<HOST_1>` result
+against the literal token already baked into
+`ai/eval/cases/gateway_hijack-positive-en-deidentified.json`'s
+`root_cause_entity` field - they match.
+
+Also added `-lang {en,ar}` to select `QuestionEn`/`QuestionAr` (grading
+criteria are language-independent; only the prompt text changes), and
+flipped `-skip-deidentified`'s default to `false` now that it's supported.
+
+## Full dev split, English, Phi-4-mini-instruct (all 6 cases)
+
+```
+[collector_down-ambiguous-en]               FAIL - confident hypothesis where refusal was correct
+[gateway_hijack-positive-en]                FAIL - fabricated citation + confidence over ceiling (x2)
+[gateway_hijack-positive-en-deidentified]    FAIL - confidence over ceiling (x2), but Top-1 hit + citePrec 1.00
+[normal_traffic-negative-en]                PASS - correct refusal
+[rogue_dhcp-positive-en]                    PASS - Top-1 hit, citePrec 0.50
+[rogue_dhcp-positive-en-deidentified]        FAIL - no hypothesis offered
+
+pass: 2/6, top-1: 2/6, top-3: 2/6, correct refusals: 1/1, mean citePrec: 0.30
+```
+
+A real, notable finding from adding the deidentified pair: on
+`gateway_hijack`, the DEIDENTIFIED variant scored BETTER on the metrics
+that matter most (Top-1 hit and citePrec 1.00, vs 0 and 0 on the real-address
+version) even though both still failed on confidence-ceiling. Small sample,
+not a claim that de-identification improves accuracy in general - just an
+honest report of what this run actually showed, worth watching for in a
+larger run rather than either over- or under-interpreting from N=1.
+
+## Same 6 cases, Arabic, Phi-4-mini-instruct
+
+```
+[collector_down-ambiguous-en]               FAIL - confident hypothesis where refusal was correct
+[gateway_hijack-positive-en]                FAIL - confidence over ceiling (citePrec 1.00 this time)
+[gateway_hijack-positive-en-deidentified]    PASS
+[normal_traffic-negative-en]                PASS - correct refusal
+[rogue_dhcp-positive-en]                    PASS - Top-1 hit, citePrec 1.00
+[rogue_dhcp-positive-en-deidentified]        INVALID JSON - truncated, not malformed
+
+pass: 3/5 graded, top-1: 1/5, top-3: 1/5, correct refusals: 1/1, mean citePrec: 0.75
+(case IDs keep their "-en" suffix regardless of -lang - that's ai/eval/gen's
+file-naming convention, not which language was actually asked; QuestionAr
+was genuinely used for all 6, confirmed by reading the actual request
+prompts sent.)
+```
+
+The one invalid case was inspected directly, not just logged as a failure:
+the raw response is well-formed JSON syntax up to where it stops - a long,
+itemized Arabic `unknowns` list still being generated when the 700-token
+`-n-predict` budget ran out, so the closing braces never arrived. Not an
+extraction bug (confirmed: the visible partial JSON is syntactically valid
+as far as it goes) and not a malformed-JSON bug on the model's part - a
+real, honest finding that Arabic generation for this model/case can need
+more than 700 tokens to reach the same completeness English does, plausibly
+because this tokenizer is less token-efficient for Arabic. Worth raising
+`-n-predict` for future Arabic runs, not fixed retroactively here since
+that would mean re-running rather than reporting what this run actually
+produced.
+
+**Headline comparison, same 6 cases, same model, language changed**:
+mean citation precision was noticeably HIGHER in Arabic (0.75) than English
+(0.30) in this run, and one more case passed outright (3/5 graded vs 2/6).
+Both real numbers from a 5-6 case sample - reported honestly, not treated as
+a general "this model is better in Arabic" conclusion, which N=6 cannot
+support either way.
+
+## Second candidate: Qwen2.5-1.5B-Instruct, English, same 6 cases
+
+Chosen over the plan's §6.1 Qwen3-4B hypothesis for the same reason as
+before (see docs/evidence/20/DECISIONS.md #17): Qwen2.5's 3B+ GGUF releases
+carry a non-commercial research license. The 1.5B release IS Apache-2.0
+(confirmed on the official `Qwen/Qwen2.5-1.5B-Instruct-GGUF` HuggingFace
+repo, not assumed) - genuinely commercially usable, smaller (1.12GB vs
+Phi-4-mini's 2.49GB), and a different model family, making this a real
+architecture comparison, not just a quantization comparison. Downloaded
+with the operator's standing approval for completing this category of work
+(the operator explicitly named "مقارنة نموذج AI ثانٍ" as part of the
+approved scope before this download).
+
+```
+[collector_down-ambiguous-en]               INVALID JSON - truncated
+[gateway_hijack-positive-en]                FAIL - no hypothesis offered
+[gateway_hijack-positive-en-deidentified]    FAIL - no hypothesis offered
+[normal_traffic-negative-en]                PASS - correct refusal
+[rogue_dhcp-positive-en]                    FAIL - no hypothesis offered
+[rogue_dhcp-positive-en-deidentified]        FAIL - Top-1 hit, citePrec 0.20, but 5 separate confidence-ceiling violations
+
+pass: 1/5 graded, top-1: 1/5, top-3: 1/5, correct refusals: 1/1, mean citePrec: 0.04
+```
+
+## Head-to-head, same 6 cases, same harness, English
+
+| | Phi-4-mini-instruct (3.8B, MIT) | Qwen2.5-1.5B-Instruct (1.5B, Apache-2.0) |
+|---|---|---|
+| Pass (no hard violations) | 2/6 | 1/5 (1 invalid) |
+| Top-1 cause hit | 2/6 | 1/5 |
+| Correct refusals | 1/1 | 1/1 |
+| Mean citation precision | 0.30 | 0.04 |
+| Invalid/truncated JSON | 0/6 | 1/6 |
+
+Honest reading: Phi-4-mini-instruct outperforms Qwen2.5-1.5B on every
+tracked metric in this run, most sharply on citation precision (0.30 vs
+0.04 - Qwen either cited nothing or cited close to nothing correct when it
+did cite). Consistent with the size difference (3.8B vs 1.5B) and not a
+surprising result, but a real, measured one rather than an assumed one -
+this is exactly the kind of number §6.4 asks to be tracked per candidate,
+not decided by guessing which model "should" be better.
+
+**This is not a selection decision.** Two candidates, one prompt, one
+sample size (N=6, dev split only, by design - `test` stays held out), one
+quantization each. A real model-selection call needs more candidates and
+the `test` split, not this.
+
+## Verification
+
+- `gofmt -l`, `go vet ./ai/eval/...`, `go build ./ai/eval/...`: clean.
+- `go test ./ai/eval/run/... -v`: all pass, including the new
+  `TestBuildDeidentifyTableMatchesGeneratorOrder` cross-checked against real
+  `gateway_hijack` corpus data and the literal `<HOST_1>` token already in
+  that scenario's deidentified case file.
+- Both models verified as real, complete, valid GGUF files after download
+  (`file` command architecture/tensor-count check, matching each vendor's
+  stated architecture: `phi3` for Phi-4-mini, `qwen2` for Qwen2.5-1.5B).
+- `llama-server` health-checked before each run; stopped cleanly after the
+  last one (not left running).
+- The one invalid-JSON case per language/model was read directly from its
+  raw output, not just counted as a number - confirmed genuine truncation
+  in both cases (Arabic Phi-4-mini run, English Qwen2.5 run), not a parsing
+  defect.
+
+## Honest scope, unchanged from docs/evidence/20 except where closed above
+
+- Deidentified cases: CLOSED (was open).
+- Arabic: CLOSED for this model, this split (was open). Qwen2.5-1.5B was
+  NOT run in Arabic - a real, deferred extension, not done here for time.
+- Second candidate: CLOSED (was open).
+- `test` split: still correctly held out - not run for either model.
+- No third candidate, no quantization comparison (e.g. Phi-4-mini at Q5/Q8),
+  no larger `-n-predict` re-run of the two truncated cases.

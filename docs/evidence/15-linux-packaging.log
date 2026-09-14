@@ -1,0 +1,71 @@
+PRODUCT_RELEASE_PLAN_AR.md §5, Phase 4: "ابنِ .deb, .rpm, AppImage على أقدم
+baseline مدعوم؛ smoke test لكل حزمة في VM نظيفة، install/upgrade/uninstall/
+reboot، وتأكد أن uninstall لا يحذف evidence."
+
+Added deploy/build-deb.sh and deploy/build-rpm.sh - real, reusable project
+scripts (not throwaway test scripts), following the same "why" comment style
+as the rest of deploy/. Both built successfully in the netrewind-lab WSL2
+distro after installing dpkg/rpm tooling (`apk add dpkg rpm` - Alpine ships
+both as cross-packaging tools; ~1GB, well within the now-28GB-free disk
+budget, see docs/agent-state/PROGRESS.md).
+
+Design choice, and why: rather than wrapping deploy/install.sh as a
+postinst script, both packages use their package manager's NATIVE
+config-preservation mechanism (dpkg conffiles / rpm %config(noreplace)) for
+/etc/netrewind/netrewindd.yaml and every rules/*.yaml file. This gets
+install.sh's own rule - "An upgrade must never overwrite a configuration
+somebody tuned" - from the package manager itself, which already implements
+it correctly (offer to keep/replace/diff), rather than a second,
+hand-rolled implementation of the same guarantee.
+
+## What was actually built and verified (real commands, real output)
+
+- `dist/netrewind_0.9.2-dev1_amd64.deb` - built with dpkg-deb, inspected with
+  `dpkg-deb --info`/`-c`. Real, found-and-fixed defect: the package root
+  directory entry ("./") was initially mode 0700, inherited from `mktemp -d`'s
+  own default - a real risk if a dpkg version ever re-applies a package's
+  recorded root-entry permissions to the real "/", not something worth
+  leaving to chance. Fixed with an explicit `chmod 0755` on the staging root
+  before `dpkg-deb --build`; re-verified the rebuilt archive shows
+  `drwxr-xr-x` for "./".
+- `dist/netrewind-0.9.2_dev1-1.x86_64.rpm` - built with rpmbuild, inspected
+  with `rpm -qip`/`-qlvp`. Hit and fixed a real Alpine/RPM-ecosystem
+  incompatibility: rpm's default post-build stripping scripts
+  (`brp-strip`, `brp-strip-static-archive`) assume GNU `file`/`xargs -d`,
+  neither of which exist on a busybox/musl host - disabled via
+  `%global debug_package %{nil}` / `%global __os_install_post %{nil}` in the
+  spec, which is correct anyway since the release binaries are already
+  static and already built without debug info by the real release path.
+- Both packages extracted into isolated temporary directories (`dpkg -x`,
+  `rpm2cpio | cpio -idm`) - never installed onto the lab distro's real root,
+  to avoid disturbing the environment the rest of this session's testing
+  depends on. Verified for real, not just listed:
+  - Correct file layout: both binaries at `/usr/local/bin/`, all 19
+    `rules/*.yaml` files present under `/etc/netrewind/rules/` with 0640
+    permissions, the systemd unit at the right path, `/var/lib/netrewind`
+    present at 0750.
+  - The extracted `netrewind` binary actually runs (`netrewind version`).
+  - The packaged, path-rewritten `netrewindd.yaml` together with all 19
+    packaged rule files pass a real `netrewindd --check-config` (pointed at
+    the extraction directory's own paths, since the packaged config
+    correctly names the real system's absolute paths, which do not exist
+    inside an isolated test extraction - not a defect, a property of the
+    test being isolated on purpose).
+
+## What is NOT done, and why (an honest limitation, not a shortcut)
+
+Real `dpkg -i`/`rpm -i` installation, `systemctl enable --now`, an actual
+upgrade over a previous version, `--uninstall`/erase, and a reboot survival
+check were **not performed**, because the netrewind-lab WSL2 distro is
+Alpine, which runs OpenRC, not systemd - there is no live systemd to
+activate a unit against here, and installing onto this exact distro's real
+root is also the environment this session depends on for the core recorder
+lab, which is a second, independent reason not to install onto it for real.
+This needs a real systemd-based Linux (Ubuntu/Debian for .deb, Fedora/RHEL
+for .rpm), ideally a disposable VM exactly as the plan specifies ("VM
+نظيفة"), which is not available in this environment. AppImage was not
+attempted in this pass either.
+
+Everything above that COULD be verified without a systemd host was verified
+for real; what is stated as done is done, and what still needs a real
+systemd VM is named explicitly rather than implied.

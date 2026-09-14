@@ -1,0 +1,47 @@
+Continuation of ai/eval/ (docs/evidence/16-ai-eval-corpus.log): the grading
+harness itself, per PRODUCT_RELEASE_PLAN_AR.md §6.4's requirement that the
+evaluation mechanism exist and be trustworthy before any model is scored
+with it - "A grader nobody has tried to fool with a bad answer is not yet a
+grader," proven here by actually trying.
+
+Added:
+- ai/eval/schema/ - the Case/Expected shape, shared by the generator
+  (ai/eval/gen) and the harness so they cannot silently drift onto two
+  different definitions of the same case (this was a real risk: they
+  started as two separately-typed copies during development and were
+  unified once the harness needed the same shape the generator produces).
+- ai/eval/harness/harness.go - Grade(caseID, expected, knownEventIDs, out)
+  checks a model's constrained-JSON answer (ModelOutput, matching §6.2's
+  required shape exactly: summary, ranked_hypotheses[], evidence_event_ids[],
+  counter_evidence[], unknowns[], confidence_ceiling, next_checks[]) against
+  one case's expectations. Hard violations (fabricated citations, exceeding
+  the evidence's own confidence ceiling, a confident answer where refusal
+  was correct, no unknowns named on a refusal) are separated from scored-not-
+  blocking metrics (Top-1/Top-3 cause hit, citation precision) - matching
+  §6.4's own split between release-blocking criteria and per-candidate
+  tracked numbers.
+
+9 unit tests prove the harness actually catches what it should, not just
+that it runs: a fabricated event-ID citation always fails regardless of
+anything else; confidence above the evidence's own ceiling fails; offering
+nothing on a real, findable cause fails; a confident hypothesis on a
+refusal-expected case fails (the exact false-causality §6.2 forbids); a
+refusal naming no unknowns fails (a bare refusal is not more useful than a
+wrong answer); a correct, honest refusal passes; Top-3-but-not-Top-1 and
+partial citation precision are scored correctly, not rounded to pass/fail.
+
+TestHarnessRunsAgainstEveryGeneratedCase is the integration check: it loads
+every one of the 33 real cases ai/eval/gen produced from corpus/v1/, builds
+a synthetic "perfect" answer directly from each case's own Expected block,
+and grades it. All 33 pass. This is not a test of any model (none exists
+yet) - it is a test that the harness itself is internally consistent with
+the corpus it grades, which has to be true before either is trusted.
+
+Verification: gofmt/go vet clean; full repository test suite passes on both
+Windows and Linux (the latter with -race) with these new packages included;
+regenerating the corpus (`go run ./ai/eval/gen/`) after the schema
+unification still produces the same 33 cases correctly.
+
+Still not done: no actual model, no download, no benchmark run against a
+real candidate - this remains exactly the "yardstick before the AI" the
+plan requires, nothing past it.

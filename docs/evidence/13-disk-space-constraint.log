@@ -1,0 +1,46 @@
+A real, machine-level constraint discovered during Phase 2 work, not a code
+or test result - recorded here because it genuinely changes what can be done
+safely in the remaining phases without the user's input.
+
+This machine's C: drive is a 238 GB volume at roughly 96-98% used
+throughout this session, independent of anything this session did. One
+ordinary debug build of the new Tauri desktop shell
+(desktop/src-tauri, `cargo build`, no optimisation, no bundling) alone used
+1.9 GB, taking free space from ~8.3 GB down to ~6.6 GB. That build cache was
+removed immediately after being proven to succeed once (it is exactly as
+disposable as Go's own gitignored build/ directory - nothing of value was
+lost), which brought free space back up to ~11 GB.
+
+Why this matters for the phases still ahead:
+
+- A Tauri *release* build (optimised, bundled into an MSI/NSIS installer)
+  is larger than a debug build, not smaller.
+- Setting up a second Linux environment capable of building this same
+  desktop app for Linux (webkit2gtk-dev, a full Rust + Node toolchain, on a
+  glibc distro - the existing WSL2 lab distro is a minimal, musl-based
+  Alpine image purpose-built for the network lab, not a GUI toolchain host)
+  would plausibly consume several more gigabytes on top of what is already
+  a near-full disk.
+- Phase 6 (local AI) requires downloading an actual model file to evaluate
+  it - Qwen3-4B at Q4_K_M quantisation is roughly 2.5 GB by itself, and a
+  real evaluation per the plan's own §6.4 compares multiple
+  candidates/quantisations, which multiplies that.
+
+None of this needs a password, a signing key, or a business/legal decision -
+it is a plain resource constraint, and it was not treated as a reason to
+stop working. What it does mean: further large, disk-consuming steps
+(a Linux GUI toolchain, a full release/installer build, downloading AI model
+weights) were not attempted in this session without first surfacing this,
+since doing so on a drive already this full risks a much worse problem than
+anything this session is trying to solve. Lower-disk-footprint work
+continued in the meantime (Go-side packages, tests, documentation, the
+desktop app's Demo-mode frontend, which needed no large downloads beyond the
+one-time Rust/Node toolchain install already accounted for above).
+
+Recommendation for the user, stated once and acted on either way: freeing
+disk space (or pointing future large downloads/builds at a different drive,
+if one exists on this machine) before the next session continues into
+Phase 4's Linux packaging validation, the Windows installer build, or Phase
+6's model evaluation would remove this constraint entirely. No other action
+is required to keep the project moving - the phases that do not need large
+downloads or a second GUI toolchain continue regardless.

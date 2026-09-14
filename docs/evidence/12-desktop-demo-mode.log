@@ -1,0 +1,54 @@
+PRODUCT_RELEASE_PLAN_AR.md §5, Phase 2: "ابنِ أولاً وضع Demo/Import على
+corpus ثابت ثم local store... الصفحات المطلوبة: Overview/Health، Incidents،
+Timeline، Investigation، Rules، Evidence bundles، Settings، Diagnostics."
+
+Scaffolded desktop/ (Tauri v2 + React/TypeScript, via `npm create tauri-app`).
+See docs/product/adr/0001-desktop-shell-and-demo-mode.md for the design
+decisions and their reasoning.
+
+Implemented and verified working, real data, both languages:
+- Overview/Health: reports observation gaps (system.gap/collector_down) and
+  which collector sources are present in the loaded recording. Deliberately
+  does NOT claim a live up/down status in Demo mode (no registry.Snapshot
+  exists without a running agent) - a different, honestly labelled claim.
+- Incidents: full causal-chain rendering, including the causes (solid
+  line) / correlates (dashed) / precedes (dotted) visual distinction
+  required by §3, confirmed visually in the running app in both languages.
+- Timeline: every recorded event, ordered, with severity coloring.
+- Investigation (Host): free-text search across subject label/id and attrs,
+  confirmed against a real IP address returning its real cross-scenario
+  history.
+- Settings: language switch (persisted to localStorage).
+
+Data: desktop/src/demo/demo-events.json and demo-incidents.json are a real
+export (`netrewind events/incidents -o json`) from a fresh run of
+`lab/inject.sh all` on this machine - not hand-written fixtures.
+
+Verification performed:
+- `npx tsc --noEmit`: clean.
+- `npm run build` (Vite): succeeds.
+- `cargo check` then `cargo build` in desktop/src-tauri: both succeed on
+  this machine (MSVC toolchain already present; Rust itself was installed
+  via `winget install Rustlang.Rustup`, not present before this session).
+- Visual verification: ran the real Vite dev server and viewed it through
+  an actual browser, in both Arabic (RTL) and English (LTR), across all
+  five pages. Caught and fixed a real RTL bug this way - an early CSS
+  approach (swapping grid-template-columns + an `order` override) put the
+  sidebar on the physical left even in Arabic, which is the LTR convention,
+  not the RTL one. Fixed by using logical CSS properties
+  (border-inline-end, etc.) throughout and letting `dir="rtl"` on `<html>`
+  position the DOM-first sidebar on the "start" (right) side automatically,
+  matching real Arabic app convention (Gmail, Slack) - re-verified visually
+  after the fix.
+
+Known limitations, stated plainly:
+- Rule text (title/why/advice in rules/*.yaml) is English-only; the Arabic
+  UI is fully bilingual but incident narrative prose is not yet translated.
+  Visible directly in the running app (Arabic chrome, English incident
+  text). Translating 19 rule files is separate, larger work.
+- No accessibility audit tool (axe or equivalent) was run - not available
+  in this environment. Manual checks only: keyboard focus/Enter on nav
+  items, semantic headings, logical-property RTL layout.
+- The Linux build of this same desktop app (Tauri also targets Linux) was
+  NOT attempted in this session. See 13-disk-space-constraint.log for why,
+  and for what this means for near-term next steps.

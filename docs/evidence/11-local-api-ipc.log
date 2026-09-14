@@ -1,0 +1,42 @@
+PRODUCT_RELEASE_PLAN_AR.md §4.1: "أنشئ API محلياً versioned (v1) فوق IPC
+محلي فقط: named pipe مع ACL على Windows وUnix-domain socket مع permissions
+على Linux. يصدر DTOs ولا يكشف اتصال SQLite للواجهة. لا يُفتح HTTP على LAN في
+الإصدار الأول."
+
+Added:
+- internal/ipc/ - the local-only transport. Unix domain socket at mode 0600
+  on Linux; a Windows named pipe on a protected DACL granting access to
+  exactly the creating user's SID (via github.com/Microsoft/go-winio, a new
+  dependency - the standard, widely-used library for this on Windows;
+  Docker/containerd/Kubernetes all use it for the same purpose). Both
+  implementations were run for real on their actual platform, not simulated:
+  ipc_test.go + ipc_unix_test.go on Linux (checked the socket file's mode
+  directly), ipc_test.go + ipc_windows_test.go on this real Windows machine
+  (checked the SID lookup and that the constructed SDDL actually parses via
+  winio.SddlToSecurityDescriptor).
+- internal/api/v1/ - the versioned API itself: GET /v1/health, /v1/capabilities
+  (the registry's live snapshot), /v1/events, /v1/incidents, with since/
+  until/limit/kind/family/subject/rule/min_severity query parameters, a
+  single typed JSON error shape, and empty results returned as [] rather
+  than null. It never exposes store.Store or a database handle - every
+  response is exactly what Store.Query/QueryIncidents already return,
+  serialized the same way the CLI's own -o json output already is.
+- TestServedOverRealLocalIPC (internal/api/v1/integration_test.go) proves the
+  two packages actually work together: a real ipc.Listen() listener, a real
+  http.Server bound to it, and a real http.Client dialing that exact
+  transport (net.Dial("unix", ...) on Linux, winio.DialPipe on Windows) -
+  not httptest.NewRecorder, which never touches internal/ipc at all. Run for
+  real on this Windows machine: PASS.
+
+Not yet done, and stated plainly rather than implied: the API is read-only
+and does not yet have the authn/authz layer beyond what the transport itself
+enforces (file mode / pipe ACL). Verifying a connecting peer's credentials
+in-process (SO_PEERCRED on Linux, named-pipe client-process inspection on
+Windows) as defense in depth beyond transport permissions is not built. The
+CLI has not been migrated to use this API yet - it still reads the store
+directly, which is untouched and still fully tested (see cmd/netrewind's own
+test suite, unaffected by this change).
+
+Verification: gofmt clean, go vet clean (native and GOOS=linux) on Windows;
+the full repository test suite passes on both Windows and Linux, the latter
+with -race.

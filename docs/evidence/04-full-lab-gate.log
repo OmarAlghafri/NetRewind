@@ -1,0 +1,392 @@
+$ wsl -d netrewind-lab -u root -- sh -c 'cd /opt/netrewind && ./inject.sh all'
+(all 14 fault-injection scenarios, run unattended, matching CI's "lab" job)
+
+lab up: netns nrlab with hosts nrh1 and nrh2
+recorder running in netns nrlab (pid 86)
+
+-- injecting: access port flaps
+-- injecting: a host's hardware address changes under its address
+-- injecting: the default gateway is answered by a different machine
+-- injecting: two machines claim one address
+-- injecting: a prefix is re-pointed at a different next hop
+-- injecting: the default route is re-pointed
+-- injecting: the default route disappears
+-- injecting: a service that does not answer
+-- generating: connections that succeed, for the rollup
+-- injecting: a working path is broken by an ARP change
+-- injecting: a filtering rule breaks a path that was working
+   waiting for the ruleset poll
+-- injecting: a second DHCP server answers on the segment
+-- injecting: a client's resolver changes under it
+-- injecting: a probed target stops answering
+   waiting for a baseline
+-- waiting for a connection rollup
+
+================ metrics the recorder exports ==================
+netrewind_build_info{observer="Dell",version="dev"} 1
+netrewind_recorder_blind_seconds_total 0
+netrewind_dropped_events_total{source="ringbuf"} 0
+netrewind_clock_steps_total 0
+netrewind_collector_up{collector="ebpf.flow"} 1
+netrewind_collector_up{collector="netlink.addr"} 1
+netrewind_collector_up{collector="netlink.link"} 1
+netrewind_collector_up{collector="netlink.neigh"} 1
+netrewind_collector_up{collector="netlink.route"} 1
+netrewind_collector_up{collector="policy.nftables"} 1
+netrewind_collector_up{collector="probe.icmp"} 1
+netrewind_collector_up{collector="update"} 1
+netrewind_collector_up{collector="wire"} 1
+netrewind_events_total{kind="dhcp.ack",severity="info"} 1
+netrewind_events_total{kind="dhcp.offer",severity="info"} 1
+netrewind_events_total{kind="dhcp.server_seen",severity="error"} 1
+netrewind_events_total{kind="dhcp.server_seen",severity="notice"} 1
+netrewind_events_total{kind="dns.resolver_changed",severity="warn"} 1
+netrewind_events_total{kind="flow.first_failure_for_pair",severity="warn"} 1
+netrewind_events_total{kind="flow.handshake_fail",severity="notice"} 9
+netrewind_events_total{kind="flow.rollup",severity="info"} 4
+netrewind_events_total{kind="l2.arp_binding_changed",severity="error"} 1
+netrewind_events_total{kind="l2.arp_binding_changed",severity="warn"} 6
+netrewind_events_total{kind="l2.arp_binding_new",severity="info"} 5
+netrewind_events_total{kind="l2.duplicate_ip",severity="error"} 3
+
+================ what the recorder reconstructed ================
+13:42:03 to 13:52:03 (10m0s)
+
+     13:50:15.462             the recorder started
+  !  13:50:17.248  +1.79s     nrlab1 was shut down administratively
+  -  13:50:19.254  +2.01s     nrlab1 came back after 2.006s
+  !  13:50:20.266  +1.01s     10.99.0.11 moved from 02:00:00:00:00:11 to 02:00:00:00:00:aa
+  !  13:50:20.378  +110ms     10.99.0.11 moved from 02:00:00:00:00:aa to 02:00:00:00:00:11
+  !! 13:50:21.276  +900ms     10.99.0.201 moved from 02:00:00:00:00:01 to 02:00:00:00:00:ff - this is the default gateway
+  !  13:50:22.287  +1.01s     10.99.0.11 moved from 02:00:00:00:00:11 to 02:00:00:00:00:bb
+  !! 13:50:22.288  +0s        10.99.0.11 is being claimed by more than one machine  (x3)
+  !  13:50:23.295  +1.01s     10.99.0.11 moved from 02:00:00:00:00:bb to 02:00:00:00:00:aa
+  !  13:50:24.303  +1.01s     10.99.0.11 moved from 02:00:00:00:00:aa to 02:00:00:00:00:bb
+     13:50:25.315  +1.01s     route to 10.200.0.0/24 added via 10.99.0.11
+  -  13:50:26.324  +1.01s     route to 10.200.0.0/24 now goes via 10.99.1.11 (was 10.99.0.11)
+     13:50:27.334  +1.01s     10.99.0.202 first answered from 02:00:00:00:00:02
+  !! 13:50:27.338  +0s        the default route now goes via 10.99.0.202 (was 10.99.0.201)
+  !! 13:50:28.343  +1.01s     the default route was removed - nothing beyond the local segment is reachable
+  -  13:50:30.349  +2.01s     connections to 10.99.0.11 port 9999 went unanswered  (x4)
+     13:50:35.468  +5.12s     0 connections opened, 0 closed, 4 unanswered
+  !! 13:50:35.545  +80ms      10.99.0.11 stopped answering entirely
+  -  13:50:37.371  +1.83s     connections to 10.99.0.11 port 9100 went unanswered  (x3)
+     13:50:45.404  +8.03s     10.99.1.11 first answered from fe:f7:4a:04:6e:1f  (x2)
+     13:50:45.468  +60ms      1 connections opened, 1 closed, 3 unanswered
+  !  13:50:46.414  +950ms     10.99.1.11 moved from fe:f7:4a:04:6e:1f to 02:00:00:00:00:de
+  !  13:50:50.421  +4.01s     10.99.1.1 can no longer reach 10.99.1.11 on port 9200 - it worked 5s ago
+  -  13:50:50.423  +0s        10.99.1.11 stopped answering at layer 2
+  -  13:50:54.437  +4.01s     connections to 10.99.0.11 port 9300 went unanswered  (x2)
+     13:50:55.467  +1.03s     0 connections opened, 0 closed, 2 unanswered
+  !  13:50:55.484  +20ms      4 filtering rule(s) were added
+     13:51:05.467  +9.98s     0 connections opened, 0 closed, 1 unanswered
+  -  13:51:05.490  +20ms      4 filtering rule(s) were removed
+  -  13:51:06.502  +1.01s     a DHCP server answered from 10.99.0.1
+     13:51:06.502  +0s        10.99.0.50 was confirmed to 02:00:00:00:00:55
+  !! 13:51:08.551  +2.05s     a second DHCP server appeared on 10.99.0.99, handing out 10.99.0.99 as the gateway
+     13:51:08.551  +0s        10.99.0.77 was offered to 02:00:00:00:00:55
+  !  13:51:10.618  +2.07s     10.99.0.11 started asking 10.99.0.99 instead of 10.99.0.1
+  -  13:51:15.929  +5.31s     10.99.0.11 stopped answering at layer 2  (x2)
+     13:51:17.882  +1.95s     10.99.0.11 first answered from 02:00:00:00:00:11  (x2)
+  -  13:51:23.663  +5.78s     10.99.0.202 stopped answering at layer 2
+  -  13:51:23.663  +0s        10.99.0.201 stopped answering at layer 2
+  -  13:51:28.538  +4.87s     10.99.0.1 reported host unreachable for 10.99.0.11  (x14)
+  -  13:51:37.670  +9.13s     nrlab0 came up
+  -  13:51:45.463  +7.79s     10.99.0.11 is answering again
+
+================ following one host across the incident ========
+10.99.0.11 also answered to: 02:00:00:00:00:11
+
+13:42:03 to 14:02:03 (20m0s)
+
+     13:50:15.462             the recorder started
+  !  13:50:20.266  +4.8s      10.99.0.11 moved from 02:00:00:00:00:11 to 02:00:00:00:00:aa
+  !  13:50:20.378  +110ms     10.99.0.11 moved from 02:00:00:00:00:aa to 02:00:00:00:00:11
+  !  13:50:22.287  +1.91s     10.99.0.11 moved from 02:00:00:00:00:11 to 02:00:00:00:00:bb
+  !! 13:50:22.288  +0s        10.99.0.11 is being claimed by more than one machine  (x3)
+  !  13:50:23.295  +1.01s     10.99.0.11 moved from 02:00:00:00:00:bb to 02:00:00:00:00:aa
+  !  13:50:24.303  +1.01s     10.99.0.11 moved from 02:00:00:00:00:aa to 02:00:00:00:00:bb
+  -  13:50:30.349  +6.05s     connections to 10.99.0.11 port 9999 went unanswered  (x4)
+  !! 13:50:35.545  +5.2s      10.99.0.11 stopped answering entirely
+  -  13:50:37.371  +1.83s     connections to 10.99.0.11 port 9100 went unanswered  (x3)
+  -  13:50:54.437  +17.07s    connections to 10.99.0.11 port 9300 went unanswered  (x2)
+  !  13:51:10.618  +16.18s    10.99.0.11 started asking 10.99.0.99 instead of 10.99.0.1
+  -  13:51:15.929  +5.31s     10.99.0.11 stopped answering at layer 2  (x2)
+     13:51:17.882  +1.95s     10.99.0.11 first answered from 02:00:00:00:00:11  (x2)
+  -  13:51:28.538  +10.66s    10.99.0.1 reported host unreachable for 10.99.0.11  (x14)
+  -  13:51:45.463  +16.93s    10.99.0.11 is answering again
+
+================ what correlation concluded ====================
+! A link went down and took hosts with it
+   13:50:17 to 13:50:50  (33s)   rule link-down-isolated-hosts, confidence 80%
+   affected: 10.99.1.11
+
+   1  13:50:17.248  link.down  nrlab1
+      An interface went down.
+      |  which caused
+   2  13:50:50.423  l2.neighbor_failed  10.99.1.11
+      Hosts stopped answering at layer 2 immediately afterwards, which
+      is the link failure showing up as apparent host failures.
+
+   root cause: link.down on nrlab1 (confidence 80%)
+   next:
+      The hosts did not fail. Restore the link and they will return;
+      investigating them individually wastes the outage.
+
+! An address moved to a different machine
+   13:50:20 to 13:50:20  (0s)   rule address-changed-hands, confidence 75%
+   affected: 10.99.0.11
+
+   1  13:50:20.378  l2.arp_binding_changed  10.99.0.11
+      This address is now answered by hardware that was not previously
+      bound to it, so the machine behind it is a different machine.
+
+   root cause: l2.arp_binding_changed on 10.99.0.11 (confidence 75%)
+   next:
+      Normal after a DHCP lease expires. Worth a look if the address is
+      a server, is statically assigned, or moved without a lease renewal
+      near it.
+
+!! The default gateway is being answered by a different machine
+   13:50:21 to 13:50:50  (29s)   rule gateway-hijack, confidence 90%
+   affected: 10.99.0.201, 10.99.1.11
+
+   1  13:50:21.276  l2.arp_binding_changed  10.99.0.201
+      The hardware address answering for the default gateway changed.
+      Every host on this segment now sends its outbound traffic to a
+      different machine.
+      |  which caused
+   2  13:50:27.338  l3.default_route_changed  default
+      Routing followed the change, so traffic is now leaving through a
+      path nobody chose.
+      |  and at the same time
+   3  13:50:50.423  l2.neighbor_failed  10.99.1.11
+      Connectivity was lost while the gateway was being answered
+      elsewhere.
+
+   root cause: l2.arp_binding_changed on 10.99.0.201 (confidence 90%)
+   next:
+      Find which switch port the new hardware address is learned on
+      before changing anything. A failover looks identical to an attack
+      from here; the port tells them apart.
+
+! An address moved to a different machine
+   13:50:22 to 13:50:22  (0s)   rule address-changed-hands, confidence 75%
+   affected: 10.99.0.11
+
+   1  13:50:22.287  l2.arp_binding_changed  10.99.0.11
+      This address is now answered by hardware that was not previously
+      bound to it, so the machine behind it is a different machine.
+
+   root cause: l2.arp_binding_changed on 10.99.0.11 (confidence 75%)
+   next:
+      Normal after a DHCP lease expires. Worth a look if the address is
+      a server, is statically assigned, or moved without a lease renewal
+      near it.
+
+!! Two machines are claiming the same address
+   13:50:22 to 13:50:50  (28s)   rule contested-address, confidence 80%
+   affected: 10.99.0.11, 10.99.1.11
+
+   1  13:50:22.288  l2.duplicate_ip  10.99.0.11
+      The hardware address answering for this address kept changing
+      between the same few machines, which is what an address conflict
+      looks like from the neighbour table.
+      |  which caused
+   2  13:50:50.423  l2.neighbor_failed  10.99.1.11
+      The address stopped answering reliably while it was contested.
+
+   root cause: l2.duplicate_ip on 10.99.0.11 (confidence 80%)
+   next:
+      Check for a statically configured host inside the DHCP pool, or a
+      second DHCP server. Both produce this, and both keep producing it
+      until one is removed.
+
+!! A measured path stopped answering
+   13:50:24 to 13:51:45  (1m21s)   rule reachability-lost, confidence 90%
+   affected: 10.99.0.11
+
+   1  13:50:24.303  l2.arp_binding_changed  10.99.0.11
+      This is the last thing that changed before the path stopped
+      answering.
+      |  which caused
+   2  13:50:35.545  metric.anomaly  10.99.0.11
+      Probes to this address began going unanswered. Packet loss
+      announces itself to nobody; it has to be measured, and it was.
+      |  and then, without a known link
+   3  13:51:45.463  metric.anomaly  10.99.0.11
+      It later answered again, which bounds how long the outage lasted.
+
+   root cause: l2.arp_binding_changed on 10.99.0.11 (confidence 90%)
+   next:
+      This is measured, not reported: the recorder sent probes and they
+      did not come back. If the change named above was intended, the
+      loss is a side effect nobody planned. If there is no change above
+      it, the fault is beyond what this recorder can see from where it
+      sits.
+
+! A machine's resolver changed under it
+   13:50:24 to 13:51:10  (46s)   rule resolver-hijacked, confidence 80%
+   affected: 10.99.0.11
+
+   1  13:50:24.303  l2.arp_binding_changed  10.99.0.11
+      This is what changed on the path just before the resolver did.
+      |  which caused
+   2  13:51:10.618  dns.resolver_changed  10.99.0.11
+      This machine started sending its lookups somewhere else. Every
+      name it resolves from here on is answered by a different party.
+
+   root cause: dns.resolver_changed on 10.99.0.11 (confidence 80%)
+   next:
+      Compare against your DHCP scope. A client that changed resolver
+      without a lease renewal near it did not choose to; something told
+      it to. Check for a second DHCP server and for the gateway's
+      hardware address changing at about the same time.
+
+!! The default route was re-pointed
+   13:50:27 to 13:50:28  (1s)   rule default-route-moved, confidence 85%
+
+   1  13:50:27.338  l3.default_route_changed  default
+      The route all outbound traffic follows now points somewhere else.
+      |  which caused
+   2  13:50:28.343  l3.route_removed  default
+      Reachability changed once the traffic started taking the new path.
+
+   root cause: l3.default_route_changed on default (confidence 85%)
+   next:
+      Confirm this was intended. Compare the time against your change
+      record: an unplanned default route change means outbound traffic
+      is leaving through a path nobody chose.
+
+!! The default route disappeared
+   13:50:28 to 13:50:50  (22s)   rule default-route-lost, confidence 95%
+   affected: 10.99.1.11
+
+   1  13:50:28.343  l3.route_removed  default
+      The default route was withdrawn. Nothing beyond the local segment
+      is reachable from here.
+      |  which caused
+   2  13:50:50.423  l2.neighbor_failed  10.99.1.11
+      Reachability began failing once there was no default path.
+
+   root cause: l3.route_removed on default (confidence 95%)
+   next:
+      Look at the timeline immediately before this. A default route
+      rarely leaves on its own; it follows an interface going down, a
+      DHCP lease expiring, or a routing daemon losing its peer. Fix
+      that, not the route.
+
+! A service stopped answering
+   13:50:30 to 13:50:32  (2s)   rule service-unreachable, confidence 80%
+   affected: 10.99.0.11
+
+   1  13:50:30.349  flow.handshake_fail  10.99.0.11  (x3)
+      Repeated connections to this service went from the opening SYN
+      straight to closed without ever being answered. Something refused
+      them, dropped them, or was not listening.
+
+   root cause: flow.handshake_fail on 10.99.0.11 (confidence 80%)
+   next:
+      Check whether the service is listening before blaming the network.
+      If it is, look at the timeline for a filtering change or a route
+      change just before the first failure - both look identical from
+      the client.
+
+! A service stopped answering
+   13:50:37 to 13:50:43  (6s)   rule service-unreachable, confidence 80%
+   affected: 10.99.0.11
+
+   1  13:50:37.371  flow.handshake_fail  10.99.0.11  (x3)
+      Repeated connections to this service went from the opening SYN
+      straight to closed without ever being answered. Something refused
+      them, dropped them, or was not listening.
+
+   root cause: flow.handshake_fail on 10.99.0.11 (confidence 80%)
+   next:
+      Check whether the service is listening before blaming the network.
+      If it is, look at the timeline for a filtering change or a route
+      change just before the first failure - both look identical from
+      the client.
+
+! An address moved to a different machine
+   13:50:46 to 13:50:46  (0s)   rule address-changed-hands, confidence 75%
+   affected: 10.99.1.11
+
+   1  13:50:46.414  l2.arp_binding_changed  10.99.1.11
+      This address is now answered by hardware that was not previously
+      bound to it, so the machine behind it is a different machine.
+
+   root cause: l2.arp_binding_changed on 10.99.1.11 (confidence 75%)
+   next:
+      Normal after a DHCP lease expires. Worth a look if the address is
+      a server, is statically assigned, or moved without a lease renewal
+      near it.
+
+!! A path that was working stopped working
+   13:50:46 to 13:50:50  (4s)   rule change-broke-a-path, confidence 88%
+   affected: 10.99.1.11
+
+   1  13:50:46.414  l2.arp_binding_changed  10.99.1.11
+      This is the last thing that changed on the path before it broke.
+      |  which caused
+   2  13:50:50.421  flow.first_failure_for_pair  10.99.1.11
+      Two machines that had been connecting successfully can no longer
+      complete a handshake. Whatever else is true, something between
+      them changed.
+      |  and at the same time
+   3  13:50:50.423  l2.neighbor_failed  10.99.1.11
+      Other connections started failing in the same window.
+
+   root cause: l2.arp_binding_changed on 10.99.1.11 (confidence 88%)
+   next:
+      The change named here is the nearest one in time, not a proven
+      cause. Confirm it against your change record before acting: if it
+      was intended, the breakage is a side effect nobody planned; if it
+      was not, something changed the network without going through you.
+
+!! A second DHCP server is answering on this segment
+   13:51:08 to 13:51:10  (2s)   rule rogue-dhcp-server, confidence 92%
+   affected: 10.99.0.99, 10.99.0.11
+
+   1  13:51:08.551  dhcp.server_seen  10.99.0.99
+      A DHCP server answered on a segment that already had one. Every
+      client that renews from here on gets whichever of them replies
+      first.
+      |  which caused
+   2  13:51:10.618  dns.resolver_changed  10.99.0.11
+      Clients began taking different addresses, gateways or resolvers,
+      which is the second server's configuration arriving.
+
+   root cause: dhcp.server_seen on 10.99.0.99 (confidence 92%)
+   next:
+      Find the switch port the new server's hardware address is learned
+      on and shut it. Almost always a consumer router plugged in the
+      wrong way round, with its LAN side facing the network. Until it is
+      off, clients will keep taking its addresses and its gateway at
+      random.
+
+  ok    link.down                    1 recorded
+  ok    link.up                      2 recorded
+  ok    l2.arp_binding_changed       7 recorded
+  ok    l2.duplicate_ip              1 recorded
+  ok    l3.route_added               1 recorded
+  ok    l3.default_route_changed     1 recorded
+  ok    l3.route_removed             1 recorded
+  ok    flow.handshake_fail          3 recorded
+  ok    flow.rollup                  4 recorded
+  ok    flow.first_failure_for_pair  1 recorded
+  ok    dhcp.server_seen             2 recorded
+  ok    dns.resolver_changed         1 recorded
+  ok    metric.anomaly               2 recorded
+  ok    policy.rule_changed          2 recorded
+
+  ok    gateway-hijack               concluded
+  ok    contested-address            concluded
+  ok    default-route-moved          concluded
+  ok    default-route-lost           concluded
+  ok    service-unreachable          concluded
+  ok    change-broke-a-path          concluded
+  ok    rogue-dhcp-server            concluded
+  ok    resolver-hijacked            concluded
+
+PASS: every injected fault was reconstructed, and correlation named the cause

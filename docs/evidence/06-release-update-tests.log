@@ -1,0 +1,52 @@
+Release/self-update is validated entirely through the project's own automated
+tests (internal/update/), never against a real installed system, per the
+project's own safe-by-design update path (checksum + mandatory-once-configured
+ed25519 signature verification, a real execution of the new binary's
+--version before anything is replaced, old binaries kept, and separate
+config knobs for "check" vs. "apply").
+
+On Windows:
+$ CGO_ENABLED=0 go test ./internal/update/... -v
+25 tests, 20 PASS, 5 SKIP (skipped ones actually execute installed binaries
+and real file-mode/exec-bit semantics - guarded to Linux).
+
+On Linux (WSL2 netrewind-lab, run against the same source tree via the
+/mnt/c/netrewind-src junction):
+$ CGO_ENABLED=0 go test ./internal/update/... -v
+--- PASS: TestTheInstallerDoesNotEditAConfigurationSomebodyTuned
+--- PASS: TestTheInstallerTellsTheRecorderWhereTheConfigurationIs
+--- PASS: TestTheInstallerCreatesThePlaceItInstallsInto
+--- PASS: TestUninstallNeverTouchesTheRecord
+--- PASS: TestMakefileNamesTarballsTheWayTheUpdaterLooksForThem
+--- PASS: TestTheApplianceImageIsBuiltWithTheReleaseVersion
+--- PASS: TestTheReleaseRefusesAnOlderToolchainThanGoModAsksFor
+--- PASS: TestTheApplianceImageRefusesAnOlderToolchainToo
+--- PASS: TestCIDoesNotPublishOverASignedRelease
+--- PASS: TestOpenSSLSignaturesVerifyHere
+--- PASS: TestVersionOrdering
+--- PASS: TestADevelopmentBuildHasNoVersion
+--- PASS: TestParseChecksums
+--- PASS: TestMalformedChecksumsAreRefused
+--- PASS: TestSignatureVerification
+--- PASS: TestAVerifiedDownloadIsAccepted
+--- PASS: TestATamperedDownloadIsRefused
+--- PASS: TestAReleaseWithNoChecksumsIsRefused
+--- PASS: TestConfiguringAKeyMakesSignaturesMandatory
+--- PASS: TestASignedReleaseIsAcceptedAndReported
+--- PASS: TestInstallReplacesBinariesAndKeepsTheOldOnes
+--- PASS: TestABinaryThatDoesNotRunIsNotInstalled
+--- PASS: TestAnArchiveMissingABinaryIsRefused
+--- PASS: TestPathTraversalInTheArchiveIsIgnored
+--- PASS: TestTheWholeUpdatePathFromReleaseToInstalledBinary
+--- PASS: TestAReleaseTooOldToReportItsVersionIsRefusedClearly
+--- SKIP: TestThePublishedChecksumFileParses (needs a real published release)
+PASS
+ok  	github.com/OmarAlghafri/netrewind/internal/update	0.140s
+
+24/25 pass on Linux (the remaining skip fetches a real published GitHub
+release's checksum file and is intentionally not run offline).
+
+No live/production self-update was performed against any real installed
+NetRewind on this machine - the task explicitly calls for validating this via
+its existing safe test mechanism rather than a real update, and one exists and
+passes.

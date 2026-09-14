@@ -1,0 +1,70 @@
+Continuation of the ports/analyze extraction (PRODUCT_RELEASE_PLAN_AR.md §4.1)
+after link.* (docs/evidence/08-carrier-loss-fix.log). Two more families done
+in this pass:
+
+## l2.* (neighbour/ARP) - the highest-value family in the real evidence
+
+internal/ports/neighbor.go + internal/analyze/neighbor.go, replacing the
+decision logic previously inline in internal/collect/netlink/neigh_linux.go.
+internal/collect/netlink/severity.go (FirstSightingSeverity) moved alongside
+it into internal/analyze/severity.go - same category of pure decision logic,
+same reasoning as the original file's own comment ("The policy lives apart
+from the netlink plumbing so it can be tested without a kernel").
+
+Gateway detection (is this address the current default gateway) stays in the
+adapter (internal/collect/netlink/neigh_linux.go's isGateway, with its
+existing 30s cache) rather than moving into the analyzer: it needs a
+route-table read, which is exactly the kind of platform-specific plumbing
+the analyzer must never reach for itself. The adapter computes the answer
+and hands it in on the observation - the general pattern for any future
+"needs another table" case.
+
+14 tests in internal/analyze/neighbor_test.go: new binding, gateway vs
+ordinary severity on both first-sighting and change, duplicate-IP detection
+(three flips triggers it, two does not, changes aging out of the 60s window
+do not accumulate), MAC-moved, neighbor-failed, and the boundary cases
+(failure on an unknown address, an unchanged re-announcement).
+
+## l3.* (route + address)
+
+internal/ports/route.go + internal/analyze/route.go, replacing
+internal/collect/netlink/route_linux.go's RouteCollector AND AddrCollector
+logic. Route is the more complex of the two (tracks every route to a
+destination, not just the winner, exactly preserving the original's
+upsert/supersede/remove/winner semantics - a replace is matched by priority
+alone, not by where it points, since re-pointing a prefix at a new next hop
+at the same metric is precisely the common case a replace expresses).
+Address is stateless (ObserveAddress is a plain function, no analyzer
+struct needed - there was nothing to diff in the original either).
+
+11 new tests: route added to a fresh destination, a worse-metric standby
+NOT changing the winner, losing the winner promotes a standby (route
+changed, not added+removed), withdrawing the only route, default-route
+severity (error) vs ordinary-route severity (notice) on removal, default
+route moving (default_route_changed, error) vs an ordinary route moving
+(route_changed, notice), a replace at a different metric adding an
+alternative rather than superseding, and address add/remove.
+
+## Verification (both families, both platforms)
+
+- `gofmt -l` clean on both.
+- `go vet` clean, native and `GOOS=linux`, on Windows.
+- Full repo test suite: passes on Windows (`go test ./...`) and on Linux
+  with the race detector (`CGO_ENABLED=1 go test -race ./...` in the
+  `netrewind-lab` WSL distro) - 43 tests in internal/analyze total after
+  this pass (20 interface + 14 neighbor + 9 route/address, i.e. the
+  additions), zero regressions anywhere else.
+- The real lab (`lab/inject.sh all`, rebuilt Linux binaries, restaged, run
+  fresh): **PASS** both times (once after neighbor, once after route/address),
+  all 14 event kinds recorded and all 8 correlation rules concluded each
+  time, with `link.down` staying at 2 recorded - confirming the carrier-loss
+  fix from the link.* extraction survived two further unrelated refactors
+  intact.
+
+## Remaining ports (not done yet)
+
+`policy.*` (nftables, internal/collect/policy/nftables_linux.go - single
+collector, likely simpler than neighbor/route), `flow.*` (eBPF, more
+invasive - the ring-buffer/tracepoint plumbing is unlike anything else in
+the tree, do last), `wire.*` (DHCP/DNS/ICMP, internal/collect/wire and
+internal/collect/probe).

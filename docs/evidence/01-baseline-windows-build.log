@@ -1,0 +1,71 @@
+Environment: Windows 11 Pro (10.0.26200), go1.26.6 windows/amd64, git-bash shell.
+Per Makefile/docs/dev-environment.md: build, vet and test are expected to work
+from a Windows checkout even though real observation needs Linux. Verified here.
+
+$ gofmt -l ./cmd ./internal
+(no output - nothing needs formatting)
+exit: 0
+
+$ CGO_ENABLED=0 go vet ./...
+(no output - clean)
+exit: 0
+
+$ CGO_ENABLED=0 GOOS=linux go vet ./...
+(no output - clean)
+exit: 0
+
+$ CGO_ENABLED=0 go test ./...
+ok  	github.com/OmarAlghafri/netrewind/cmd/netrewind	2.146s
+ok  	github.com/OmarAlghafri/netrewind/cmd/netrewindd	2.154s
+?   	github.com/OmarAlghafri/netrewind/internal/collect	[no test files]
+ok  	github.com/OmarAlghafri/netrewind/internal/collect/flow	1.373s
+ok  	github.com/OmarAlghafri/netrewind/internal/collect/netlink	1.447s
+ok  	github.com/OmarAlghafri/netrewind/internal/collect/policy	1.361s
+ok  	github.com/OmarAlghafri/netrewind/internal/collect/probe	1.361s
+ok  	github.com/OmarAlghafri/netrewind/internal/collect/wire	1.831s
+ok  	github.com/OmarAlghafri/netrewind/internal/correlate	2.394s
+ok  	github.com/OmarAlghafri/netrewind/internal/event	1.519s
+ok  	github.com/OmarAlghafri/netrewind/internal/identity	1.674s
+?   	github.com/OmarAlghafri/netrewind/internal/incident	[no test files]
+ok  	github.com/OmarAlghafri/netrewind/internal/listen	1.616s
+ok  	github.com/OmarAlghafri/netrewind/internal/metrics	2.103s
+ok  	github.com/OmarAlghafri/netrewind/internal/otel	4.251s
+ok  	github.com/OmarAlghafri/netrewind/internal/store	4.379s
+ok  	github.com/OmarAlghafri/netrewind/internal/update	4.899s
+?   	github.com/OmarAlghafri/netrewind/internal/update/cmd/verifysig	[no test files]
+ok  	github.com/OmarAlghafri/netrewind/internal/web	1.869s
+?   	github.com/OmarAlghafri/netrewind/lab/inject	[no test files]
+exit: 0
+
+$ CGO_ENABLED=0 go build -o build/netrewindd.exe ./cmd/netrewindd
+$ CGO_ENABLED=0 go build -o build/netrewind.exe ./cmd/netrewind
+BUILD OK
+
+$ ./build/netrewind.exe version
+netrewind dev (schema v1)
+
+$ ./build/netrewind.exe --help
+NetRewind records what changed on the network so it can be replayed after the fact.
+
+Usage:
+  netrewind [command]
+
+Available Commands:
+  completion    Generate the autocompletion script for the specified shell
+  events        List recorded events in time order
+  help          Help about any command
+  incidents     List what correlation concluded, with the chain behind each conclusion
+  rules         Load and check the correlation rules
+  serve         Read the record in a browser
+  timeline      Read recorded history as a narrative
+  version       Print the version
+  what-happened Reconstruct what happened around a moment, for one machine or for all of them
+
+Flags:
+      --db string   path to the event store
+  -h, --help        help for netrewind
+
+Result: build, vet (native + linux target) and the full test suite are all
+clean on native Windows, and the CLI binary runs. This matches what the
+project documents ("build, vet, test... work from a Windows or macOS
+checkout too") and is the cross-platform half of the baseline.

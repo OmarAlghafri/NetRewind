@@ -1,0 +1,39 @@
+PRODUCT_RELEASE_PLAN_AR.md §4.1: "صمم evidence bundle read-only: manifest،
+schema/app version، recorder capabilities، events/incidents/rules ذات الصلة،
+checksums، optional signature، وبدون أسرار أو أسماء DNS ما لم يوافق
+المستخدم. نفذ import في DB مؤقت ثم atomic promote؛ لا يلمس السجل الأصلي.
+أضف export redacted."
+
+Added internal/bundle/ (bundle.go + bundle_test.go, 10 tests, all passing on
+Windows and Linux with -race). Format: tar.gz containing manifest.json,
+events.json, incidents.json, SHA256SUMS, and an optional SHA256SUMS.sig -
+deliberately the same checksum-file shape internal/update already parses
+(ParseChecksums) and the release process already produces, so the project has
+one checksum format, not two.
+
+What's real and tested:
+- Export reads a window of events+incidents from any store.Store, redacts
+  DNS query names by default (the one field docs/schema.md already treats as
+  sensitive), and writes the archive with a manifest recording exactly what
+  it contains - including a Truncated flag if the window held more than the
+  read limit, so a bundle never silently looks more complete than it is.
+- Import verifies checksums before parsing anything, verifies a signature if
+  (and only if) a public key is configured - same mandatory-once-configured
+  policy as internal/update, reusing its VerifySignature directly rather than
+  a second implementation - then validates every event individually
+  (invalid ones are dropped and counted, never fatal to the whole import),
+  and only then promotes a fully-built temporary SQLite file into place with
+  a single rename. It never opens or touches any other store on the machine.
+- Zip-slip: extraction only ever writes into a fixed, five-name allow-list
+  keyed by filepath.Base(entry name), so a crafted archive entry with "../"
+  or an absolute path is inert by construction, not by a check that could be
+  forgotten later. Tested by actually adding such an entry to a real bundle
+  and confirming import still succeeds correctly, ignoring it.
+- Signing is deliberately NOT built into Export: the same reasoning as
+  internal/update's signing key never touching the running process (Makefile
+  "sign" target) applies here - a bundle is signed the same external way a
+  release is, and Import's verification is what matters, tested against both
+  a correctly and an incorrectly signed bundle.
+
+Full repo test suite and go vet, Windows and Linux (the latter with -race):
+clean.

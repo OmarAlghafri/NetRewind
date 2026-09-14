@@ -1,0 +1,195 @@
+First real model measured against ai/eval/harness - PRODUCT_RELEASE_PLAN_AR.md
+§6.4's actual gate ("سجّل... citation precision، Top-1/Top-3 cause coverage"
+per candidate). Everything before this log (docs/evidence/16, 17) built the
+yardstick; this is the first real number measured with it.
+
+## Candidate chosen, and why it differs from the plan's own §6.1 hypothesis
+
+§6.1 named Qwen3-4B Q4_K_M as the starting hypothesis. Checked before
+downloading anything: Qwen2.5's 3B-parameter GGUF releases ship under the
+"Qwen Research License" - non-commercial only - which would be a real,
+avoidable licensing blocker for a product whose licensing model is already
+an open business question (docs/product/licensing-plan.md). Chose
+microsoft/Phi-4-mini-instruct instead: MIT-licensed (confirmed directly from
+its HuggingFace repo's LICENSE file), 3.8B parameters, comparable size class
+to the plan's own hypothesis. This is a deliberate, reasoned substitution,
+not a silent deviation - the plan's own candidate remains worth benchmarking
+later if a permissively-licensed Qwen release becomes relevant.
+
+Downloaded, with the operator's explicit approval (stated filename/source/
+size beforehand, per this session's own file-download policy):
+- `bartowski/microsoft_Phi-4-mini-instruct-GGUF`, `*-Q4_K_M.gguf`, 2,491,874,688
+  bytes. Verified after download: real GGUF v3 file, 196 tensors, architecture
+  "phi3", name "Phi 4 Mini Instruct" (not a corrupted/partial download).
+- `ggml-org/llama.cpp` release `b10948`, `llama-b10948-bin-win-cpu-x64.zip`
+  (CPU-only build, no GPU/driver dependency needed for this bounded eval) -
+  MIT-licensed, official upstream GitHub release, fetched via `gh release
+  download` (exact asset name/size confirmed via `gh api` before downloading,
+  not guessed).
+
+Both live under `ai/eval/models/`, gitignored (multi-GB binaries, never
+versioned - this log is the permanent record of what was fetched and from
+where).
+
+## Two real bugs found and fixed before trusting any number
+
+**Bug 1 - llama-cli + JSON-schema grammar + jinja chat template**: a direct
+smoke test (`llama-cli -jf schema.json -sys ... -p ...`) failed outright:
+`Error: Failed to initialize samplers: Unexpected empty grammar stack after
+accepting piece: assistant`. Isolated by testing with and without `--no-jinja`
+- the jinja-templated chat-role text interacts badly with schema-grammar
+sampling in this llama.cpp build (b10948). Fixed by adding `--no-jinja`
+(llama.cpp's built-in, non-jinja Phi-3/Phi-4 template still applies correct
+role formatting - confirmed the model answered a trivial smoke-test question
+correctly, in valid schema JSON, with this flag).
+
+**Bug 2 - a real bug in this repo's own `ai/eval/run` extraction code, not
+the model**: the first full benchmark run (results discarded, not this run)
+scored 1/4 pass with 3 of 4 cases showing "no hypothesis offered" - despite
+the raw llama-cli transcript, read by hand, clearly showing the model HAD
+produced full, substantive JSON answers. Root cause:
+`extractModelOutput`'s first version used `strings.LastIndex(raw, "{")` to
+find the model's answer inside llama-cli's full terminal transcript; because
+the model's own answer JSON contains NESTED objects (one per
+`ranked_hypotheses` entry), the textually-last `{` in the whole transcript
+was an INNER brace belonging to one hypothesis object, not the outer answer
+object - forward-matching from there silently extracted just
+`{"cause":...,"entity":...,"confidence":...}` instead of the real answer.
+That small object unmarshals into `harness.ModelOutput` without error (Go
+ignores unrecognised fields), producing an all-zero-value result that the
+harness correctly, but meaninglessly, graded as "no hypothesis offered."
+
+Fixed the scanning logic (track brace depth, keep the LAST complete span
+that both opens and closes at depth 0), added 3 regression tests built
+directly from this failure shape (`ai/eval/run/main_test.go`). Re-ran with
+the fix - **still wrong**, and for a genuinely different, more interesting
+reason: llama-cli's own interactive terminal ECHO of a long input prompt
+truncates a string value mid-display for readability (inserting literal
+"... (truncated)" text into what is supposed to be an exact JSON echo).
+That truncation permanently unbalances any brace-depth counter trying to
+re-parse the transcript from the start - the model's real answer JSON later
+in the transcript is itself perfectly well-formed, but the counter never
+gets back to a clean depth-0 baseline to recognise it, because the echoed
+prompt before it is now corrupted mid-stream. Confirmed by feeding the exact
+captured transcript into a standalone test: the scanner found exactly ONE
+complete top-level span (the very first echoed event object) and nothing
+after it in the entire remaining text, matching the truncation's position.
+
+This is a structural problem with re-parsing llama-cli's interactive-mode
+terminal output at all, not something a smarter regex fixes. **Switched the
+runner from shelling out to `llama-cli` per case to calling `llama-server`'s
+OpenAI-compatible `/v1/chat/completions` HTTP endpoint instead** - the
+response body IS the model's answer with no terminal-display layer in
+between to reintroduce this class of bug. `ai/eval/run/main.go`'s package
+doc comment carries the full reasoning. The existing brace-depth extractor
+is kept (still useful for stripping an occasional markdown code fence around
+the JSON) but now only ever sees a single, clean response body, not a mixed
+transcript.
+
+## The real, trustworthy result (dev split, 4 non-deidentified cases)
+
+Command:
+```
+llama-server -m ai/eval/models/Phi-4-mini-instruct-Q4_K_M.gguf \
+  --host 127.0.0.1 --port 8811 -t 8 --no-jinja -jf schema.json &
+go run ./ai/eval/run -split dev -server http://127.0.0.1:8811 -n-predict 700
+```
+
+```
+[collector_down-ambiguous-en] FAIL - offered a confident hypothesis for a case where refusal was the correct answer
+[gateway_hijack-positive-en]  FAIL - cited event id not present in the input: 01M2DNG9B46EKK7Q83SZQ9PKV6; confidence exceeds evidence's own ceiling (x2)
+[normal_traffic-negative-en]  PASS - correct refusal
+[rogue_dhcp-positive-en]      PASS - Top-1 hit, Top-3 hit, citation precision 0.50
+
+pass (no hard violations): 2/4
+top-1 cause hit: 1/4
+top-3 cause hit: 1/4
+correct refusals: 1/1 (the one true-negative case)
+mean citation precision (non-empty citations): 0.17
+```
+
+Full raw model output for all 4 cases: `ai/eval/results/20260913T224921Z/results.json`
+(gitignored - regenerable by re-running against the same model; this log is
+the permanent record of what it said).
+
+## Reading the two real failures honestly, not just the pass/fail label
+
+**gateway_hijack's fabricated citation is a genuinely interesting, specific
+mistake**, not random noise: the real ARP-change event's `event_id` is
+`01M2DNG9B46EKK7Q83SYPGC6KY`, but that SAME event's `subject.id` (an internal
+host identifier, not an event ID) is `01M2DNG9B46EKK7Q83SZQ9PKV6` - the two
+ULIDs share a long timestamp-derived prefix and differ only in their last
+few characters (`...SYPGC6KY` vs `...SZQ9PKV6`), because ULIDs generated
+moments apart naturally share that prefix. The model appears to have
+confused the subject's internal ID with the event's own ID, and used the
+wrong one as both its `evidence_event_ids` citation and its `entity` value
+(where the expected entity was the human-readable `"10.99.0.201"`). This is
+exactly the class of error the harness's fabrication check exists to catch
+- caught correctly this time, on a real, non-obvious mistake, not an
+artifact of this session's own tooling.
+
+**collector_down's over-confident hypothesis is a real limitation, not a
+harness quirk**: the model correctly identified that collectors were down
+and cited that fact - accurately - as its summary, but the case's grading
+requires refusal here specifically because "the collector was down" is a
+signal that the underlying connectivity question CANNOT be answered, not
+itself a satisfying answer to it (matching the "recorder-was-blind"/
+"collector-not-watching" rules' own semantics, §6.2: "ارفض الاستنتاج في
+gap/collector-down"). A 3.8B model at Q4 quantization did not make this
+distinction. Whether a larger model, a different prompt emphasising this
+distinction more explicitly, or few-shot examples would fix this is an open
+question for a later candidate/prompt iteration - recorded honestly as a
+real gap, not smoothed over.
+
+## Scope of this first run, stated plainly
+
+- Only 4 of the dev split's 6 cases were run: the two `-deidentified`
+  variants (`gateway_hijack-positive-en-deidentified`,
+  `rogue_dhcp-positive-en-deidentified`) were deliberately skipped
+  (`-skip-deidentified` defaults true) because this runner does not yet
+  replicate `ai/eval/gen`'s address-substitution table at eval time - feeding
+  real addresses as event context while the question itself was de-identified
+  would defeat the point of that case variant. Real, stated limitation, not
+  hidden; fixing it is a small, well-scoped follow-up (compute the same
+  first-seen-order `<HOST_N>` substitution the generator uses, applied to the
+  loaded event context before building the prompt).
+- Only the `dev` split was run, per the plan's own methodology (`test` stays
+  held out until a real model-selection decision is being made, not spent on
+  every exploratory run).
+- Only English questions were used - Arabic-language benchmarking of the
+  same cases has not been attempted yet.
+- One model, one quantization, one prompt. This is not yet a comparison
+  across candidates/quantizations/prompts as §6.4's fuller benchmark table
+  calls for - it is the first real number, proving the whole pipeline
+  (download → serve → prompt → parse → grade) works end-to-end against a
+  real model, honestly scored.
+- CPU-only inference, 8 threads: 42 seconds to 2m40s per case depending on
+  event-context size. Not fast enough for interactive use in this
+  configuration - expected and unsurprising for a 3.8B Q4 model on CPU, and
+  irrelevant to whether the SCORES are trustworthy, which is what this run
+  was actually testing.
+
+## Verification
+
+- `gofmt -l`, `go vet ./ai/eval/...`: clean.
+- `go test ./ai/eval/run/... -v`: 3/3 new regression tests pass (built from
+  the actual bug-2 failure shape), plus the pre-existing harness/gen suites
+  unaffected.
+- `go build ./ai/eval/...`: succeeds.
+- Manually cross-checked 2 of the 4 raw model answers against the real
+  corpus event data (`corpus/v1/gateway_hijack/events.json`,
+  `corpus/v1/rogue_dhcp/events.json`) to confirm the harness's violations
+  and hits are real, not artifacts - see the "reading the failures honestly"
+  section above.
+- `curl http://127.0.0.1:8811/health` before and during the run: server
+  stayed up throughout; no crashes.
+- `llama-server` stopped cleanly after this run (not left running).
+
+## Not done yet
+
+- No comparison candidate (Gemma, a different quantization) benchmarked.
+- No Arabic-language run.
+- De-identified case variants not evaluated (see Scope above).
+- No `test`-split run (correctly deferred).
+- No decision made about whether Phi-4-mini-instruct is "the" candidate -
+  this is one honest data point, not a selection.

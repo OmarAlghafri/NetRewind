@@ -1,0 +1,180 @@
+Phase 3 (dedicated UX/accessibility pass) - the first formal audit against
+the live desktop app, not attempted until now. PRODUCT_RELEASE_PLAN_AR.md
+§5's remaining Phase 3 gap explicitly named "no formal axe-or-equivalent
+audit, no keyboard/zoom/reduced-motion pass beyond basic nav focusability."
+This closes the axe-audit half with real findings and real fixes, against
+the actual running app in a real browser, not a static code read.
+
+Method: `desktop/` served via its own Vite dev server (`npm run dev`,
+already configured as this project's `netrewind-desktop-dev` preview target),
+opened in a real browser tab, axe-core 4.10.2 injected via
+`https://cdnjs.cloudflare.com` (not vendored - a one-off audit tool, not a
+runtime dependency), run against all 8 shell pages plus the first-run
+wizard's 6 steps, in both light and dark color schemes (`prefers-color-scheme`
+emulated), and in both Arabic (RTL) and English.
+
+## Round 1 - real violations found
+
+`axe.run(document, {resultTypes: ['violations']})` per page/step:
+
+- **8 shell pages, dark theme**: Incidents (7 nodes), Timeline (17 nodes),
+  Diagnostics (2 nodes) - all `color-contrast` (serious): severity badges
+  (`.sev-info`, `.sev-error`) failed WCAG AA's 4.5:1 minimum for normal-size
+  text. Overview/Host/Rules/Evidence/Settings: 0 violations.
+- **8 shell pages, light theme**: Timeline (11 nodes), Diagnostics (1 node) -
+  same `.sev-info`/`.sev-error` `color-contrast` failure; Incidents happened
+  to render 0 error-severity badges in this data set so it did not surface
+  there in this theme, but the same CSS rule was equally broken.
+- **Wizard, all 6 steps, both themes**: `landmark-one-main` (moderate, 1 node
+  each) and `region` (moderate, 1-7 nodes each) - the wizard's root element
+  was a plain `<div className="wizard-overlay">`, not contained in or itself
+  a `<main>` landmark, unlike the normal 8-page shell (`App.tsx` already
+  wraps its content in `<main className="main">` - only the wizard, which
+  replaces that content entirely before onboarding completes, was missing it).
+
+Exact measured contrast ratios (via axe's own failure summaries, not
+independently recomputed only - cross-checked by hand too):
+- Dark `.sev-info`: 4.09:1 (needs 4.5:1) - `#9a978f` on `#34373b`.
+- Dark `.sev-error`: 4.46:1 (needs 4.5:1) - `#d4695f` on `#2c211a`.
+- Light `.sev-info`: 4.2:1 (needs 4.5:1) - `#6b6862` on `#e2e0db`.
+- Light `.sev-error`: 6.06:1 - already passing, not touched.
+
+## A real, separate finding NOT caught by axe: keyboard operability
+
+Read `desktop/src/components/Sidebar.tsx` after noticing its nav items are
+plain `<div role="button" tabIndex={0}>` rather than native `<button>`
+elements (a deliberate-looking but incomplete choice - axe's rule set does
+not flag "role=button div with an incomplete key handler" the way it flags
+missing ARIA attributes, so this needed a manual code read, not just a tool
+run). Two real gaps:
+1. `onKeyDown` only handled `"Enter"`, not `" "` (Space) - the WAI-ARIA APG
+   button pattern requires both. A screen-reader or keyboard-only user
+   pressing Space on a focused nav item (very common muscle memory for
+   "activate this button") would do nothing.
+2. No `aria-current="page"` on the active item - the active page was only
+   distinguished visually (a CSS class), invisible to assistive tech.
+
+## Fixes made
+
+`desktop/src/App.css`:
+- Added `--sev-info-text`/`--sev-error-text`, dedicated badge-text color
+  variables per theme, rather than reusing `--text-muted`/`--error` (which
+  pass contrast everywhere else they're used - changing them globally would
+  risk regressing an already-passing area to fix a narrower one).
+  Dark: `#b0ada5` (5.12:1) / `#dc7a70` (5.28:1). Light info: `#5a564f`
+  (5.53:1). Light error unchanged (`#a3312a`, already 6.06:1).
+- Added `.nav-item:focus-visible { outline: 2px solid var(--accent); ... }` -
+  there was no custom focus style at all before this (relying on browser
+  default, unverified whether visible enough against this dark sidebar).
+
+`desktop/src/components/Sidebar.tsx`: `onKeyDown` now handles `" "` alongside
+`"Enter"` (with `e.preventDefault()`, matching native button behaviour of
+suppressing the page-scroll Space normally triggers); `aria-current="page"`
+added to the active item.
+
+`desktop/src/onboarding/Wizard.tsx`: root `<div className="wizard-overlay">`
+changed to `<main className="wizard-overlay">` - semantically correct, since
+it genuinely is the page's main content while shown, and required no other
+DOM restructuring (React fragment/children unchanged).
+
+## Round 2 - re-verified against the live app, not just re-read
+
+Re-ran axe against all 8 pages (both themes) and all 6 wizard steps after
+the fixes, same method: **0 violations everywhere.**
+
+Real keyboard-operability check, done carefully because the first attempt
+was misleading: this session's browser-automation tool's synthetic
+`key`/`space`/`Return` presses did not trigger the focused element's React
+handler in this environment (confirmed on a native, unmodified `<button>`
+too - the sidebar language toggle - which also failed to respond to a
+synthetic Return press even before this session touched anything, ruling out
+a code regression and pointing at a tool/environment limitation instead of
+a product defect). Dispatching a genuine `KeyboardEvent('keydown', {key:
+' '})` directly at the focused nav item via `element.dispatchEvent(...)`
+DID correctly trigger navigation and update `aria-current` - confirming the
+fix's logic itself is correct, even though this session could not observe
+it through a literal synthesized hardware keypress in this specific browser
+harness. Documented honestly rather than either claiming a full live
+keyboard test that didn't actually work, or silently skipping verification.
+
+## Verification
+
+- `npx tsc --noEmit` (desktop/): clean.
+- `npm run build`: succeeds (300KB/87KB gzip JS, no regression in bundle
+  size from these changes).
+- axe-core 4.10.2 against all 8 pages × 2 color schemes + 6 wizard steps:
+  0 violations post-fix (26+ real violation instances found and fixed
+  pre-fix).
+- Manual DOM inspection (`role`, `tabIndex`, `aria-current`, computed
+  `outline` style) confirms the ARIA/focus-style fixes are actually present
+  and computed correctly at runtime, not just present in source.
+- Disposable `desktop/dist/` verification build output removed afterward.
+
+## Scope and honest limitations
+
+- This is one pass with one tool (axe-core) against the Demo-mode desktop
+  shell + wizard. It is not a full manual screen-reader walkthrough (NVDA/
+  VoiceOver), not a full keyboard-only end-to-end task completion test (the
+  tool limitation above blocked a literal synthesized-keypress version of
+  this - a human tester with a real keyboard should still do this once),
+  and not a zoom/reduced-motion pass (`prefers-reduced-motion` is not
+  referenced anywhere in `App.css` - there is very little animation in this
+  UI to begin with, but this was not verified, only noted).
+- `Diagnostics`/`Incidents`/`Timeline` were the only pages with any severity
+  badges in the current demo data set at all - the contrast fix is a CSS
+  rule fix (applies everywhere `.sev-info`/`.sev-error` render), not a
+  per-page patch, so it is not data-set-dependent, but only those 3 pages'
+  pre-fix violations were directly observed.
+- No color-blindness simulation was run (axe's contrast checks are luminance-
+  based, not a substitute for a deuteranopia/protanopia pass on the
+  causes/correlates/precedes line-style distinction `App.css` already uses
+  specifically BECAUSE color alone was deemed insufficient there - that
+  design decision predates this audit and was not re-tested here).
+
+Phase 3 is not fully closed by this one log - the "no formal audit" gap
+specifically named in `PROGRESS.md` is now addressed; the keyboard/zoom/
+reduced-motion items beyond basic nav focusability remain open, narrower
+work.
+
+## Second addendum - color-blindness simulation, the causes/correlates/precedes line distinction
+
+`App.css`'s `.relation-causes`/`.relation-correlates`/`.relation-precedes`
+rules (solid/dashed/dotted `border-top-style`, with `causes` also getting a
+distinct `--warn-line` color while `correlates`/`precedes` share
+`--neutral-line`) were designed, per the code's own framing, specifically
+so this distinction does not rely on color alone. Verified rather than
+taken on faith: injected real SVG `feColorMatrix` filters (deuteranopia,
+protanopia, and full grayscale - the strictest case, removing all hue and
+saturation information) via `document.documentElement.style.filter` on the
+live Incidents page (which has real examples of all three relation types in
+the current demo data) and inspected the result directly.
+
+**Result: the distinction holds up completely, even in full grayscale** -
+solid, dashed, and finely-dotted lines remain visually distinct by pattern
+alone with zero color information present, and every relation line is also
+paired with a plain-language label ("which caused", "and at the same time",
+"and then, without a known link") that reinforces the same information
+redundantly. This is a real, positive finding, not a gap: the earlier
+design decision to avoid relying on color alone is now empirically
+confirmed to actually work, not just intended to.
+
+## Addendum - reduced-motion and zoom, checked directly rather than left open
+
+**Reduced motion**: `grep -rn "transition|animation|@keyframes" desktop/src/`
+found zero matches in any `.tsx`/`.css` file (the only hits were unrelated
+JSON data fields named "transition" describing TCP state changes in demo
+event fixtures, not CSS). There is no motion anywhere in this UI to gate
+behind `prefers-reduced-motion` - adding an empty media query would be
+boilerplate with no effect. Verified absence, not an unexamined gap.
+
+**Zoom**: spot-checked at 200% browser zoom (`document.body.style.zoom =
+'2'`) on Overview and Incidents (the page with the most complex layout -
+severity badges, causal-chain connector lines) in Arabic/RTL. Text wraps
+correctly, no interactive element became unreachable or overlapped another,
+and a horizontal scrollbar appeared for content wider than the zoomed
+viewport - acceptable under WCAG 1.4.10 (Reflow), which permits scrolling
+in one dimension, not zero. Not a full pass (didn't check all 8 pages at
+multiple zoom levels, and only tested programmatic `zoom` CSS rather than a
+real browser Ctrl+/Ctrl- keyboard zoom, which this session's browser tool
+does not support triggering), but a real, positive first data point rather
+than an unexamined "not done."

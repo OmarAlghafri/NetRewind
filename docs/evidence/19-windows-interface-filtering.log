@@ -1,0 +1,77 @@
+Second follow-up to ADR 0002 (spikes/windows-ip-helper): the interface-row
+filtering problem, per docs/agent-state/NEXT_ACTION.md item 5 — the ADR's
+other named open question, alongside the double-notification anomaly
+resolved in docs/evidence/18-windows-notification-family-split.log.
+
+Added `spikes/windows-ip-helper/filter.go` (two functions:
+`isShimInterface` matching a fixed, closed set of 9 NDIS/WFP/Npcap/
+VirtualBox/Wi-Fi-filter/Hyper-V-extension shadow-row suffixes; and
+`isNeverPresentScaffolding`, a structural MTU==0 && OperStatus==notPresent
+rule, not a name match) and `filter_test.go`, which transcribes the REAL,
+complete 66-row interface table from
+`spikes/windows-ip-helper/run1-observation-25s.txt` (not a sample) as a Go
+literal fixture and asserts the filter's classification against a per-row
+judgement call made by reading the real data, plus the resulting totals.
+
+Command and result:
+
+    cd spikes/windows-ip-helper && go vet ./... && go test ./... -v
+
+    === RUN   TestFilterAgainstRealCapturedSixtySixRows
+    --- PASS: TestFilterAgainstRealCapturedSixtySixRows (0.00s)
+    === RUN   TestIsShimInterfaceDoesNotFalsePositiveOnRealAliases
+    --- PASS: TestIsShimInterfaceDoesNotFalsePositiveOnRealAliases (0.00s)
+    === RUN   TestIsNeverPresentScaffoldingRequiresBothSignals
+    --- PASS: TestIsNeverPresentScaffoldingRequiresBothSignals (0.00s)
+    PASS
+
+Real, measured result against the real 66-row table: **45 shim rows** (the
+LWF/Npcap/QoS/VirtualBox/Wi-Fi-filter/Hyper-V-extension shadow rows) +
+**4 never-present-scaffolding rows** (Teredo, 6to4, IP-HTTPS, the disabled
+Kernel Debugger NIC — all MTU 0 with OperStatus notPresent, and only these
+four among the 21 non-shim rows share that signature) = **49 dropped**,
+**17 kept**.
+
+Honest correction to ADR 0002's own earlier prose: the ADR's original
+estimate was "~9 real network paths ... three 'Local Area Connection* N'
+virtual/tunnel adapters." The real data, once shims are correctly excluded,
+shows **six** distinct numbered "Local Area Connection* N" adapters (7
+through 12), not three — the ADR's own eyeball estimate under-counted this
+family. 17 is the honest, reproducible, tested count this filter produces;
+it is not forced to match the earlier "~9" prose, and the discrepancy is
+recorded here rather than quietly reconciled by fudging either number.
+
+What this filter does NOT resolve, by design, for lack of positive
+evidence: the four "Local Area Connection* N" rows numbered 3-6 (real,
+distinct, non-zero MTUs of 4091/1480/1460/1464, currently down,
+MediaConnectState "unknown") are kept as candidate-real rather than
+filtered out, even though they share interface Type 131 with the excluded
+Teredo/6to4/IP-HTTPS tunnel rows. There is no evidence in this data that
+they are noise — unlike Teredo/6to4/IP-HTTPS they carry real, differing MTU
+values, which is exactly the signal `isNeverPresentScaffolding` is built to
+respect (see its doc comment). Whether these four are GNS3/VirtualBox
+host-only virtual adapters worth surfacing, or another category of noise,
+is not established here and is honestly left as a real open question for
+5B, not guessed at.
+
+This closes the "design a filtering heuristic and test it against the real
+66-row table" half of NEXT_ACTION.md item 5/ADR 0002's remaining open
+question. It does NOT design a full identity/dedup scheme for a real
+`WindowsLinkAdapter` (e.g. how `InterfaceLuid` vs `InterfaceIndex` stability
+across reboots should map onto `internal/ports.InterfaceObservation`'s
+identity) — that remains 5B's job, once an isolated VM is available to test
+against real transitions, not this spike's.
+
+Verification:
+- cd spikes/windows-ip-helper && go vet ./...: clean.
+- go test ./... -v: all 3 tests pass (see above).
+- go build -o spike.exe .: still succeeds with the new files added to the
+  same package.
+- cd "<repo root>" && CGO_ENABLED=0 go vet ./...: still clean — nested
+  module isolation confirmed again, unaffected by this addition.
+- git status --porcelain: only spikes/ (untracked as a whole, consistent
+  with its pre-existing repo state) changed by this work.
+
+Updated docs/product/adr/0002-windows-spike-findings.md's interface-noise
+section to record this as a resolved-with-a-tested-filter finding, with the
+six-not-three correction and the still-open LAC*3-6 question stated plainly.

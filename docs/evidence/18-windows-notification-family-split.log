@@ -1,0 +1,102 @@
+Follow-up to ADR 0002 (spikes/windows-ip-helper): resolving the one open
+anomaly the spike flagged but did not explain - each of the three
+Notify*Change2 registrations fired its synthetic MibInitialNotification
+callback TWICE (not once) when registered with family=AF_UNSPEC, on both the
+25s and 60s runs. The ADR named a leading hypothesis and explicitly said it
+was "not verified by re-running with explicit AF_INET/AF_INET6 separately,
+which would be the obvious next check" - this is that check.
+
+Change made: spikes/windows-ip-helper/main.go's three registerXNotify
+functions now take a `family uint16` parameter (previously hardcoded
+windows.AF_UNSPEC) and log it on every callback (`reqFamily=%d`). A new
+`-split-family` flag makes main() register each of the three notification
+types TWICE - once with AF_INET (2), once with AF_INET6 (23) - instead of
+once with AF_UNSPEC (0), everything else (seed calls, observation duration,
+cancellation) unchanged. Default behaviour (`-split-family` omitted) is
+byte-for-byte the same as before: one AF_UNSPEC registration per type.
+
+Command and real output (spikes/windows-ip-helper/run3-split-family-20s.txt,
+full transcript kept alongside the code exactly as run1/run2 were):
+
+    go vet ./...        # clean
+    go build -o spike.exe .
+    ./spike.exe -duration=20s -split-family=true
+
+Result - the registration and callback section, verbatim:
+
+    --- registering change notifications (split-family=true) ---
+    NOTIFY iface: reqFamily=2 type=InitialNotification row=nil
+    NotifyIpInterfaceChange(AF_INET): registered ok, handle=1789527597312
+    NOTIFY addr: reqFamily=2 type=InitialNotification row=nil
+    NotifyUnicastIpAddressChange(AF_INET): registered ok, handle=1789527662672
+    NOTIFY route: reqFamily=2 type=InitialNotification row=nil
+    NotifyRouteChange2(AF_INET): registered ok, handle=1789527666832
+    NOTIFY iface: reqFamily=23 type=InitialNotification row=nil
+    NotifyIpInterfaceChange(AF_INET6): registered ok, handle=1789527672528
+    NOTIFY addr: reqFamily=23 type=InitialNotification row=nil
+    NotifyUnicastIpAddressChange(AF_INET6): registered ok, handle=1789527682464
+    NOTIFY route: reqFamily=23 type=InitialNotification row=nil
+    NotifyRouteChange2(AF_INET6): registered ok, handle=1789527688112
+
+    total notifications received: 6
+      route          2
+      iface          2
+      addr           2
+
+CONFIRMED, not just plausible: registering separately per family produced
+exactly ONE initial-notification callback per (type, family) pair - 3 types
+x 2 families = 6 total, each fired exactly once. This is the same total
+count (6) as the original AF_UNSPEC runs, but now spread 1-per-family
+instead of 2-on-one-handle. That is direct, positive evidence for the ADR's
+leading hypothesis: passing AF_UNSPEC does not register "once, generically"
+- it internally performs two registrations, one per address family, each of
+which gets its own synthetic initial callback, both delivered through the
+single handle/callback the caller sees. AF_UNSPEC is not a distinct wire
+behaviour, it is sugar for "do this twice, once per real family."
+
+This resolves ADR 0002's specific open question ("what causes the double
+initial-notification per registration") but does NOT resolve the second half
+of that same question, which this check was never designed to test: whether
+a REAL (non-initial) notification would likewise be delivered twice under
+AF_UNSPEC - e.g. would a single real address change on one interface fire
+the callback once (correctly attributed to whichever family the address
+actually belongs to) or twice (once per internal per-family registration,
+regardless of which family the change was actually in)? This run made zero
+real network changes (same passive-only safety boundary as the original
+spike - see ADR 0002's Decision section) and none occurred naturally in the
+20s window, so this remains open, now correctly scoped as "does the SAME
+per-family duplication apply to real notifications" rather than "why do
+initial notifications double" (answered).
+
+Practical implication for a future WindowsLinkAdapter (5B): if it registers
+with AF_UNSPEC (the natural choice, since internal/ports.InterfaceObservation
+is address-family-agnostic and Linux's netlink adapter does not split by
+family either), it must NOT assume "notification count == real event count."
+Either de-duplicate in the adapter (the same category of problem
+newOverflowReporter already exists to handle for netlink) or register
+per-family explicitly and merge - the second option is now known to work
+cleanly for at least the synthetic initial notification and costs one extra
+handle per type (6 handles total instead of 3), which is cheap.
+
+Verification:
+- cd spikes/windows-ip-helper && go vet ./...: clean.
+- go build -o spike.exe .: succeeds.
+- ./spike.exe -duration=20s -split-family=true: ran to completion, exit 0,
+  transcript preserved at run3-split-family-20s.txt.
+- cd "<repo root>" && go vet ./...: still clean (nested module, same
+  isolation property as before - confirmed again, not assumed, since other
+  work in this repo continued concurrently).
+- git status --porcelain at repo root: only spikes/windows-ip-helper/main.go
+  (modified) and the new run3-split-family-20s.txt + rebuilt spike.exe are
+  new/changed by this work; nothing under internal/, cmd/, desktop/,
+  corpus/, ai/, rules/ touched.
+
+Updated docs/product/adr/0002-windows-spike-findings.md's relevant section
+to record this as a confirmed finding rather than an open question, and
+narrowed the still-open question to the real-notification duplication case
+specifically.
+
+Still not done, same as before: no real (non-synthetic) notification of any
+kind has been observed end-to-end on this machine; that remains deferred to
+an isolated Phase 5B VM per the plan's own division of labour, unchanged by
+this check.

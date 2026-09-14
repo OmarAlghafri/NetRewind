@@ -1,0 +1,139 @@
+Structured, phase-by-phase walkthrough, driven by hand rather than the
+scripted "inject.sh all" gate: a fresh lab (lab/inject.sh setup), the recorder
+started manually against its own fresh database, one fault injected at a time,
+with CLI queries run in between so each phase's evidence is visible on its own.
+
+== PHASE A: healthy baseline, before any fault ==
+$ netrewind events --db /tmp/netrewind-walk/events.db --last 2m
+TIME          KIND          SUBJECT  SEV   DETAIL
+13:57:19.965  system.start  Dell     info
+13:58:02.665  system.start  Dell     info
+13:58:02.665  system.gap    Dell     warn  gap_duration_ms=42698 gap_start_ns=1789307839967588532
+
+Note (environment, not a project defect): the first attempt to start the
+recorder from a scripted WSL invocation was killed by SIGHUP when that
+invocation returned, because it was only backgrounded with "&" and not
+detached with nohup - an ordinary Unix process-lifecycle detail, not a
+NetRewind bug. The interesting part is what happened next unprompted:
+NetRewind's own gap detection caught that accidental ~43s blind period and
+recorded it accurately (gap_duration_ms=42698) the moment the recorder came
+back up. This is real, unplanned evidence for the blind-spot detection
+described in the project (system.gap / netrewind_recorder_blind_seconds_total)
+- it was not staged.
+
+== PHASE B: recorder confirmed running ==
+$ ps aux | grep netrewindd
+  120 root  0:00 ./build/netrewindd --db /tmp/netrewind-walk/events.db --rules ./rules
+                 --log-level debug --probe 10.99.0.11 --metrics-addr 127.0.0.1:9464
+                 --gap-threshold 12s
+
+(Earlier attempt with --gap-threshold 3s was refused outright by the daemon's
+own config validation: "gap_threshold: 3s is below the 10s heartbeat, so every
+restart would be recorded as a gap" - a real, correct guard against a
+false-positive gap on every clean restart.)
+
+== PHASE C: inject one fault - path_broke ==
+$ lab/inject.sh run path_broke
+-- injecting: a working path is broken by an ARP change
+
+== PHASE D: raw events after the fault ==
+$ netrewind events --db ... --last 2m --family flow
+13:58:32.673  flow.rollup                  Dell        info  closed=1 opened=1 ...
+13:58:32.839  flow.first_failure_for_pair  10.99.1.11  warn  dport=9200 dst=10.99.1.11 last_success_ago_ms=5017 src=10.99.1.1
+
+$ netrewind events --db ... --last 2m --kind l2.arp_binding_changed
+13:58:28.830  l2.arp_binding_changed  10.99.1.11  warn  mac_new=02:00:00:00:00:de mac_old=42:db:6d:e2:f2:54
+
+== PHASE F: what-happened + incidents (root cause, cause vs. correlation) ==
+$ netrewind what-happened --db ... --host 10.99.1.11 --at now --window 5m
+     13:57:19.965             the recorder started
+     13:58:02.665  +42.7s     the recorder started
+  !  13:58:02.665  +0s        the recorder was not watching for 43s
+     13:58:27.822  +25.16s    10.99.1.11 first answered from 42:db:6d:e2:f2:54  (x2)
+  !  13:58:28.830  +1.01s     10.99.1.11 moved from 42:db:6d:e2:f2:54 to 02:00:00:00:00:de
+  !  13:58:32.839  +4.01s     10.99.1.1 can no longer reach 10.99.1.11 on port 9200 - it worked 5s ago
+  -  13:58:32.843  +0s        10.99.1.11 stopped answering at layer 2
+
+$ netrewind incidents --db ... --last 5m
+! The record has a hole in it
+   rule recorder-was-blind, confidence 100%
+   1  system.gap  Dell - "An absence of events here does not mean an absence of problems."
+   root cause: system.gap on Dell (confidence 100%)
+
+!! A path that was working stopped working
+   rule change-broke-a-path, confidence 88%          affected: 10.99.1.11
+   1  l2.arp_binding_changed  10.99.1.11
+      This is the last thing that changed on the path before it broke.
+      |  which caused
+   2  flow.first_failure_for_pair  10.99.1.11
+      Two machines that had been connecting successfully can no longer
+      complete a handshake.
+      |  and at the same time
+   3  l2.neighbor_failed  10.99.1.11
+   root cause: l2.arp_binding_changed on 10.99.1.11 (confidence 88%)
+   next: "The change named here is the nearest one in time, not a proven
+   cause. Confirm it against your change record before acting."
+
+This is the project's headline demonstration, taken from the code's own
+comment above the scenario: "The whole point of the recorder in one
+scenario: two machines that were connecting fine, a change on the path, and
+then they cannot [connect]." The tool draws an explicit "which caused" link
+from the ARP change to the connection failure, at 88% confidence, and its own
+generated advice is careful to say this is the nearest-in-time change, not a
+proven cause - i.e. it is not overclaiming a mechanism it did not verify.
+
+== Second fault: gateway_hijack ==
+$ lab/inject.sh run gateway_hijack
+-- injecting: the default gateway is answered by a different machine
+
+$ netrewind events --db ... --last 1m --kind l2.arp_binding_changed
+13:58:57.390  l2.arp_binding_changed  10.99.0.201  error  is_gateway=true mac_new=02:00:00:00:00:ff mac_old=02:00:00:00:00:01
+
+$ netrewind incidents --db ... --last 1m --rule gateway-hijack
+!! The default gateway is being answered by a different machine
+   rule gateway-hijack, confidence 90%     affected: 10.99.0.201
+   1  l2.arp_binding_changed  10.99.0.201
+      The hardware address answering for the default gateway changed. Every
+      host on this segment now sends its outbound traffic to a different
+      machine.
+   root cause: l2.arp_binding_changed on 10.99.0.201 (confidence 90%)
+   next: Find which switch port the new hardware address is learned on
+   before changing anything. A failover looks identical to an attack from
+   here; the port tells them apart.
+
+Note severity=error here vs. warn for an ordinary host's ARP change above -
+the collector treats an ARP change on the gateway's own address as more
+severe than one on an arbitrary host (is_gateway=true), which is exactly the
+right distinction for a network engineer to have made for them.
+
+== PHASE E: recovery ==
+$ ip netns exec nrlab ip neigh replace 10.99.0.201 lladdr 02:00:00:00:00:01 dev nrlab0 nud reachable
+$ netrewind events --db ... --last 1m --kind l2.arp_binding_changed
+13:58:57.390  l2.arp_binding_changed  10.99.0.201  error  mac_new=02:00:00:00:00:ff mac_old=02:00:00:00:00:01
+13:59:14.112  l2.arp_binding_changed  10.99.0.201  error  address_changed_hands=true mac_new=02:00:00:00:00:01 mac_old=02:00:00:00:00:ff
+(the gateway's hardware address is recorded moving back to the legitimate one)
+
+Metrics scraped just before stopping:
+netrewind_recorder_blind_seconds_total 42.698
+netrewind_dropped_events_total{source="ringbuf"} 0
+netrewind_collector_up{collector="ebpf.flow"}       1
+netrewind_collector_up{collector="netlink.addr"}    1
+netrewind_collector_up{collector="netlink.link"}    1
+netrewind_collector_up{collector="netlink.neigh"}   1
+netrewind_collector_up{collector="netlink.route"}   1
+netrewind_collector_up{collector="policy.nftables"} 1
+netrewind_collector_up{collector="probe.icmp"}      1
+netrewind_collector_up{collector="update"}          1
+netrewind_collector_up{collector="wire"}            1
+netrewind_correlation_dropped_total 0
+
+== Teardown ==
+$ kill <netrewindd pid>; lab/inject.sh teardown
+$ ip netns list
+(empty - nrlab, nrh1, nrh2 all removed, nothing left touching even the
+synthetic topology, let alone anything real)
+
+$ netrewind events --db /tmp/netrewind-walk/events.db --last 10m -o json | grep -c event_id
+12
+(the record itself is an ordinary SQLite file and survives the namespaces
+and the process that wrote it being torn down)
