@@ -1,0 +1,431 @@
+/* Evidence-first calm operations UI (PRODUCT_RELEASE_PLAN_AR.md §3):
+   quiet and legible during an outage, no loud palette, no decoration that
+   doesn't help a decision. Light/dark via prefers-color-scheme, matching
+   the desktop shell rather than forcing one theme. */
+
+:root {
+  --bg: #f7f7f5;
+  --bg-elevated: #ffffff;
+  --border: #e2e0db;
+  --text: #1c1b1a;
+  --text-muted: #6b6862;
+  --accent: #2f6f4e;
+  --warn-line: #b3541e;
+  --warn-bg: #fbeee4;
+  --error: #a3312a;
+  --neutral-line: #8a877f;
+  --sidebar-bg: #efeee9;
+  /* Dedicated badge text colors, distinct from --text-muted/--error: those
+     two pass contrast everywhere else they're used, but fail WCAG AA
+     (4.5:1) specifically against .severity-badge's own background pairing
+     (found via a real axe-core audit against the live app, both themes -
+     see docs/evidence/21-desktop-accessibility-audit.log). Changing
+     --text-muted/--error themselves would risk the areas that already
+     pass; these exist only for the badge. */
+  --sev-info-text: #5a564f;
+  --sev-error-text: #a3312a;
+  --font-ui: "Inter", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17181a;
+    --bg-elevated: #1f2124;
+    --border: #34373b;
+    --text: #e7e6e3;
+    --text-muted: #9a978f;
+    --accent: #5fae86;
+    --warn-line: #e08a4e;
+    --warn-bg: #2c211a;
+    --error: #d4695f;
+    --neutral-line: #6f6d68;
+    --sidebar-bg: #1b1c1e;
+    --sev-info-text: #b0ada5;
+    --sev-error-text: #dc7a70;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html[dir="rtl"] body {
+  font-family: "IBM Plex Sans Arabic", var(--font-ui);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+}
+
+/* Technical fields (IP, MAC, port, timestamp) stay left-to-right and
+   isolated from the surrounding paragraph direction always, per §3.5:
+   "IP/MAC/ports/timestamps تبقى isolated LTR ومثبتة". */
+.ltr-field {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+/* The sidebar is the first DOM child and anchors to the inline-start edge -
+   the left in English, the right in Arabic, which is the RTL convention
+   real Arabic apps use for primary navigation (Gmail, Slack, etc. all keep
+   the nav rail on the "start" side, not fixed to the physical left). Using
+   grid-template-columns as authored (never swapped) plus border-inline-end
+   (a logical property, not border-right) is what makes this follow
+   direction automatically instead of fighting it with an .order() override
+   in each direction. */
+.app-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: var(--sidebar-bg);
+  border-inline-end: 1px solid var(--border);
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.app-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  padding: 8px 10px 16px;
+}
+
+.nav-item {
+  padding: 9px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.94rem;
+}
+
+.nav-item.active {
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.nav-item:hover {
+  background: var(--bg-elevated);
+}
+
+.nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.main {
+  padding: 24px 32px;
+  max-width: 980px;
+}
+
+.page-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.page-subtitle {
+  color: var(--text-muted);
+  margin: 0 0 20px;
+  font-size: 0.95rem;
+}
+
+.demo-banner {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-line);
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  margin-bottom: 20px;
+}
+
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+
+.severity-badge {
+  display: inline-block;
+  border-radius: 4px;
+  padding: 1px 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.sev-info { background: var(--border); color: var(--sev-info-text); }
+.sev-notice { background: var(--border); color: var(--text); }
+.sev-warn { background: var(--warn-bg); color: var(--warn-line); }
+.sev-error { background: var(--warn-bg); color: var(--sev-error-text); }
+
+.incident-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin: 0 0 6px;
+}
+
+.incident-meta {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
+.chain {
+  border-inline-start: 2px solid var(--border);
+  padding-inline-start: 16px;
+  margin: 10px 0;
+}
+
+.chain-link {
+  position: relative;
+  padding-bottom: 14px;
+}
+
+.chain-link:last-child {
+  padding-bottom: 0;
+}
+
+.chain-link::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: -21px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+/* Relation lines: shape differs, not only color, so the distinction reads
+   without relying on color perception (§3: "لا يعتمد التمييز على اللون
+   وحده"). causes = solid warning line; correlates = dashed neutral line;
+   precedes = dotted neutral line. */
+.relation-line {
+  border: none;
+  border-top-width: 2px;
+  margin: 6px 0 6px 0;
+  width: 32px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.relation-causes { border-top-style: solid; border-top-color: var(--warn-line); }
+.relation-correlates { border-top-style: dashed; border-top-color: var(--neutral-line); }
+.relation-precedes { border-top-style: dotted; border-top-color: var(--neutral-line); }
+
+.relation-label {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-inline-start: 6px;
+}
+
+.root-cause-box {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 10px 0;
+  font-size: 0.9rem;
+}
+
+.advice-box {
+  border-inline-start: 3px solid var(--accent);
+  padding: 6px 12px;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin-top: 10px;
+}
+
+.timeline-row {
+  display: flex;
+  gap: 14px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+  align-items: baseline;
+}
+
+.timeline-time {
+  color: var(--text-muted);
+  width: 100px;
+  flex-shrink: 0;
+}
+
+.capability-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-inline-end: 8px;
+}
+
+.status-up { background: var(--accent); }
+.status-down { background: var(--error); }
+.status-unknown { background: var(--text-muted); }
+
+.lang-toggle {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.lang-toggle button {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.lang-toggle button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.search-box {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 0.95rem;
+  margin-bottom: 18px;
+}
+
+.empty-state {
+  color: var(--text-muted);
+  padding: 30px 0;
+  text-align: center;
+  font-size: 0.92rem;
+}
+
+/* First-run wizard (PRODUCT_RELEASE_PLAN_AR.md §5, Phase 2: "wizard أول
+   تشغيل"). A full-viewport overlay shown before the normal app shell;
+   reuses the existing .card/.page-title/.capability-row primitives above
+   rather than inventing a second visual language. Logical properties only,
+   so this renders correctly unmirrored in both RTL Arabic and LTR English,
+   same as the rest of the app (ADR 0001). */
+.wizard-overlay {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.wizard-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px 32px;
+  max-width: 620px;
+  width: 100%;
+}
+
+.wizard-progress {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.wizard-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+.wizard-dot.done {
+  background: var(--accent);
+}
+
+.wizard-dot.active {
+  background: var(--accent);
+  outline: 2px solid var(--warn-bg);
+}
+
+.wizard-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.wizard-nav-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.wizard-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.wizard-btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.wizard-btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  font-weight: 600;
+}
+
+.wizard-step-note {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+/* Same visual language as the real <button disabled> elements in
+   pages/Evidence.tsx (kept as a shared class here rather than duplicated
+   inline styles, since the wizard's agent/import step follows the exact
+   same "genuinely disabled, not a fake no-op" pattern). */
+.disabled-button {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  font-size: 0.9rem;
+  margin-top: 10px;
+}

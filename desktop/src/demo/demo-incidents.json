@@ -1,0 +1,717 @@
+[
+  {
+    "incident_id": "01M2E00AZ7YQPGTSQME2YNQ9CQ",
+    "opened_at": 1789323618761418114,
+    "closed_at": 1789323651879269647,
+    "status": "closed",
+    "title": "A link went down and took hosts with it",
+    "severity": "warn",
+    "confidence": 80,
+    "root_cause": {
+      "kind": "link.down",
+      "entity": "nrlab1",
+      "event_id": "01M2DZZAE9EYT6BCR5QVX2TPKG",
+      "confidence": 80
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DZZAE9EYT6BCR5QVX2TPKG",
+        "kind": "link.down",
+        "at": 1789323618761418114,
+        "subject": "nrlab1",
+        "relation": "",
+        "why": "An interface went down.",
+        "evidence": {
+          "describe": "nrlab1 was shut down administratively"
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2E00AS706QXH22PCP575B76",
+        "kind": "l2.neighbor_failed",
+        "at": 1789323651879269647,
+        "subject": "10.99.1.11",
+        "relation": "causes",
+        "why": "Hosts stopped answering at layer 2 immediately afterwards, which is the link failure showing up as apparent host failures.",
+        "evidence": {
+          "describe": "10.99.1.11 stopped answering at layer 2"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.1.11"
+    ],
+    "rule_id": "link-down-isolated-hosts",
+    "advice": "The hosts did not fail. Restore the link and they will return; investigating them individually wastes the outage."
+  },
+  {
+    "incident_id": "01M2DZZDNRNP5DPBQKEG6VP6F2",
+    "opened_at": 1789323621929232352,
+    "closed_at": 1789323621929232352,
+    "status": "closed",
+    "title": "An address moved to a different machine",
+    "severity": "warn",
+    "confidence": 75,
+    "root_cause": {
+      "kind": "l2.arp_binding_changed",
+      "entity": "10.99.0.11",
+      "event_id": "01M2DZZDH9S2AGZEE12F3CA8V6",
+      "confidence": 75
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DZZDH9S2AGZEE12F3CA8V6",
+        "kind": "l2.arp_binding_changed",
+        "at": 1789323621929232352,
+        "subject": "10.99.0.11",
+        "relation": "",
+        "why": "This address is now answered by hardware that was not previously bound to it, so the machine behind it is a different machine.",
+        "evidence": {
+          "describe": "10.99.0.11 moved from 02:00:00:00:00:aa to 02:00:00:00:00:11"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "address-changed-hands",
+    "advice": "Normal after a DHCP lease expires. Worth a look if the address is a server, is statically assigned, or moved without a lease renewal near it."
+  },
+  {
+    "incident_id": "01M2DZZED4YKN5HH821MN4H3WY",
+    "opened_at": 1789323622779765445,
+    "closed_at": 1789323651879269647,
+    "status": "closed",
+    "title": "The default gateway is being answered by a different machine",
+    "severity": "error",
+    "confidence": 90,
+    "root_cause": {
+      "kind": "l2.arp_binding_changed",
+      "entity": "10.99.0.201",
+      "event_id": "01M2DZZEBVB2XZ5JN2NF2FYY66",
+      "confidence": 90
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DZZEBVB2XZ5JN2NF2FYY66",
+        "kind": "l2.arp_binding_changed",
+        "at": 1789323622779765445,
+        "subject": "10.99.0.201",
+        "relation": "",
+        "why": "The hardware address answering for the default gateway changed. Every host on this segment now sends its outbound traffic to a different machine.",
+        "evidence": {
+          "describe": "10.99.0.201 moved from 02:00:00:00:00:01 to 02:00:00:00:00:ff - this is the default gateway"
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2DZZM8FJRQSX6M9N73WGN9B",
+        "kind": "l3.default_route_changed",
+        "at": 1789323628815834747,
+        "subject": "default",
+        "relation": "causes",
+        "why": "Routing followed the change, so traffic is now leaving through a path nobody chose.",
+        "evidence": {
+          "describe": "the default route now goes via 10.99.0.202 (was 10.99.0.201)"
+        }
+      },
+      {
+        "seq": 2,
+        "event_id": "01M2E00AS706QXH22PCP575B76",
+        "kind": "l2.neighbor_failed",
+        "at": 1789323651879269647,
+        "subject": "10.99.1.11",
+        "relation": "correlates",
+        "why": "Connectivity was lost while the gateway was being answered elsewhere.",
+        "evidence": {
+          "describe": "10.99.1.11 stopped answering at layer 2"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.1.11",
+      "10.99.0.201"
+    ],
+    "rule_id": "gateway-hijack",
+    "advice": "Find which switch port the new hardware address is learned on before changing anything. A failover looks identical to an attack from here; the port tells them apart."
+  },
+  {
+    "incident_id": "01M2DZZFCDNK5S08S1F0CX79Y5",
+    "opened_at": 1789323623786338456,
+    "closed_at": 1789323623786338456,
+    "status": "closed",
+    "title": "An address moved to a different machine",
+    "severity": "warn",
+    "confidence": 75,
+    "root_cause": {
+      "kind": "l2.arp_binding_changed",
+      "entity": "10.99.0.11",
+      "event_id": "01M2DZZFBA065FSAGF0HZTH07D",
+      "confidence": 75
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DZZFBA065FSAGF0HZTH07D",
+        "kind": "l2.arp_binding_changed",
+        "at": 1789323623786338456,
+        "subject": "10.99.0.11",
+        "relation": "",
+        "why": "This address is now answered by hardware that was not previously bound to it, so the machine behind it is a different machine.",
+        "evidence": {
+          "describe": "10.99.0.11 moved from 02:00:00:00:00:11 to 02:00:00:00:00:bb"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "address-changed-hands",
+    "advice": "Normal after a DHCP lease expires. Worth a look if the address is a server, is statically assigned, or moved without a lease renewal near it."
+  },
+  {
+    "incident_id": "01M2DZZFCDNK5S08S1F2PQGC54",
+    "opened_at": 1789323623787476204,
+    "closed_at": 1789323651879269647,
+    "status": "closed",
+    "title": "Two machines are claiming the same address",
+    "severity": "error",
+    "confidence": 80,
+    "root_cause": {
+      "kind": "l2.duplicate_ip",
+      "entity": "10.99.0.11",
+      "event_id": "01M2DZZFBBW4G7GMX7M1XN8AND",
+      "confidence": 80
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DZZFBBW4G7GMX7M1XN8AND",
+        "kind": "l2.duplicate_ip",
+        "at": 1789323623787476204,
+        "subject": "10.99.0.11",
+        "relation": "",
+        "why": "The hardware address answering for this address kept changing between the same few machines, which is what an address conflict looks like from the neighbour table.",
+        "evidence": {
+          "describe": "10.99.0.11 is being claimed by more than one machine"
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2E00AS706QXH22PCP575B76",
+        "kind": "l2.neighbor_failed",
+        "at": 1789323651879269647,
+        "subject": "10.99.1.11",
+        "relation": "causes",
+        "why": "The address stopped answering reliably while it was contested.",
+        "evidence": {
+          "describe": "10.99.1.11 stopped answering at layer 2"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11",
+      "10.99.1.11"
+    ],
+    "rule_id": "contested-address",
+    "advice": "Check for a statically configured host inside the DHCP pool, or a second DHCP server. Both produce this, and both keep producing it until one is removed."
+  },
+  {
+    "incident_id": "01M2DZZWJ9G4E782BTKGVNE9ED",
+    "opened_at": 1789323625794690622,
+    "closed_at": 1789323677079529217,
+    "status": "closed",
+    "title": "A measured path stopped answering",
+    "severity": "error",
+    "confidence": 90,
+    "root_cause": {
+      "kind": "l2.arp_binding_changed",
+      "entity": "10.99.0.11",
+      "event_id": "01M2DZZHA2TMCB9X8YXGQ3WF8T",
+      "confidence": 90
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DZZHA2TMCB9X8YXGQ3WF8T",
+        "kind": "l2.arp_binding_changed",
+        "at": 1789323625794690622,
+        "subject": "10.99.0.11",
+        "relation": "",
+        "why": "This is the last thing that changed before the path stopped answering.",
+        "evidence": {
+          "describe": "10.99.0.11 moved from 02:00:00:00:00:aa to 02:00:00:00:00:bb"
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2DZZWD9XR1ECWR6SAG6K4D3",
+        "kind": "metric.anomaly",
+        "at": 1789323637161119274,
+        "subject": "10.99.0.11",
+        "relation": "causes",
+        "why": "Probes to this address began going unanswered. Packet loss announces itself to nobody; it has to be measured, and it was.",
+        "evidence": {
+          "describe": "10.99.0.11 stopped answering entirely"
+        }
+      },
+      {
+        "seq": 2,
+        "event_id": "01M2E013CQ3BN90RP18GDH0222",
+        "kind": "metric.anomaly",
+        "at": 1789323677079529217,
+        "subject": "10.99.0.11",
+        "relation": "precedes",
+        "why": "It later answered again, which bounds how long the outage lasted.",
+        "evidence": {
+          "describe": "10.99.0.11 is answering again"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "reachability-lost",
+    "advice": "This is measured, not reported: the recorder sent probes and they did not come back. If the change named above was intended, the loss is a side effect nobody planned. If there is no change above it, the fault is beyond what this recorder can see from where it sits."
+  },
+  {
+    "incident_id": "01M2E00YR1C5CZSXS8096Q7VEE",
+    "opened_at": 1789323625794690622,
+    "closed_at": 1789323672071978060,
+    "status": "closed",
+    "title": "A machine's resolver changed under it",
+    "severity": "warn",
+    "confidence": 80,
+    "root_cause": {
+      "kind": "dns.resolver_changed",
+      "entity": "10.99.0.11",
+      "event_id": "01M2E00YG7HGQN83V2AKFHMPXW",
+      "confidence": 80
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DZZHA2TMCB9X8YXGQ3WF8T",
+        "kind": "l2.arp_binding_changed",
+        "at": 1789323625794690622,
+        "subject": "10.99.0.11",
+        "relation": "",
+        "why": "This is what changed on the path just before the resolver did.",
+        "evidence": {
+          "describe": "10.99.0.11 moved from 02:00:00:00:00:aa to 02:00:00:00:00:bb"
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2E00YG7HGQN83V2AKFHMPXW",
+        "kind": "dns.resolver_changed",
+        "at": 1789323672071978060,
+        "subject": "10.99.0.11",
+        "relation": "causes",
+        "why": "This machine started sending its lookups somewhere else. Every name it resolves from here on is answered by a different party.",
+        "evidence": {
+          "describe": "10.99.0.11 started asking 10.99.0.99 instead of 10.99.0.1"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "resolver-hijacked",
+    "advice": "Compare against your DHCP scope. A client that changed resolver without a lease renewal near it did not choose to; something told it to. Check for a second DHCP server and for the gateway's hardware address changing at about the same time."
+  },
+  {
+    "incident_id": "01M2DZZM8MH54K0835ADRHYTVZ",
+    "opened_at": 1789323628815834747,
+    "closed_at": 1789323629821865797,
+    "status": "closed",
+    "title": "The default route was re-pointed",
+    "severity": "error",
+    "confidence": 85,
+    "root_cause": {
+      "kind": "l3.default_route_changed",
+      "entity": "default",
+      "event_id": "01M2DZZM8FJRQSX6M9N73WGN9B",
+      "confidence": 85
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DZZM8FJRQSX6M9N73WGN9B",
+        "kind": "l3.default_route_changed",
+        "at": 1789323628815834747,
+        "subject": "default",
+        "relation": "",
+        "why": "The route all outbound traffic follows now points somewhere else.",
+        "evidence": {
+          "describe": "the default route now goes via 10.99.0.202 (was 10.99.0.201)"
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2DZZN7XRBAB2BF5YZ7XNC2C",
+        "kind": "l3.route_removed",
+        "at": 1789323629821865797,
+        "subject": "default",
+        "relation": "causes",
+        "why": "Reachability changed once the traffic started taking the new path.",
+        "evidence": {
+          "describe": "the default route was removed - nothing beyond the local segment is reachable"
+        }
+      }
+    ],
+    "rule_id": "default-route-moved",
+    "advice": "Confirm this was intended. Compare the time against your change record: an unplanned default route change means outbound traffic is leaving through a path nobody chose."
+  },
+  {
+    "incident_id": "01M2DZZNFPF0NA9PZYYF7TD4Y2",
+    "opened_at": 1789323629821865797,
+    "closed_at": 1789323651879269647,
+    "status": "closed",
+    "title": "The default route disappeared",
+    "severity": "error",
+    "confidence": 95,
+    "root_cause": {
+      "kind": "l3.route_removed",
+      "entity": "default",
+      "event_id": "01M2DZZN7XRBAB2BF5YZ7XNC2C",
+      "confidence": 95
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DZZN7XRBAB2BF5YZ7XNC2C",
+        "kind": "l3.route_removed",
+        "at": 1789323629821865797,
+        "subject": "default",
+        "relation": "",
+        "why": "The default route was withdrawn. Nothing beyond the local segment is reachable from here.",
+        "evidence": {
+          "describe": "the default route was removed - nothing beyond the local segment is reachable"
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2E00AS706QXH22PCP575B76",
+        "kind": "l2.neighbor_failed",
+        "at": 1789323651879269647,
+        "subject": "10.99.1.11",
+        "relation": "causes",
+        "why": "Reachability began failing once there was no default path.",
+        "evidence": {
+          "describe": "10.99.1.11 stopped answering at layer 2"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.1.11"
+    ],
+    "rule_id": "default-route-lost",
+    "advice": "Look at the timeline immediately before this. A default route rarely leaves on its own; it follows an interface going down, a DHCP lease expiring, or a routing daemon losing its peer. Fix that, not the route."
+  },
+  {
+    "incident_id": "01M2DZZSCP69KP8SGNBDNEFRYM",
+    "opened_at": 1789323631827653632,
+    "closed_at": 1789323633833613850,
+    "status": "closed",
+    "title": "A service stopped answering",
+    "severity": "warn",
+    "confidence": 80,
+    "root_cause": {
+      "kind": "flow.handshake_fail",
+      "entity": "10.99.0.11",
+      "event_id": "01M2DZZQ6KDC900N5S7FK4Y9Y2",
+      "confidence": 80
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DZZQ6KDC900N5S7FK4Y9Y2",
+        "kind": "flow.handshake_fail",
+        "at": 1789323631827653632,
+        "subject": "10.99.0.11",
+        "relation": "",
+        "why": "Repeated connections to this service went from the opening SYN straight to closed without ever being answered. Something refused them, dropped them, or was not listening.",
+        "evidence": {
+          "describe": "connections to 10.99.0.11 port 9999 went unanswered",
+          "last_event_id": "01M2DZZQ6KDC900N5S7FK4Y9Y2",
+          "matched_count": 3
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "service-unreachable",
+    "advice": "Check whether the service is listening before blaming the network. If it is, look at the timeline for a filtering change or a route change just before the first failure - both look identical from the client."
+  },
+  {
+    "incident_id": "01M2E0044FE4FVKP7QG17N1DE5",
+    "opened_at": 1789323638844796687,
+    "closed_at": 1789323644857571165,
+    "status": "closed",
+    "title": "A service stopped answering",
+    "severity": "warn",
+    "confidence": 80,
+    "root_cause": {
+      "kind": "flow.handshake_fail",
+      "entity": "10.99.0.11",
+      "event_id": "01M2DZZY1WZPB12EQYWT4Q14X7",
+      "confidence": 80
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2DZZY1WZPB12EQYWT4Q14X7",
+        "kind": "flow.handshake_fail",
+        "at": 1789323638844796687,
+        "subject": "10.99.0.11",
+        "relation": "",
+        "why": "Repeated connections to this service went from the opening SYN straight to closed without ever being answered. Something refused them, dropped them, or was not listening.",
+        "evidence": {
+          "describe": "connections to 10.99.0.11 port 9100 went unanswered",
+          "last_event_id": "01M2DZZY1WZPB12EQYWT4Q14X7",
+          "matched_count": 3
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "service-unreachable",
+    "advice": "Check whether the service is listening before blaming the network. If it is, look at the timeline for a filtering change or a route change just before the first failure - both look identical from the client."
+  },
+  {
+    "incident_id": "01M2E00726CQ5B6R54BGRPNMHB",
+    "opened_at": 1789323647871843328,
+    "closed_at": 1789323647871843328,
+    "status": "closed",
+    "title": "An address moved to a different machine",
+    "severity": "warn",
+    "confidence": 75,
+    "root_cause": {
+      "kind": "l2.arp_binding_changed",
+      "entity": "10.99.1.11",
+      "event_id": "01M2E006VZ0ZDN823X02C3M68S",
+      "confidence": 75
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2E006VZ0ZDN823X02C3M68S",
+        "kind": "l2.arp_binding_changed",
+        "at": 1789323647871843328,
+        "subject": "10.99.1.11",
+        "relation": "",
+        "why": "This address is now answered by hardware that was not previously bound to it, so the machine behind it is a different machine.",
+        "evidence": {
+          "describe": "10.99.1.11 moved from 16:6d:8d:73:c7:d7 to 02:00:00:00:00:de"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.1.11"
+    ],
+    "rule_id": "address-changed-hands",
+    "advice": "Normal after a DHCP lease expires. Worth a look if the address is a server, is statically assigned, or moved without a lease renewal near it."
+  },
+  {
+    "incident_id": "01M2E00AZ7YQPGTSQMDR8XD93W",
+    "opened_at": 1789323647871843328,
+    "closed_at": 1789323651879269647,
+    "status": "closed",
+    "title": "A path that was working stopped working",
+    "severity": "error",
+    "confidence": 88,
+    "root_cause": {
+      "kind": "l2.arp_binding_changed",
+      "entity": "10.99.1.11",
+      "event_id": "01M2E006VZ0ZDN823X02C3M68S",
+      "confidence": 88
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2E006VZ0ZDN823X02C3M68S",
+        "kind": "l2.arp_binding_changed",
+        "at": 1789323647871843328,
+        "subject": "10.99.1.11",
+        "relation": "",
+        "why": "This is the last thing that changed on the path before it broke.",
+        "evidence": {
+          "describe": "10.99.1.11 moved from 16:6d:8d:73:c7:d7 to 02:00:00:00:00:de"
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2E00AS485Y8MMEH87B4QZQ7",
+        "kind": "flow.first_failure_for_pair",
+        "at": 1789323651876282975,
+        "subject": "10.99.1.11",
+        "relation": "causes",
+        "why": "Two machines that had been connecting successfully can no longer complete a handshake. Whatever else is true, something between them changed.",
+        "evidence": {
+          "describe": "10.99.1.1 can no longer reach 10.99.1.11 on port 9200 - it worked 5s ago"
+        }
+      },
+      {
+        "seq": 2,
+        "event_id": "01M2E00AS706QXH22PCP575B76",
+        "kind": "l2.neighbor_failed",
+        "at": 1789323651879269647,
+        "subject": "10.99.1.11",
+        "relation": "correlates",
+        "why": "Other connections started failing in the same window.",
+        "evidence": {
+          "describe": "10.99.1.11 stopped answering at layer 2"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.1.11"
+    ],
+    "rule_id": "change-broke-a-path",
+    "advice": "The change named here is the nearest one in time, not a proven cause. Confirm it against your change record before acting: if it was intended, the breakage is a side effect nobody planned; if it was not, something changed the network without going through you."
+  },
+  {
+    "incident_id": "01M2E00WHQTEPKJA7JV8G971H9",
+    "opened_at": 1789323669997207960,
+    "closed_at": 1789323672071978060,
+    "status": "closed",
+    "title": "A second DHCP server is answering on this segment",
+    "severity": "error",
+    "confidence": 92,
+    "root_cause": {
+      "kind": "dhcp.server_seen",
+      "entity": "10.99.0.99",
+      "event_id": "01M2E00WFDXWB6PD42SK2C0M3G",
+      "confidence": 92
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2E00WFDXWB6PD42SK2C0M3G",
+        "kind": "dhcp.server_seen",
+        "at": 1789323669997207960,
+        "subject": "10.99.0.99",
+        "relation": "",
+        "why": "A DHCP server answered on a segment that already had one. Every client that renews from here on gets whichever of them replies first.",
+        "evidence": {
+          "describe": "a second DHCP server appeared on 10.99.0.99, handing out 10.99.0.99 as the gateway"
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2E00YG7HGQN83V2AKFHMPXW",
+        "kind": "dns.resolver_changed",
+        "at": 1789323672071978060,
+        "subject": "10.99.0.11",
+        "relation": "causes",
+        "why": "Clients began taking different addresses, gateways or resolvers, which is the second server's configuration arriving.",
+        "evidence": {
+          "describe": "10.99.0.11 started asking 10.99.0.99 instead of 10.99.0.1"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.99",
+      "10.99.0.11"
+    ],
+    "rule_id": "rogue-dhcp-server",
+    "advice": "Find the switch port the new server's hardware address is learned on and shut it. Almost always a consumer router plugged in the wrong way round, with its LAN side facing the network. Until it is off, clients will keep taking its addresses and its gateway at random."
+  },
+  {
+    "incident_id": "01M2E02JGAFE9JP3A3D49T45P5",
+    "opened_at": 1789323685110447010,
+    "closed_at": 1789323725273711942,
+    "status": "closed",
+    "title": "A link went down and took hosts with it",
+    "severity": "warn",
+    "confidence": 80,
+    "root_cause": {
+      "kind": "link.down",
+      "entity": "nrlab0",
+      "event_id": "01M2E01B7PKQNSFX2ATSJ620BG",
+      "confidence": 80
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2E01B7PKQNSFX2ATSJ620BG",
+        "kind": "link.down",
+        "at": 1789323685110447010,
+        "subject": "nrlab0",
+        "relation": "",
+        "why": "An interface went down.",
+        "evidence": {
+          "describe": "nrlab0 lost carrier"
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2E00W19DNG670M9485XSN7Q",
+        "kind": "l2.neighbor_failed",
+        "at": 1789323725273711942,
+        "subject": "10.99.0.11",
+        "relation": "causes",
+        "why": "Hosts stopped answering at layer 2 immediately afterwards, which is the link failure showing up as apparent host failures.",
+        "evidence": {
+          "describe": "10.99.0.11 stopped answering at layer 2"
+        }
+      }
+    ],
+    "victims": [
+      "10.99.0.11"
+    ],
+    "rule_id": "link-down-isolated-hosts",
+    "advice": "The hosts did not fail. Restore the link and they will return; investigating them individually wastes the outage."
+  },
+  {
+    "incident_id": "01M2E02JGAFE9JP3A3D7WM9GX2",
+    "opened_at": 1789323685110447010,
+    "closed_at": 1789323699114257312,
+    "status": "closed",
+    "title": "A port is flapping",
+    "severity": "warn",
+    "confidence": 88,
+    "root_cause": {
+      "kind": "link.down",
+      "entity": "nrlab0",
+      "event_id": "01M2E01B7PKQNSFX2ATSJ620BG",
+      "confidence": 88
+    },
+    "chain": [
+      {
+        "seq": 0,
+        "event_id": "01M2E01B7PKQNSFX2ATSJ620BG",
+        "kind": "link.down",
+        "at": 1789323685110447010,
+        "subject": "nrlab0",
+        "relation": "",
+        "why": "The same interface went down repeatedly in a few minutes. One outage is an event; a run of them is a fault in the link itself.",
+        "evidence": {
+          "describe": "nrlab0 lost carrier",
+          "last_event_id": "01M2E01B7PKQNSFX2ATSJ620BG",
+          "matched_count": 3
+        }
+      },
+      {
+        "seq": 1,
+        "event_id": "01M2E01RXAKT8M0JGKXFJV6P9T",
+        "kind": "link.up",
+        "at": 1789323699114257312,
+        "subject": "nrlab0",
+        "relation": "correlates",
+        "why": "It came back each time, which is why nobody noticed it was failing.",
+        "evidence": {
+          "describe": "nrlab0 came back after 14.003s"
+        }
+      }
+    ],
+    "rule_id": "port-flapping",
+    "advice": "A port that flaps repeatedly is usually a failing transceiver, a marginal cable, or a duplex mismatch. Restarting the interface will not fix any of those, and hides the evidence."
+  }
+]
