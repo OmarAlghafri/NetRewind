@@ -38,6 +38,11 @@ Thumbs.db
 # Runtime / temp
 *.tmp
 *.log
+# ...except docs/evidence/*.log: these are permanent, durable QA/test
+# transcripts (real commands + real output), not runtime/temp files - the
+# ".log" extension is just their naming convention. Without this exemption
+# the blanket rule above silently drops every one of them from `git add`.
+!docs/evidence/*.log
 
 # Transient run outputs
 snapshots/
@@ -46,3 +51,16 @@ reports/*.md
 # GNS3 project working directory (topology is built through the API; its runtime
 # artifacts are machine-specific and not versioned inside the code repo).
 NetRewind*Lab/
+
+# Downloaded model weights for ai/eval benchmarking - multi-GB binaries,
+# never versioned; docs/evidence/*.log records what was downloaded, from
+# where, and what it scored, which is the part that actually needs to survive.
+ai/eval/models/
+# Raw per-run benchmark output (ai/eval/run) - regenerable by re-running
+# against the same model; docs/evidence/*.log carries the summarized,
+# permanent record of each real run instead.
+ai/eval/results/
+
+# Working notes kept during development to track phase status and open
+# questions across sessions - useful locally, not project documentation.
+docs/agent-state/
