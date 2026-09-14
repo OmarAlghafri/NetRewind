@@ -1,0 +1,88 @@
+Re-runs every candidate model in both languages under the corrected
+`ai/eval/run`, after the two measurement defects recorded in log 24 were
+fixed: the runner now sends `cache_prompt: false` on every request (so a
+long-lived llama-server evaluates each prompt from scratch instead of
+serving it from the KV cache left by an earlier request, which changed the
+logits enough to flip greedy argmax), and the system prompt's rule 6 now
+requires every free-text field to be written in the question's language.
+One table, one runner, one prompt, one budget, for all four combinations -
+superseding the piecemeal tables in logs 20, 23 and 24 as the basis for the
+model decision.
+
+## Setup
+
+Same as logs 23/24 in every other respect: llama.cpp b10948 (CPU, 8
+threads), the JSON schema grammar extracted from the runner's own
+`expectedJSONSchema`, `temperature 0`, `-n-predict 700`, the 6-case `dev`
+split including both de-identified variants. One llama-server per model,
+started fresh and stopped after both languages. Raw results (gitignored):
+
+    ai/eval/results/20260914T070716Z   Phi-4-mini-instruct  English
+    ai/eval/results/20260914T071722Z   Phi-4-mini-instruct  Arabic
+    ai/eval/results/20260914T072638Z   Qwen2.5-1.5B-Instruct  English
+    ai/eval/results/20260914T073118Z   Qwen2.5-1.5B-Instruct  Arabic
+
+Two regression tests pin the fixes (`ai/eval/run/main_test.go`:
+`TestRequestDisablesThePromptCache`, `TestSystemPromptNamesTheAnswerLanguage`).
+
+## Results
+
+| | Phi-4-mini (3.8B, MIT) EN | Phi-4-mini AR | Qwen2.5-1.5B (Apache-2.0) EN | Qwen2.5-1.5B AR |
+|---|---|---|---|---|
+| Valid schema JSON | 6/6 | 6/6 | 5/6 | 5/6 |
+| Pass (no hard violation) | 0/6 | 2/6 | 1/5 | 0/5 |
+| Top-1 cause hit | 3/6 | 2/6 | 1/5 | 1/5 |
+| Top-3 cause hit | 3/6 | 2/6 | 3/5 | 1/5 |
+| Correct refusals (of 2 refusal cases) | 0 | 2 | 1 (1 case invalid) | 0 (1 case invalid) |
+| Mean citation precision | 0.08 | 0.30 | 0.30 | 0.07 |
+| Fabricated event ID cited | yes (2 cases) | yes (2 cases) | no | no |
+| Answered in the question's language | 6/6 | 6/6 | 6/6 | 4/6 |
+
+Per-case lines are in the raw results; the failures, read individually:
+
+- Phi-4-mini, both languages, both `gateway_hijack` variants: cites
+  `01M2DNG9B46EKK7Q83SZQ9PKV6`, an ID that does not exist in the input -
+  one character run away from the real `01M2DNG9B46EKK7Q83SYPGC6KY`. A
+  fabricated citation is the single hardest failure the harness has, and
+  the plan's gate ("event IDs صحيحة 100%") makes it disqualifying on its own.
+- Phi-4-mini English: answers confidently on both refusal cases
+  (`collector_down`, `normal_traffic`) - 0 of 2 correct refusals. The same
+  model in Arabic refused both correctly. Same weights, same evidence; the
+  difference is the prompt language, which is a real finding about how
+  little the refusal behaviour can be relied on.
+- Every positive case that was answered exceeded its own confidence ceiling
+  (both models, both languages), which the harness counts as a hard
+  violation.
+- Qwen2.5-1.5B: `collector_down` still loops to the token cap in both
+  languages (the log 24 behaviour, unchanged by the prompt); 4/6 Arabic
+  answers in Arabic (up from 1/6 in log 24).
+
+## What changed against logs 23/24, and why the numbers moved
+
+The earlier runs served most prompts from the prompt cache; these do not.
+Phi-4-mini English moved from 2/6 pass to 0/6, and its Top-1 from 2/6 to
+3/6 - the same model, evaluated the same way twice, is this far apart on a
+6-case sample, which is the reason a 6-case `dev` split was never going to
+be the basis for a selection decision and why the `test` split stays
+untouched. The answer-language instruction did what it was for: Phi now
+answers Arabic questions in Arabic 6/6 (3/6 before), Qwen 4/6 (1/6 before).
+
+## Decision
+
+No candidate meets the release gate in `PRODUCT_RELEASE_PLAN_AR.md` §6
+(100% valid JSON, 100% real event IDs, no causal claim under a gap or with a
+collector down, and the agreed Top-3/citation thresholds on a frozen test
+split): the best combination (Phi-4-mini, Arabic) passes 2 of 6 cases and
+fabricates an event ID in another two. Per the plan's own rule - "نتيجة
+سيئة تعني إبقاء AI off، لا تخفيض العتبة بصمت" - **no model ships in 1.0.0
+and no AI feature is enabled.** The evaluation corpus, harness and runner
+remain in the tree as the gate any future candidate has to clear.
+
+## Verification
+
+- `go test ./ai/eval/...`: all pass, including the two new regression
+  tests.
+- Each run's summary line is reproduced above verbatim from the runner's
+  output; the answer-language counts are from counting Arabic-script
+  characters in every saved raw response.
+- llama-server confirmed stopped after the sweep (no process left).

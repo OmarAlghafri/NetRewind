@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
 
 // TestExtractModelOutputIgnoresNestedBraces is a regression test for a real
 // bug found while reading docs/evidence/20-ai-eval-first-benchmark.log's raw
@@ -91,5 +95,27 @@ func TestExtractModelOutputHandlesStrayClosingBrace(t *testing.T) {
 	}
 	if out.Summary != "ok" {
 		t.Errorf("Summary = %q, want %q", out.Summary, "ok")
+	}
+}
+
+// TestRequestDisablesThePromptCache pins the reproducibility fix: every
+// request tells llama-server not to serve the prompt from its KV cache, so
+// a rerun of the same case evaluates the same tokens the same way.
+func TestRequestDisablesThePromptCache(t *testing.T) {
+	body, err := json.Marshal(chatCompletionRequest{Temperature: 0, MaxTokens: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), `"cache_prompt":false`) {
+		t.Errorf("request body = %s, want cache_prompt:false present", body)
+	}
+}
+
+// TestSystemPromptNamesTheAnswerLanguage pins that the prompt asks for the
+// answer in the question's language, so -lang ar measures Arabic output
+// and not only Arabic comprehension.
+func TestSystemPromptNamesTheAnswerLanguage(t *testing.T) {
+	if !strings.Contains(systemPrompt, "same language as the question") {
+		t.Errorf("system prompt no longer instructs the answer language")
 	}
 }

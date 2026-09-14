@@ -102,18 +102,17 @@ repeatable.
     Both refusal cases were among the invalid ones, so no refusal number
     exists for this combination. Worse than Phi-4-mini-instruct in Arabic
     on every metric and worse than its own English run.
-  - Two caveats found while doing that, which apply to **all** runs so far
-    (log 24 has the detail): `temperature: 0` did not reproduce
-    byte-for-byte across two runs against one long-lived `llama-server`
-    (its prompt cache serves later prompts from KV state and the cached vs.
-    fresh paths are not bit-identical - restart the server or send
-    `cache_prompt: false` for any run that must be reproducible, e.g. the
-    eventual `test`-split one); and the system prompt never specifies an
-    answer language, so `-lang ar` measures acting on an Arabic question
-    against English evidence, not explaining in Arabic (Phi-4-mini answered
-    in Arabic on 3/6 cases, Qwen on 1/6). Neither is changed in `ai/eval/run`
-    yet, to keep the existing numbers comparable; both should be fixed
-    together before the next full candidate sweep.
+  - Both measurement defects those runs exposed are fixed
+    (`docs/evidence/27-ai-eval-corrected-sweep.log`): the runner sends
+    `cache_prompt: false` so a long-lived `llama-server` evaluates every
+    prompt from scratch (its prompt cache had made `temperature: 0` runs
+    non-reproducible), and the system prompt requires answers in the
+    question's language. The corrected sweep of both models in both
+    languages is the table that stands: no candidate meets the release
+    gate - the best combination passes 2 of 6 cases and Phi-4-mini
+    fabricates an event ID in two others - so **no model ships and no AI
+    feature is enabled in 1.0.0**, per the plan's own rule that a bad result
+    keeps AI off rather than lowering the bar.
   - `ai/eval/run` now supports `-lang {en,ar}` and correctly replicates
     `ai/eval/gen`'s address-substitution table for `-deidentified` cases
     (verified against the real `<HOST_1>` token already in
