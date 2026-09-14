@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "netrewind-desktop",
+  "bundle": {
+    "linux": {
+      "deb": {
+        "desktopTemplate": "./linux/netrewind.desktop"
+      },
+      "rpm": {
+        "desktopTemplate": "./linux/netrewind.desktop"
+      }
+    }
+  }
+}

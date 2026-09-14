@@ -2,6 +2,10 @@ import { useMemo } from "react";
 import { useLanguage } from "../i18n/LanguageContext";
 import type { NetRewindEvent, Incident } from "../types";
 import { SeverityBadge } from "../components/SeverityBadge";
+import type { SourceSettings } from "../data/source";
+import type { Record } from "../data/useRecord";
+
+declare const __APP_VERSION__: string;
 
 const SEVERITY_ORDER = ["info", "notice", "warn", "error"] as const;
 
@@ -11,8 +15,18 @@ const SEVERITY_ORDER = ["info", "notice", "warn", "error"] as const;
 // event's "kind" before the first "." (e.g. "link" from "link.down"),
 // mirroring how internal/correlate's own rule files group kinds (rules/*.yaml
 // "kinds:" lists).
-export function Diagnostics({ events, incidents }: { events: NetRewindEvent[]; incidents: Incident[] }) {
-  const { t } = useLanguage();
+export function Diagnostics({
+  events,
+  incidents,
+  settings,
+  record,
+}: {
+  events: NetRewindEvent[];
+  incidents: Incident[];
+  settings: SourceSettings;
+  record: Record;
+}) {
+  const { t, lang } = useLanguage();
 
   const byFamily = useMemo(() => {
     const counts = new Map<string, number>();
@@ -35,6 +49,40 @@ export function Diagnostics({ events, incidents }: { events: NetRewindEvent[]; i
     <div>
       <h1 className="page-title">{t("diagnostics_title")}</h1>
       <p className="page-subtitle">{t("diagnostics_subtitle")}</p>
+
+      <div className="card">
+        <strong>{t("diagnostics_source_title")}</strong>
+        <div className="capability-row">
+          <span>{t("diagnostics_app_version")}</span>
+          <span className="ltr-field">{__APP_VERSION__}</span>
+        </div>
+        <div className="capability-row">
+          <span>{t("diagnostics_source_kind")}</span>
+          <span className="ltr-field">{settings.kind}</span>
+        </div>
+        {settings.kind === "live" && (
+          <div className="capability-row">
+            <span>{t("diagnostics_endpoint")}</span>
+            <span className="ltr-field">{settings.endpoint || "(default)"}</span>
+          </div>
+        )}
+        {settings.kind === "bundle" && (
+          <div className="capability-row">
+            <span>{t("diagnostics_bundle_path")}</span>
+            <span className="ltr-field" style={{ wordBreak: "break-all" }}>
+              {settings.bundlePath}
+            </span>
+          </div>
+        )}
+        <div className="capability-row" style={{ borderBottom: "none" }}>
+          <span>{t("diagnostics_last_refresh")}</span>
+          <span className="ltr-field">
+            {record.refreshedAt
+              ? record.refreshedAt.toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour12: false })
+              : "-"}
+          </span>
+        </div>
+      </div>
 
       <div className="card">
         <strong>{t("diagnostics_totals_title")}</strong>

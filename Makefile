@@ -41,6 +41,38 @@ linux:
 test:
 	go test ./...
 
+# ---------------------------------------------------------------------------
+# Desktop application (desktop/: Tauri + React)
+# ---------------------------------------------------------------------------
+#
+# The desktop installer carries the recorder on Windows, where there is no
+# package manager to install it from: desktop-resources stages the native
+# recorder binaries, the rules and the sample configuration where
+# desktop/src-tauri/tauri.conf.json's "resources" entry expects them, and
+# the NSIS installer registers the service from there. On Linux the recorder
+# comes from its own .deb/.rpm (deploy/build-deb.sh, build-rpm.sh), so the
+# staged directory only carries a note saying so.
+DESKTOP_RES := $(BUILD)/desktop-resources/recorder
+
+.PHONY: desktop-resources
+desktop-resources:
+	rm -rf $(DESKTOP_RES) && mkdir -p $(DESKTOP_RES)
+ifeq ($(OS),Windows_NT)
+	go build -trimpath -ldflags "-s -w $(LDFLAGS)" -o $(DESKTOP_RES)/netrewindd.exe ./cmd/netrewindd
+	go build -trimpath -ldflags "-s -w $(LDFLAGS)" -o $(DESKTOP_RES)/netrewind.exe  ./cmd/netrewind
+	mkdir -p $(DESKTOP_RES)/rules && cp rules/*.yaml $(DESKTOP_RES)/rules/
+	cp deploy/netrewindd.yaml $(DESKTOP_RES)/netrewindd.sample.yaml
+else
+	echo "The NetRewind recorder for Linux is installed from its own package (netrewind .deb/.rpm), not from the desktop bundle." > $(DESKTOP_RES)/README.txt
+endif
+
+# Type-check, unit-test and build the desktop application's installers into
+# desktop/src-tauri/target/release/bundle/. Needs Node, Rust and the Tauri
+# CLI (npm ci installs it); on Linux also the WebKitGTK development packages.
+.PHONY: desktop
+desktop: desktop-resources
+	cd desktop && npm ci && npm test && npx tauri build
+
 # The load tests measure sustained throughput, so they run alone. Under
 # `go test ./...` the packages run concurrently and the number measures the
 # contention between them rather than the store.

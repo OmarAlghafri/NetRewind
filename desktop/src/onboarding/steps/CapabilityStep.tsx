@@ -1,12 +1,15 @@
 import { useMemo } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
-import type { Incident, NetRewindEvent } from "../../types";
+import type { Record } from "../../data/useRecord";
+import { CapabilityTable } from "../../components/CapabilityTable";
 
-// Computed the same way pages/Overview.tsx already does (distinct
-// `source` values actually present in the loaded recording) - real numbers
-// from the real demo data already in memory, not placeholders.
-export function CapabilityStep({ events, incidents }: { events: NetRewindEvent[]; incidents: Incident[] }) {
+// Real numbers from the record that is actually loaded. With a live
+// recorder (or a bundle, whose manifest carries the producing recorder's
+// registry) the capability matrix itself is shown; in demo mode only the
+// sources present in the recording can be known.
+export function CapabilityStep({ record }: { record: Record }) {
   const { t } = useLanguage();
+  const { events, incidents, capabilities } = record;
 
   const sources = useMemo(() => {
     const set = new Set<string>();
@@ -30,17 +33,24 @@ export function CapabilityStep({ events, incidents }: { events: NetRewindEvent[]
         </div>
       </div>
 
-      <div className="card">
-        <strong>
-          <span className="ltr-field">{sources.length}</span> {t("sources_in_recording")}
-        </strong>
-        {sources.map((s) => (
-          <div className="capability-row" key={s}>
-            <span className="ltr-field">{s}</span>
-            <span className="status-dot status-up" title={t("seen_in_recording")} />
-          </div>
-        ))}
-      </div>
+      {capabilities.length > 0 ? (
+        <div className="card">
+          <strong>{t("capabilities_title")}</strong>
+          <CapabilityTable capabilities={capabilities} />
+        </div>
+      ) : (
+        <div className="card">
+          <strong>
+            <span className="ltr-field">{sources.length}</span> {t("sources_in_recording")}
+          </strong>
+          {sources.map((s) => (
+            <div className="capability-row" key={s}>
+              <span className="ltr-field">{s}</span>
+              <span className="status-dot status-up" title={t("seen_in_recording")} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

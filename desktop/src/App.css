@@ -140,7 +140,14 @@ body {
   font-size: 0.95rem;
 }
 
-.demo-banner {
+/* The source banner: demo (amber, a reminder), live (green, current), or
+   an error (red, with the recorder's own message and a retry). */
+.source-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
   background: var(--warn-bg);
   border: 1px solid var(--warn-line);
   color: var(--text);
@@ -148,6 +155,117 @@ body {
   border-radius: 6px;
   font-size: 0.88rem;
   margin-bottom: 20px;
+}
+
+.source-banner-live {
+  background: var(--bg-elevated);
+  border-color: var(--accent);
+}
+
+.source-banner-error {
+  background: var(--bg-elevated);
+  border-color: var(--error);
+}
+
+.source-banner-meta {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.source-banner-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* A capability or rule row with a second line of detail under the name.
+   Both classes are named so this wins over .capability-row's flex layout
+   whatever their order in this file. */
+.capability-row.capability-row-detail {
+  display: block;
+}
+
+.capability-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.capability-name {
+  font-weight: 600;
+}
+
+.capability-status {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.88rem;
+}
+
+.capability-reason {
+  color: var(--text-muted);
+}
+
+.capability-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+/* Form fields on Settings and Evidence. */
+.field-label {
+  display: block;
+  margin-top: 12px;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.field-input {
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  margin-top: 4px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: var(--font-ui);
+}
+
+.field-check,
+.field-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.field-radio-disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.inline-ok {
+  color: var(--accent);
+  font-size: 0.88rem;
+  margin: 8px 0 0;
+}
+
+.inline-error {
+  color: var(--error);
+  font-size: 0.88rem;
+  margin: 8px 0 0;
+}
+
+.wizard-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .card {
@@ -413,19 +531,4 @@ body {
   font-size: 0.85rem;
   margin-top: 8px;
   margin-bottom: 0;
-}
-
-/* Same visual language as the real <button disabled> elements in
-   pages/Evidence.tsx (kept as a shared class here rather than duplicated
-   inline styles, since the wizard's agent/import step follows the exact
-   same "genuinely disabled, not a fake no-op" pattern). */
-.disabled-button {
-  padding: 8px 14px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-elevated);
-  color: var(--text-muted);
-  cursor: not-allowed;
-  font-size: 0.9rem;
-  margin-top: 10px;
 }

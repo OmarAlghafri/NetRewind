@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLanguage } from "../i18n/LanguageContext";
-import type { Incident, NetRewindEvent } from "../types";
+import type { SourceSettings } from "../data/source";
+import type { Record } from "../data/useRecord";
 import { LanguageStep } from "./steps/LanguageStep";
 import { PrivacyStep } from "./steps/PrivacyStep";
 import { AgentChoiceStep } from "./steps/AgentChoiceStep";
@@ -18,12 +19,14 @@ const STEPS = ["language", "privacy", "agent", "permissions", "capability", "sam
 type StepId = (typeof STEPS)[number];
 
 export function Wizard({
-  events,
-  incidents,
+  settings,
+  onChangeSettings,
+  record,
   onFinish,
 }: {
-  events: NetRewindEvent[];
-  incidents: Incident[];
+  settings: SourceSettings;
+  onChangeSettings: (next: SourceSettings) => void;
+  record: Record;
   onFinish: () => void;
 }) {
   const { t } = useLanguage();
@@ -45,10 +48,10 @@ export function Wizard({
 
         {stepId === "language" && <LanguageStep />}
         {stepId === "privacy" && <PrivacyStep />}
-        {stepId === "agent" && <AgentChoiceStep />}
-        {stepId === "permissions" && <PermissionsStep />}
-        {stepId === "capability" && <CapabilityStep events={events} incidents={incidents} />}
-        {stepId === "sample" && <SampleInvestigationStep incidents={incidents} />}
+        {stepId === "agent" && <AgentChoiceStep settings={settings} onChange={onChangeSettings} />}
+        {stepId === "permissions" && <PermissionsStep settings={settings} record={record} />}
+        {stepId === "capability" && <CapabilityStep record={record} />}
+        {stepId === "sample" && <SampleInvestigationStep incidents={record.incidents} />}
 
         <div className="wizard-actions">
           <button className="wizard-btn wizard-btn-ghost" onClick={onFinish}>

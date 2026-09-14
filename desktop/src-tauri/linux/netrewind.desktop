@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=NetRewind
+Comment=The network black box recorder's viewer
+Exec={{exec}} {{exec_arg}}
+Icon={{icon}}
+Categories={{categories}}
+Terminal=false
+StartupWMClass=netrewind-desktop

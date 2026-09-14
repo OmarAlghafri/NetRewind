@@ -129,10 +129,9 @@ jobs:
     # desktop app's supply chain and types check out?") than the Go job
     # answers, not because it's slow.
     #
-    # This does not attempt `cargo build`/`tauri build`: that needs system
-    # webview/GTK packages on Linux, is a bigger job on its own, and is
-    # explicitly out of scope here. Nothing below silently skips it - it is
-    # just not attempted.
+    # `cargo test --lib` runs the shell's unit tests; a full `tauri build`
+    # (installers) is not attempted here - that is the release job's
+    # business. Nothing below silently skips it - it is just not attempted.
     #
     # Deliberately left out of `release`'s `needs:`. That job ships the Go
     # binaries `make release` produces, on a tag; the desktop app isn't part
@@ -163,6 +162,22 @@ jobs:
       # just run the first half of this command again for nothing.
       - name: typecheck and build
         run: npm run build
+
+      # The UI's own tests (Vitest, jsdom): the data-source hook against a
+      # fake recorder, the settings persistence, the capability table and
+      # source banner. Fast enough to run on every push.
+      - name: frontend unit tests
+        run: npm test
+
+      # The Rust shell's unit tests (bundle verification, launch options)
+      # need no webview: `cargo test --lib` compiles the library only.
+      # `tauri build` itself is not attempted here - it needs the WebKitGTK
+      # development packages and is the release job's business.
+      - name: install the shell's build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+        working-directory: .
+      - name: rust unit tests (desktop shell)
+        run: cargo test --lib --manifest-path src-tauri/Cargo.toml
 
       # No --omit=dev, on purpose, for the same reason the check job's
       # govulncheck step runs unconditionally over everything: the dev
