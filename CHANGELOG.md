@@ -1,5 +1,90 @@
 # Changelog
 
+## 1.0.0 — 2026-09-14
+
+The first release of NetRewind as a product rather than a Linux daemon with a
+CLI: a recorder on Linux and on Windows, a desktop application that reads it,
+and evidence bundles that carry a record between machines. What the recorder
+observes on each platform is stated by the recorder itself, in a capability
+report, rather than claimed by the documentation.
+
+### The recorder serves a local API, and the desktop application reads it
+
+`netrewindd` now serves a versioned JSON API (`/v1/health`, `/v1/capabilities`,
+`/v1/events`, `/v1/incidents`, `/v1/rules`, `/v1/bundle`) over a local-only
+transport: a Unix domain socket on Linux (`/run/netrewind/api.sock`, shared
+with the `netrewind` group), a named pipe on Windows (`\\.\pipe\netrewind-api`,
+restricted by ACL to the installing user). There is no TCP port to find; the
+API is read-only by construction, and the store handle never leaves the
+process.
+
+The desktop application (`desktop/`, Tauri + React, Arabic and English) has
+three sources: the demo recording it always carried, a live recorder over
+that API, and an evidence bundle file. Every page — health, incidents,
+timeline, investigation, rules, evidence bundles, diagnostics, settings — takes
+the same events and incidents whichever source they came from. The health
+page shows the recorder's own capability report: what it is watching, what it
+is not, and why. `netrewind status` asks the same questions from a terminal.
+
+### Windows is a platform, not a stub
+
+`internal/collect/iphelper` records interfaces, addresses, routes and
+neighbours on Windows through the IP Helper API and feeds the same analysis
+code as the Linux netlink collectors, so a gateway hijack or a lost default
+route looks the same in the record whichever kernel saw it. Interface rows are
+re-read after every notification, twice, because the notification arrives
+while the change is still being applied and the row read at that instant can
+still show the state from before. The neighbour table is polled every two
+seconds; Windows has no change notification for it, and the capability report
+says so. Flows, filtering policy, DHCP/DNS on the wire and active probes have
+no Windows source in this release and are reported as unsupported rather than
+run as stubs.
+
+`netrewindd service install` registers the recorder as a Windows service:
+LocalSystem, automatic start, restart on failure, an event-log source, a
+configuration under `%ProgramData%\NetRewind` and the installing user granted
+access to the API pipe. The desktop installer for Windows bundles the recorder
+and runs that registration; uninstalling unregisters the service and leaves
+the record in place.
+
+### Evidence bundles are usable from end to end
+
+`netrewind bundle export` writes a window of the record as a checksummed
+archive; `bundle inspect` verifies one without importing it; `bundle import`
+turns one into a separate store. The desktop application exports from a live
+recorder and opens any bundle after verifying every member's checksum and, when
+a public key is configured, its ed25519 signature. A bundle is never merged
+into the local record.
+
+### Packaging
+
+The `.deb` and `.rpm` were installed, upgraded, removed and purged on real
+systemd hosts, and three defects that only show up there were fixed: the
+service was stopped in the wrong maintainer script and left running after
+removal; an upgrade left the previous binary running; and neither package
+declared its dependency on `nft`. Both packages create the `netrewind` group
+and recommend `nftables`. Linux desktop bundles (`.deb`, `.rpm`, AppImage)
+and Windows installers (NSIS, MSI) are built by `make desktop`.
+
+### Local AI stays off
+
+Two candidate models were benchmarked in both languages against the
+evaluation corpus. Neither meets the release gate; the runner's two
+measurement defects (non-reproducible greedy runs, no answer-language
+instruction) are fixed and the results recorded. No model ships, and no AI
+feature is enabled in this release.
+
+### Also
+
+- Platform defaults on Windows moved from the temporary directory to
+  `%ProgramData%\NetRewind`.
+- Analyzers stamp events with the platform source they came through
+  (`netlink` or `iphelper`).
+- Collectors a build cannot run are reported as `unsupported`, distinct from
+  `down`.
+- A frontend test suite (Vitest) and Rust unit tests for the desktop shell run
+  in CI alongside the Go suite.
+
 ## 0.9.1 — 2026-08-29
 
 A hardening release. Nothing here changes what the recorder is for; all of it

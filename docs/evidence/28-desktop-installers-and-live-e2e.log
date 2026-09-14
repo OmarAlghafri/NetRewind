@@ -1,0 +1,304 @@
+The desktop application and its installers, exercised end to end on a real
+machine: the Windows NSIS installer registering the recorder service, the
+installed product recording real adapter changes and exporting a bundle
+through its own API, the Linux desktop bundles built and installed on
+Ubuntu, and the screenshots under docs/screenshots/ taken from the
+installed application.
+
+## Where this ran
+
+The same separate, physical Windows 11 test machine as logs 25 and 26
+(Windows 11 Home 26200, admin SSH with key auth), never the build machine.
+Windows side for the installer and the live tests; its WSL2 Ubuntu 24.04
+(systemd 255) for the Linux desktop bundles. The adapters used are the
+ones those logs already established as safe: `Ethernet 2` (ifIndex 16, a
+VirtualBox host-only adapter with real link state, 192.168.56.1/24) for
+disable/enable, addresses and routes; the SSH path was never touched.
+Everything the tests added was removed afterwards and re-checked: the
+service, the install directory, `%ProgramData%\NetRewind`, the work
+directory, the Ubuntu build toolchain and its 342 apt packages, the
+scheduled task used to show progress on the machine's own screen.
+
+Paths below are shown with `<work dir>` for the temporary directory the
+files were copied into, and `<hostname>` where the recorder printed the
+machine name.
+
+## 1. Windows service lifecycle, driven by the recorder itself
+
+`netrewindd service install|stop|start|uninstall` on a machine with no
+prior installation, with the CLI reached from a non-service user session:
+
+    [10:03:25.513] === Windows service lifecycle ===
+    [10:03:25.592]   PASS: no service beforehand
+    [10:03:25.595] --- 1. install ---
+        wrote C:\ProgramData\NetRewind\netrewindd.yaml
+        installed service netrewindd (<work dir>\netrewindd.exe)
+        API pipe access: S-1-5-21-...-1001
+        started
+    [10:03:29.693]   PASS: service exists
+    [10:03:29.698]   PASS: service is Running
+    [10:03:31.206]   PASS: start type Automatic
+    [10:03:31.458]   PASS: runs as LocalSystem
+    [10:03:31.461]   PASS: config written under ProgramData
+    [10:03:31.473]   PASS: config grants the installing user's SID
+    [10:03:31.474]   PASS: event store created under ProgramData
+    [10:03:31.476]   PASS: service log written
+    [10:03:31.488] --- 2. the API pipe answers this (non-service) user ---
+        recorder 1.0.0-dev on <hostname>, up 5s, 1 events stored (C:\ProgramData\NetRewind\events.db)
+        endpoint \\.\pipe\netrewind-api
+    [10:03:31.528]   PASS: netrewind status reaches the service over the pipe
+    [10:03:31.529]   PASS: windows collectors are up
+    [10:03:31.529] --- 3. a real change is recorded by the service ---
+        TIME          KIND             SUBJECT        SEV     DETAIL
+        10:03:25.740  system.start     <hostname>     info
+        10:03:35.429  l3.addr_added    192.168.56.78  info    address=192.168.56.78/24 ifindex=16
+        10:03:39.196  l3.addr_removed  192.168.56.78  notice  address=192.168.56.78/24 ifindex=16
+    [10:03:42.302]   PASS: l3.addr_added 192.168.56.78 recorded
+    [10:03:42.304]   PASS: l3.addr_removed 192.168.56.78 recorded
+    [10:03:42.305] --- 4. stop / start through the service manager ---
+    [10:03:45.337]   PASS: stopped
+    [10:03:45.361]   PASS: no netrewindd process after stop
+    [10:03:49.410]   PASS: running again
+        netrewindd: running (pid 740)
+    [10:03:49.496]   PASS: clean stop recorded system.stop
+    [10:03:49.505]   PASS: restart recorded a second system.start
+    [10:03:49.505] --- 5. uninstall ---
+        uninstalled service netrewindd; the event store and configuration under C:\ProgramData\NetRewind were left in place
+    [10:03:52.038]   PASS: service gone
+    [10:03:52.042]   PASS: no process left
+    [10:03:52.042]   PASS: record kept on uninstall (by design)
+    [10:03:52.050] === service lifecycle: PASS=21 FAIL=0 ===
+
+The service log at the end of the run shows all four Windows collectors
+watching (`iphelper.link seeded=16`, `iphelper.addr seeded=3`,
+`iphelper.route seeded=7`, `iphelper.neigh seeded=25 every=2s`).
+
+## 2. The NSIS installer (`NetRewind_1.0.0_x64-setup.exe`, per machine)
+
+First run against a clean machine, silent install (`/S`):
+
+    [10:45:47.599] === NSIS installer end to end ===
+    [10:45:47.642]   PASS: no service beforehand
+    [10:45:47.644]   PASS: no install dir beforehand
+    [10:45:47.646] --- 1. silent per-machine install ---
+    [10:45:51.101]   PASS: installer exit code 0
+    [10:45:56.119]   FAIL: desktop exe installed
+    [10:45:56.119]   PASS: recorder bundled as a resource
+    [10:45:56.127]   PASS: rules bundled
+        netrewind-desktop.exe
+        uninstall.exe
+        recorder\netrewind.exe
+        recorder\netrewindd.exe
+        recorder\netrewindd.sample.yaml
+        recorder\rules\address-changed-hands.yaml
+        ... (19 rule files)
+    [10:45:56.155]   PASS: hook registered the service
+    [10:45:56.158]   PASS: service running
+    [10:45:56.179]   FAIL: config points rules at the install dir
+    [10:45:56.184]   PASS: installing user granted pipe access
+    [10:45:56.306]   PASS: netrewind status reaches the installed service
+    [10:45:56.807]   PASS: uninstaller registered in Programs and Features
+    [10:45:56.808] === installer: PASS=10 FAIL=2 ===
+
+Both FAILs were in the test script, not the product: it looked for
+`NetRewind.exe` where the bundle identifier makes the binary
+`netrewind-desktop.exe` (listed right above the failure), and it compared
+the YAML `rules:` path against an unescaped string while the file correctly
+carries escaped backslashes. Corrected, the same checks pass in the
+upgrade run below.
+
+Upgrade in the field - uninstall the previous build silently, install the
+new one over the record it left behind, then the live sequence the desktop
+application's own Export button performs:
+
+    [10:53:32.914] === desktop installer upgrade/uninstall + live E2E ===
+    [10:53:32.921] --- 1. uninstall the previous build silently ---
+    [10:53:35.255]   PASS: uninstaller exit 0
+    [10:53:39.275]   PASS: service unregistered by the pre-uninstall hook
+    [10:53:39.276]   PASS: install dir removed
+    [10:53:39.277]   PASS: record kept under ProgramData
+    [10:53:39.278] --- 2. install the new build (an upgrade in the field: the record is still there) ---
+    [10:53:42.687]   PASS: installer exit 0
+    [10:53:47.695]   PASS: service registered and running
+    [10:53:47.699]   PASS: existing config kept (install did not overwrite it)
+    [10:53:47.699] --- 3. neutral observer id for the screenshots, then generate live events ---
+    [10:53:53.892]   PASS: service restarted with the new observer id
+        TIME          KIND              SUBJECT          SEV     DETAIL
+        10:53:33.758  system.stop       <hostname>       info
+        10:53:41.818  system.start      <hostname>       info
+        10:53:47.719  system.stop       <hostname>       info
+        10:53:49.781  system.start      workstation      info
+        10:53:55.275  l3.addr_removed   192.168.56.1     notice  address=192.168.56.1/24 ifindex=16
+        10:53:55.281  l3.route_removed  192.168.56.0/24  notice  gateway= is_default=false prefix=192.168.56.0/24
+        10:54:04.971  l3.route_added    192.168.56.0/24  info    gateway= ifindex=16 is_default=false prefix=192.168.56.0/24
+        10:54:04.986  l3.addr_added     192.168.56.1     info    address=192.168.56.1/24 ifindex=16
+        10:54:14.474  l3.addr_added     192.168.56.79    info    address=192.168.56.79/24 ifindex=16
+        10:54:18.074  l3.route_added    10.99.0.0/24     info    gateway=192.168.56.2 ifindex=16 is_default=false prefix=10.99.0.0/24
+        10:54:21.126  l3.route_removed  10.99.0.0/24     notice  gateway=192.168.56.2 is_default=false prefix=10.99.0.0/24
+        10:54:24.173  l3.addr_removed   192.168.56.79    notice  address=192.168.56.79/24 ifindex=16
+    [10:54:27.359]   FAIL: live record holds link.down/link.up from the installed service
+    [10:54:27.361] --- 4. export a bundle from the running service through the API ---
+        wrote <work dir>\live.tar.gz: 14 events, 0 incidents, 2026-09-14T09:54:27+04:00 to 2026-09-14T10:54:27+04:00 (DNS names redacted)
+    [10:54:27.397]   PASS: bundle exported
+    [10:54:27.398] === e2e prep: PASS=9 FAIL=1 ===
+
+That one FAIL was real: the address and route that left and returned with
+the adapter were recorded, but the `link.down`/`link.up` pair for the
+disable/enable itself was not. Section 3 is the investigation.
+
+## 3. A missed link event, found by this run and fixed
+
+Three disable/enable rounds against the installed service, reading the
+link collector's debug log for ifIndex 16 alongside the record:
+
+    [10:55:11.692] round 1: disable
+    [10:55:19.161] round 1: enable
+    [10:55:28.241] round 2: disable
+    [10:55:34.825] round 2: enable
+    [10:55:43.956] round 3: disable
+    [10:55:50.598] round 3: enable
+    --- link events ---
+    TIME          KIND       SUBJECT     SEV     DETAIL
+    10:55:28.336  link.down  Ethernet 2  warn    x2 admin_up=false cause=administrative
+    10:55:34.897  link.up    Ethernet 2  notice  x2 admin_up=true down_duration_ms=6561
+    --- link collector lines for ifindex 16 ---
+    2026-09-14T10:55:12.635+04:00 ifname="Ethernet 2" ifindex=16 kind=0 admin_up=true oper_up=true oper_status=1 media=1 mtu=1500 seen=true
+    2026-09-14T10:55:12.636+04:00 ifname="Ethernet 2" ifindex=16 kind=2 admin_up=true oper_up=true oper_status=1 media=1 mtu=1500 seen=true
+    ...
+    2026-09-14T10:55:28.336+04:00 ifname="Ethernet 2" ifindex=16 kind=0 admin_up=false oper_up=false oper_status=2 media=0 mtu=1500 seen=true
+    ...
+    2026-09-14T10:55:44.036+04:00 ifname="Ethernet 2" ifindex=16 kind=0 admin_up=true oper_up=true oper_status=1 media=1 mtu=1500 seen=true
+    2026-09-14T10:55:50.683+04:00 ifname="Ethernet 2" ifindex=16 kind=1 admin_up=true oper_up=false oper_status=5 media=1 mtu=1500 seen=true
+
+One round in three produced the pair (the `x2` is the store's own
+de-duplication of the two notifications a single change delivers, one per
+address family - log 18). In the other two rounds every notification for
+the disable arrived while `GetIpInterfaceEntry` still returned the
+*previous* state (`admin_up=true oper_up=true` at 10:55:12 and 10:55:44,
+milliseconds after the `Disable-NetAdapter` call): the callback fires
+before the interface table reflects the change, so re-reading the row on
+notification alone can see nothing to report. The enable side has the
+mirror image: `oper_status=5` (dormant) at first, `up` a few milliseconds
+later.
+
+Fix (`internal/collect/iphelper/link_windows.go`): every notification
+also schedules two delayed re-reads of the same row (500 ms and 2.5 s
+later), so a change whose row lags the callback is still observed once the
+table catches up; the analyzer only emits on an actual state difference,
+so a re-read that finds nothing new emits nothing. A related defect had
+been fixed earlier the same morning, before the runs in sections 1 and 2:
+an interface the collector had already reported was being dropped by the
+interface-row filter while down (no media, MTU 0), so even a correctly
+read `down` row could be filtered out - a tracked interface now bypasses
+the observability filter.
+
+Five disable/enable rounds against the rebuilt service, all recorded:
+
+    TIME          KIND       SUBJECT     SEV     DETAIL
+    10:57:20.911  link.down  Ethernet 2  warn    x5 admin_up=false cause=administrative
+    10:57:26.542  link.up    Ethernet 2  notice  x5 admin_up=true down_duration_ms=5616
+
+## 4. The final build, installed and used
+
+The installer rebuilt from the final tree, installed over the previous one,
+the store reset with a neutral observer id, then the same live sequence:
+
+    [11:43:46.918] reinstall the final build
+    [11:43:56.782] installer exit 0
+    [11:44:01.789] fresh store with a neutral observer id
+    [11:44:08.879] generate live events
+        TIME          KIND              SUBJECT          SEV     DETAIL
+        11:44:03.878  system.start      workstation      info
+        11:44:10.032  link.down         Ethernet 2       warn    admin_up=false cause=administrative
+        11:44:10.034  l3.addr_removed   192.168.56.1     notice  address=192.168.56.1/24 ifindex=16
+        11:44:10.034  l3.route_removed  192.168.56.0/24  notice  gateway= is_default=false prefix=192.168.56.0/24
+        11:44:16.666  link.up           Ethernet 2       notice  admin_up=true down_duration_ms=6631
+        11:44:19.980  l3.route_added    192.168.56.0/24  info    gateway= ifindex=16 is_default=false prefix=192.168.56.0/24
+        11:44:20.000  l3.addr_added     192.168.56.1     info    address=192.168.56.1/24 ifindex=16
+        11:44:29.980  l3.addr_added     192.168.56.79    info    address=192.168.56.79/24 ifindex=16
+        11:44:33.792  l3.route_added    10.99.0.0/24     info    gateway=192.168.56.2 ifindex=16 is_default=false prefix=10.99.0.0/24
+        11:44:36.849  l3.route_removed  10.99.0.0/24     notice  gateway=192.168.56.2 is_default=false prefix=10.99.0.0/24
+        11:44:39.923  l3.addr_removed   192.168.56.79    notice  address=192.168.56.79/24 ifindex=16
+        wrote <work dir>\live.tar.gz: 11 events, 0 incidents, 2026-09-14T10:44:44+04:00 to 2026-09-14T11:44:44+04:00 (DNS names redacted)
+        bundle <work dir>\live.tar.gz
+          format v1, schema v1, written by NetRewind 1.0.0 on workstation
+          created 2026-09-14T11:44:44+04:00
+          window  2026-09-14T10:44:44+04:00 to 2026-09-14T11:44:44+04:00
+          11 events, 0 incidents, 0 collectors described
+          signature: not checked (pass --public-key to require one)
+          DNS names: redacted
+          checksums: verified
+
+The disable, the addresses and routes that left with it, the enable, and
+the address and route added and removed by hand are all in the record, in
+order, with the right causes. The bundle the CLI exported is the same
+format the desktop application opens (`bundle-open-en.png` below shows a
+bundle exported this way, opened in the application).
+
+The installed application was then started in the interactive session on
+that machine and the screenshots under `docs/screenshots/` taken from it,
+in live mode against the installed service (`health-live-*`,
+`timeline-live-en`, `rules-live-en`, `evidence-live-en`,
+`diagnostics-live-en`), with the exported bundle open (`bundle-open-en`),
+and through the first-run wizard in both languages (`wizard-*`). Each
+image was checked before being kept: no taskbar, no window other than the
+application, observer id `workstation`, no account name or address that
+identifies the machine.
+
+## 5. Linux desktop bundles
+
+Built on the test machine's Ubuntu 24.04 with `npm run tauri build`
+(Tauri 2, webkit2gtk 4.1), with the recorder staged as a resource by
+`make desktop-resources`. The first build came out under Tauri's default
+naming, which turns the product name into `net-rewind`:
+
+    -rwxr-xr-x 1 root root 77974008 Sep 14 11:36 src-tauri/target/release/bundle/appimage/NetRewind_1.0.0_amd64.AppImage
+    -rw-r--r-- 1 root root  2865914 Sep 14 11:20 src-tauri/target/release/bundle/rpm/NetRewind-1.0.0-1.x86_64.rpm
+    -rw-r--r-- 1 root root  2865182 Sep 14 11:20 src-tauri/target/release/bundle/deb/NetRewind_1.0.0_amd64.deb
+    --- .deb metadata ---
+    Package: net-rewind
+    Version: 1.0.0
+    Depends: libwebkit2gtk-4.1-0, libgtk-3-0
+    Recommends: netrewind
+    Section: net
+    --- install the desktop .deb, launch headlessly (expect a display error, not a missing library) ---
+    installed
+    launch exit=0
+    missing shared libraries: 0
+    removed the desktop .deb again
+
+`desktop/src-tauri/tauri.linux.conf.json` (a Linux-only overlay) now sets
+the product name to `netrewind-desktop`, with a custom `.desktop` entry
+template so the menu still reads "NetRewind"; the AppImage build needs
+`xdg-utils` on the build host. Rebuilt with the overlay:
+
+    -rwxr-xr-x 1 root root 77974008 Sep 14 11:45 src-tauri/target/release/bundle/appimage/netrewind-desktop_1.0.0_amd64.AppImage
+    -rw-r--r-- 1 root root  2865884 Sep 14 11:44 src-tauri/target/release/bundle/deb/netrewind-desktop_1.0.0_amd64.deb
+    -rw-r--r-- 1 root root  2866607 Sep 14 11:44 src-tauri/target/release/bundle/rpm/netrewind-desktop-1.0.0-1.x86_64.rpm
+    Package: netrewind-desktop
+    Version: 1.0.0
+    Recommends: netrewind
+    -rw-r--r-- 0/0             211 2026-09-14 11:44 usr/share/applications/netrewind-desktop.desktop
+
+    [Desktop Entry]
+    Type=Application
+    Name=NetRewind
+    Comment=The network black box recorder's viewer
+    Exec=netrewind-desktop
+    Icon=netrewind-desktop
+    Categories=Utility;
+    Terminal=false
+    StartupWMClass=netrewind-desktop
+
+    7746d288fb94c6dc49fc9a891d579640344d25942da39eaa76f47a69ddcb2aaf  netrewind-desktop-1.0.0-1.x86_64.rpm
+    d1c69fbbe9dfd8cceb0992f06552d0f1572424e1aaf50d2193432d5bc1773fdc  netrewind-desktop_1.0.0_amd64.AppImage
+    5f8c24fb07a4c3ba8e9f8a8be0d294c98a38f024d69dfb8063033a15b0d889f5  netrewind-desktop_1.0.0_amd64.deb
+
+The `.deb` was installed on that Ubuntu and the binary launched from a
+session without a display: it fails on the display, not on a missing
+library (`missing shared libraries: 0`), then the package was removed.
+Not done here: running the Linux desktop application against a live
+recorder on a Linux desktop session - the live-mode code path is the same
+one the Windows run above exercised (the only platform-specific part is
+the transport, a Unix socket instead of a named pipe, which log 11 covers).
+The `.rpm` was built but not installed on an rpm-based host in this run.

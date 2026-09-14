@@ -4,21 +4,31 @@
 
 # NetRewind — a black box recorder for the network
 
-A Linux service that records what *changed* on a network — interfaces, ARP
-bindings, routes, flows, filtering decisions — and reconstructs the causal chain
-of an outage after it is over, when the evidence would normally be gone.
+NetRewind records what *changed* on a network — interfaces, ARP bindings,
+addresses, routes, flows, filtering decisions — and reconstructs the causal
+chain of an outage after it is over, when the evidence would normally be gone.
 
-> This is a lab project, built and demonstrated on GNS3. Nothing here has been
-> deployed to production hardware.
+It is two programs:
 
-**Status: layers 1–4 recorded, correlated, and proven end to end.** A synthetic
-lab in network namespaces injects fourteen real faults — a flapping port, a
-hijacked gateway, a contested address, a re-pointed route, a vanished default, a
-rogue DHCP server, a path broken under a working connection — and checks both
-that every one is reconstructed from the record and that correlation names the
-cause. A GNS3 topology of Cisco routers and switches covers what namespaces
-cannot: real VLANs, real OSPF, and a gateway address moving between two physical
-routers. See [the roadmap](#roadmap).
+- **The recorder**, `netrewindd`: a service on Linux (netlink, eBPF, nftables,
+  the wire) or Windows (the IP Helper API) that watches the kernel and appends
+  every state change to a local store, then correlates those changes into
+  incidents with an explicit causal chain.
+- **The desktop application**: an Arabic/English viewer that reads a live
+  recorder over a local-only channel, or opens an evidence bundle exported from
+  any recorder, and shows the recorder's own account of what it can and cannot
+  see on that machine.
+
+A `netrewind` command-line tool asks the same questions from a terminal.
+
+**Status: 1.0.0.** Every capability below is backed by a test or a recorded
+run under [docs/evidence](docs/evidence/); what a given platform cannot do is
+listed in [the capability matrix](#what-each-platform-records), not left to be
+discovered.
+
+<p align="center">
+  <img src="docs/screenshots/health-live-en.png" alt="The Health page connected to a live recorder: version, uptime, store size, and the capability report" width="820">
+</p>
 
 ## The problem
 
@@ -58,11 +68,79 @@ itself:
 10:47:12  ended - port Gi0/14 was shut manually
 ```
 
-## What it does
+## Getting started
 
-- Watches interface state through netlink, distinguishing an administratively
-  shut port from a dropped carrier — different causes, different fixes, and
-  every other tool reports them identically
+### Linux
+
+```bash
+sudo apt install ./netrewind_1.0.0_amd64.deb          # or dnf install the .rpm
+sudo systemctl enable --now netrewindd
+sudo usermod -aG netrewind "$USER"                     # to read it without root; log in again
+netrewind status                                       # what is it watching?
+netrewind incidents --last 1h                          # what happened?
+```
+
+Then install the `netrewind-desktop` package (or run the AppImage) and choose
+*Live recorder* on first run.
+
+### Windows
+
+Run `NetRewind_1.0.0_x64-setup.exe` as an administrator. It installs the
+desktop application, installs the recorder as the `netrewindd` service and
+starts it. Open NetRewind and choose *Connect to the local recorder*.
+
+### From source
+
+```bash
+make all          # fmt, vet, test, build the recorder and CLI for this platform
+make desktop      # UI tests, then the desktop installers (needs Node 22, Rust, and on Linux WebKitGTK)
+sudo make lab     # Linux: the fourteen-fault synthetic lab, end to end
+```
+
+[docs/install.md](docs/install.md) has every detail: packages, the tarball
+and `install.sh`, the Windows service commands, upgrading, removing, and the
+configuration keys.
+
+## What each platform records
+
+The recorder reports this itself — `netrewind status` and the desktop's
+Health page read the registry every collector is registered in — so the
+table below is a summary of what the build does, not a promise the software
+cannot check.
+
+| Fact | Linux source | Windows source |
+|---|---|---|
+| Interface up/down, administrative vs. carrier, MTU, error rate | netlink (`netlink.link`) | IP Helper interface notifications (`iphelper.link`) |
+| Addresses added and removed | netlink (`netlink.addr`) | IP Helper address notifications, recorded once duplicate-address detection completes (`iphelper.addr`) |
+| Routes: the winner for a destination changing, the default route lost or moved | netlink (`netlink.route`) | IP Helper route notifications (`iphelper.route`) |
+| ARP/ND bindings: new, changed, moved, contested, failed | netlink (`netlink.neigh`) | the neighbour table, polled every 2 s (`iphelper.neigh`) |
+| TCP connections: handshakes failing, resets, rollups | eBPF (`ebpf.flow`) | not in this release |
+| Filtering policy changes | nftables (`policy.nftables`) | not in this release |
+| DHCP servers, DNS resolvers, ICMP unreachable, MTU black holes on the wire | raw sockets (`wire`) | not in this release |
+| Reachability probes to the gateway | ICMP (`probe.icmp`) | not in this release |
+| Gaps in the record, collectors that stopped, clock steps, self-updates | the recorder itself | the recorder itself |
+
+The desktop application, evidence bundles, the CLI's read commands and the
+correlation engine are the same code on both platforms.
+
+## The desktop application
+
+<p align="center">
+  <img src="docs/screenshots/incidents-ar.png" alt="The Incidents page in Arabic, right-to-left, showing an incident's causal chain" width="820">
+</p>
+
+Three sources — the demo recording it ships with, a live recorder, an
+evidence bundle — and eight pages: health and blind spots, incidents,
+timeline, investigation by host, rules, evidence bundles, diagnostics and
+settings. Arabic-first with full right-to-left layout; addresses, names and
+timestamps stay left-to-right. Nothing it does writes to the record.
+[docs/desktop.md](docs/desktop.md) walks through it.
+
+## What the recorder does
+
+- Watches interface state, distinguishing an administratively shut port from a
+  dropped carrier — different causes, different fixes, and every other tool
+  reports them identically
 - Watches the neighbour table, so an ARP binding moving under a running network
   is recorded — and flagged as an error rather than a warning when the address
   it moved under is the default gateway
@@ -91,11 +169,11 @@ $ netrewind what-happened --host 10.99.0.11 --at 15:00 --window 10m
   !! 12:16:01.713  +2.02s     the default route was removed - nothing beyond the local segment is reachable
 ```
 
-- Watches TCP connections from inside the kernel with eBPF, and reports when
-  **two machines that were talking a moment ago can no longer connect** — the
-  strongest single signal that something just changed. Ordinary activity is
-  summarised every ten seconds rather than recorded per connection, and when the
-  kernel has to drop something, it says so
+- On Linux, watches TCP connections from inside the kernel with eBPF, and
+  reports when **two machines that were talking a moment ago can no longer
+  connect** — the strongest single signal that something just changed.
+  Ordinary activity is summarised every ten seconds rather than recorded per
+  connection, and when the kernel has to drop something, it says so
 - Watches the filtering rules in force, so a change to them lands on the same
   timeline as the connections it breaks — qualified by table and chain, because
   the same rule in a different chain is a different rule
@@ -131,6 +209,12 @@ same time` is only co-occurrence. The engine never blurs the two, because a tool
 that does teaches its operator to distrust it — and an operator who distrusts
 the timeline is back to guessing.
 
+- Serves a **local API** (a Unix socket or a named pipe, never a TCP port) that
+  the desktop application and `netrewind status` read — see
+  [docs/api.md](docs/api.md)
+- Exports and imports **evidence bundles**: a checksummed, optionally signed
+  archive of a window of the record, made to be handed to somebody else and
+  opened without touching their own record
 - Exports **how much it did not see**, so the recorder's own reliability is
   something you can alert on rather than something you discover during the
   incident review
@@ -144,30 +228,28 @@ $ curl -s localhost:9464/metrics | grep blind
 netrewind_recorder_blind_seconds_total 0
 ```
 
-Every observability tool exports counts of what it saw. This one starts those
-two counters at zero and expects you to page on them, because a recorder that
-has gone deaf and a network that has gone quiet look identical from the outside.
-
 - Shows the same record in a browser, from the same binary. `netrewind serve`
   is server-rendered, needs no JavaScript, and is read-only — the store is
-  evidence, and the thing that displays evidence has no business modifying it.
-  The blind-spot banner is on every page rather than a panel someone has to
-  think to open
-
+  evidence, and the thing that displays evidence has no business modifying it
 - Copies the record to an **OpenTelemetry collector** if you run one, so network
-  change arrives in the same pipeline as everything else and an application
-  incident can be lined up against what the network did underneath it. OTLP over
-  HTTP, encoded by hand - there is no SDK here, for the same reason there is no
-  Prometheus client library
-
+  change arrives in the same pipeline as everything else
 - Keeps **itself** current: it checks its own releases and can install them,
   verifying the checksum published with the release and running the new binary
-  before replacing anything. Installing is off by default and the whole thing
-  can be turned off, because a recorder that rewrites its own binary is a
-  change of trust rather than a convenience
+  before replacing anything. Installing is off by default, because a recorder
+  that rewrites its own binary is a change of trust rather than a convenience
 
-Planned next: conntrack, so a recorder at the gateway sees the connections it
-forwards and not only its own.
+## What is not in 1.0
+
+- Windows records interfaces, addresses, routes and neighbours; flows,
+  filtering policy, wire-level DHCP/DNS and probes are Linux-only.
+- No local AI analysis. Two candidate models were benchmarked against the
+  evaluation corpus in both languages and neither met the release gate
+  (`ai/eval/`, [docs/evidence](docs/evidence/)); the feature stays off rather
+  than shipping a model that invents citations.
+- No telemetry, no beta channel, no hosted service. The recorder talks to the
+  network only to check for its own updates, and only if asked to.
+- Release artefacts are signed with the maintainer's ed25519 key for the
+  updater; the Windows installer is not Authenticode-signed.
 
 ## How it is different
 
@@ -185,9 +267,12 @@ LAN, and producing a causal narrative rather than a wall of alerts.
 ## Architecture
 
 ```
-netlink · eBPF · conntrack · nftables · DHCP/DNS · LLDP · config
+  Linux: netlink · eBPF · nftables · DHCP/DNS/ICMP on the wire · probes
+  Windows: IP Helper interfaces · addresses · routes · neighbour table
                           |
                     event collectors        internal/collect
+                          |
+              platform-neutral observations internal/ports, internal/analyze
                           |
                     common envelope         internal/event
                           |
@@ -199,7 +284,9 @@ netlink · eBPF · conntrack · nftables · DHCP/DNS · LLDP · config
                           |
         incidents with an explicit causal chain
                           |
-            CLI  ·  web timeline  ·  OpenTelemetry export
+   local API (internal/api/v1 over internal/ipc) · evidence bundles (internal/bundle)
+                          |
+   desktop application · CLI · web timeline · OpenTelemetry export
 ```
 
 The correlation core is named **Isnad**, after the classical Arabic method of
@@ -208,84 +295,32 @@ is verifiable. That is the standard the engine is held to: it distinguishes
 `causes` from `correlates` from `precedes`, and never claims a causal link it
 cannot show the evidence for.
 
-## Getting started
-
-Building and testing work on any platform. Observing requires Linux — see
-[docs/dev-environment.md](docs/dev-environment.md) for the VM and lab setup.
+## Testing
 
 ```bash
-make all                                          # fmt, vet, test, build
-sudo ./build/netrewindd --db ./var/events.db      # record
-./build/netrewind timeline --last 15m             # read it back
-./build/netrewind serve                           # or read it in a browser
+make vet test                                             # Go, this platform (and a Linux cross-vet)
+CGO_ENABLED=1 go test -race ./...                         # Go, on Linux
+cd desktop && npm test                                    # the UI
+cargo test --lib --manifest-path desktop/src-tauri/Cargo.toml   # the desktop shell
+sudo make lab                                             # the fourteen-fault lab (Linux)
 ```
 
-An installed recorder is configured from `/etc/netrewind/netrewindd.yaml`
-rather than from flags, and refuses to start on a configuration that would
-leave it recording nothing useful. `netrewindd --check-config` runs those
-checks and exits, which is what the systemd unit does before starting.
-
-`serve` renders the same record as pages — server-rendered, no JavaScript, and
-read-only. The templates are embedded, so it runs from the same single static
-binary as everything else, and it binds to loopback because it has no
-authentication.
-
-Or install a release:
-
-```bash
-tar -xzf netrewind-0.8.0-linux-arm64.tar.gz
-cd netrewind-0.8.0-linux-arm64 && sudo ./install.sh
-```
-
-Or write the **appliance image** to a USB stick and boot a spare machine into a
-recorder — nothing to install, nothing to configure, recording from first boot:
-
-```bash
-sudo make image
-qemu-system-x86_64 -m 512 -drive file=dist/netrewind-appliance.img,format=raw -nographic
-```
-
-178 MB compressed. See [deploy/appliance](deploy/appliance/README.md).
-
-Built for `linux/amd64` and `linux/arm64` — the same eBPF object serves both,
-because the program is architecture-neutral bytecode and the cheapest hardware
-this is meant to run on is a Raspberry Pi. There is a
-[Dockerfile](deploy/Dockerfile) too, for watching a segment for an afternoon
-without installing anything.
-
-To see the whole thing work without a network to break, run the synthetic lab.
-It builds a topology in network namespaces, records it, injects fourteen faults
-and checks that every one can be found in the record afterwards and that
-correlation named the cause:
-
-```bash
-sudo make lab
-```
-
-## Roadmap
-
-| | | |
-|---|---|---|
-| **M0** | envelope, store, interface state, CLI | done |
-| **M1** | neighbours, routes, addresses; temporal identity; narrative queries; fault-injection lab | done |
-| **M2** | eBPF connection observation, rollups, `system.drop` | done |
-| **M2b** | nftables rule changes | done |
-| **M2c** | resets and `flow.timeout_no_close` — reached through a second eBPF tracepoint rather than conntrack | done |
-| **M3** | Isnad correlation engine with backward cause matching, nineteen-rule library | done |
-| **M4** | GNS3 lab: three routers in OSPF, two switches with real VLANs and a trunk, the recorder on an access port | done |
-| **M5a** | Prometheus export, operating runbook | done |
-| **M5b** | web interface, release packaging for amd64 and arm64, container image | done |
-| **M5c** | OpenTelemetry export | done |
-| **M5d** | bootable appliance image, booted and verified in QEMU | done |
-| **M5e** | self-update from signed releases, verified against the live release feed | done |
+[docs/testing.md](docs/testing.md) lists every suite, the labs, and the
+recorded runs behind each claim in this file.
 
 ## Documentation
 
+- [Installing](docs/install.md) — packages, services, configuration, upgrades
+- [The desktop application](docs/desktop.md) — sources, pages, bundles, options
+- [دليل المستخدم بالعربية](docs/user-guide-ar.md) — the user guide in Arabic
+- [The local API](docs/api.md) — the endpoint and every route
+- [Testing](docs/testing.md) — what is tested, where, and the evidence
 - [The event schema](docs/schema.md) — the contract everything else depends on
 - [Writing a rule](docs/rules.md) — how correlation recognises a failure, and how to teach it a new one
 - [Running the recorder](docs/runbook.md) — where to put it, what to alert on, and the three commands to use during an incident
 - [Cutting a release](docs/releasing.md) — the signing key, and why it never touches CI
 - [Development environment](docs/dev-environment.md) — kernel requirements, the synthetic lab, GNS3 wiring
+- [Product documents](docs/product/) — requirements, threat model, data policy, licensing, support matrix, decisions
 - [Contributing](CONTRIBUTING.md) — the most valuable thing you can add is a rule, and it needs no Go
 - [Changelog](CHANGELOG.md) — what this version does, and what it does not
 
