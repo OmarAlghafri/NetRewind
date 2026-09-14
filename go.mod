@@ -5,6 +5,7 @@ go 1.25.0
 toolchain go1.26.6
 
 require (
+	github.com/Microsoft/go-winio v0.6.2
 	github.com/cilium/ebpf v0.22.0
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/spf13/cobra v1.10.2
@@ -16,7 +17,6 @@ require (
 )
 
 require (
-	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

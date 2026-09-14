@@ -86,6 +86,11 @@ install -m 0644 "$ROOT_ABS/deploy/systemd/netrewindd.service" %{buildroot}/etc/s
 %config(noreplace) %attr(0640,root,root) /etc/netrewind/netrewindd.yaml
 %config(noreplace) %attr(0640,root,root) /etc/netrewind/rules/*.yaml
 
+%pre
+# The group the local API socket is shared with (api.group in
+# netrewindd.yaml); created before the files land so the unit can use it.
+getent group netrewind >/dev/null || groupadd --system netrewind
+
 %post
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true

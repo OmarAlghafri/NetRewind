@@ -116,6 +116,11 @@ fi
 
 echo "==> state directory $STATEDIR"
 install -d -m 0750 "$STATEDIR"
+# The group the local API socket is shared with (api.group in the sample
+# configuration), so a desktop user can read the record without root.
+if ! getent group netrewind >/dev/null 2>&1; then
+    groupadd --system netrewind
+fi
 
 if [ ! -d "$UNITDIR" ]; then
     # Alpine, Void and Devuan are Linux hosts without systemd. The recorder

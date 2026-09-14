@@ -28,6 +28,12 @@ NoNewPrivileges=yes
 
 StateDirectory=netrewind
 StateDirectoryMode=0750
+# The local API socket lives here (api.path defaults to
+# /run/netrewind/api.sock). The directory is world-traversable so the socket
+# inside it, group-owned per api.group, can be reached by that group; the
+# record under /var/lib stays 0750.
+RuntimeDirectory=netrewind
+RuntimeDirectoryMode=0755
 ProtectSystem=strict
 ReadOnlyPaths=/etc/netrewind
 ProtectHome=yes

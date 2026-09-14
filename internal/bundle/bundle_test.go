@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"io"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -373,4 +374,28 @@ func addTarEntry(t *testing.T, data []byte, name string, content []byte) []byte 
 	tw.Close()
 	gz.Close()
 	return buf.Bytes()
+}
+
+// TestEmptyWindowEncodesArraysNotNull pins that a bundle of an empty window
+// carries "[]" for events and incidents, not "null", so a reader in another
+// language does not need Go's nil-slice convention.
+func TestEmptyWindowEncodesArraysNotNull(t *testing.T) {
+	st, err := store.OpenSQLite(filepath.Join(t.TempDir(), "events.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	var buf bytes.Buffer
+	if _, err := Export(context.Background(), st, &buf, ExportOptions{From: time.Now().Add(-time.Hour), To: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	members, err := readTarGz(&buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{eventsFile, incidentsFile} {
+		if got := strings.TrimSpace(string(members[name])); got != "[]" {
+			t.Errorf("%s = %q, want []", name, got)
+		}
+	}
 }

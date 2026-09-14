@@ -244,29 +244,34 @@ func run(ctx context.Context, log *slog.Logger, cfg config) error {
 		if apiPath == "" {
 			apiPath = ipc.DefaultPath()
 		}
+		// An API that cannot be served (a group that does not exist, a
+		// pipe name in use) is logged loudly and left unserved: the
+		// recorder's job is to record, and a viewer that cannot connect is
+		// a lesser failure than a record that was never kept.
 		l, err := ipc.ListenWith(apiPath, ipc.Options{Group: cfg.API.Group, AllowSIDs: cfg.API.AllowUsers})
 		if err != nil {
-			return err
-		}
-		var rules []*correlate.Rule
-		if engine != nil {
-			rules = engine.Rules()
-		}
-		api := &http.Server{Handler: (&apiv1.Server{
-			Store: st, Registry: reg, Version: version, ObserverID: observerID,
-			StorePath: dbPath, StartedAt: time.Now(), Rules: rules,
-		}).Handler()}
-		go func() {
-			log.Info("serving the local API", "endpoint", apiPath)
-			if err := api.Serve(l); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Error("local API stopped", "err", err)
+			log.Error("local API not served; recording continues without it", "endpoint", apiPath, "err", err)
+		} else {
+			var rules []*correlate.Rule
+			if engine != nil {
+				rules = engine.Rules()
 			}
-		}()
-		defer func() {
-			shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			api.Shutdown(shutdown)
-		}()
+			api := &http.Server{Handler: (&apiv1.Server{
+				Store: st, Registry: reg, Version: version, ObserverID: observerID,
+				StorePath: dbPath, StartedAt: time.Now(), Rules: rules,
+			}).Handler()}
+			go func() {
+				log.Info("serving the local API", "endpoint", apiPath)
+				if err := api.Serve(l); err != nil && !errors.Is(err, http.ErrServerClosed) {
+					log.Error("local API stopped", "err", err)
+				}
+			}()
+			defer func() {
+				shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer cancel()
+				api.Shutdown(shutdown)
+			}()
+		}
 	}
 
 	for _, c := range collectors {

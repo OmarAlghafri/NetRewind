@@ -174,6 +174,14 @@ func redact(e *event.Event) {
 }
 
 func marshalMembers(m Manifest, events []*event.Event, incidents []*incident.Incident) (map[string][]byte, error) {
+	// An empty window is an empty array, never null: a reader that is not
+	// Go should not have to know that Go encodes a nil slice as null.
+	if events == nil {
+		events = []*event.Event{}
+	}
+	if incidents == nil {
+		incidents = []*incident.Incident{}
+	}
 	manifestJSON, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("bundle: encode manifest: %w", err)

@@ -96,6 +96,11 @@ EOF
 cat > "$PKGROOT/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
 set -e
+# The group the local API socket is shared with (api.group in
+# netrewindd.yaml). A system group: no login, no home, just membership.
+if [ "$1" = configure ] && ! getent group netrewind >/dev/null; then
+    groupadd --system netrewind
+fi
 if [ "$1" = configure ] && [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true
     if [ -n "$2" ]; then

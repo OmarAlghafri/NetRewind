@@ -114,3 +114,16 @@ update:
 # And to follow a fork instead:
 #
 #   repo: "owner/name"
+
+# The local API the desktop application reads from: JSON over a Unix socket
+# (never a TCP port). It is on by default and reachable by the user the
+# recorder runs as - root, under the packaged unit - plus the members of
+# "group". The packages create the netrewind group; add yourself with
+#
+#   sudo usermod -aG netrewind $USER
+#
+# and log in again. Leave "group" empty to keep the socket owner-only.
+api:
+  enabled: true
+  path: /run/netrewind/api.sock
+  group: netrewind

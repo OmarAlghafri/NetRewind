@@ -10,8 +10,6 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
-
-	"github.com/OmarAlghafri/netrewind/internal/store"
 )
 
 func listen(path string, opts Options) (net.Listener, error) {
@@ -60,8 +58,17 @@ func listen(path string, opts Options) (net.Listener, error) {
 	return l, nil
 }
 
+// defaultPath is under /run rather than beside the store: /var/lib/netrewind
+// is 0750 root, which nobody else can traverse, while /run/netrewind is the
+// unit's RuntimeDirectory, created 0755 so a socket inside it that is
+// group-readable can actually be reached by that group.
 func defaultPath() string {
-	return filepath.Join(filepath.Dir(store.DefaultPath()), "api.sock")
+	if os.Getuid() == 0 || os.Geteuid() == 0 {
+		return "/run/netrewind/api.sock"
+	}
+	// Unprivileged runs (a developer's shell, the tests) get a per-user
+	// location that needs no root-owned directory.
+	return filepath.Join(os.TempDir(), "netrewind-"+strconv.Itoa(os.Getuid()), "api.sock")
 }
 
 func dial(ctx context.Context, path string) (net.Conn, error) {
