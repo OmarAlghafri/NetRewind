@@ -33,6 +33,7 @@ import (
 	"github.com/OmarAlghafri/netrewind/internal/identity"
 	"github.com/OmarAlghafri/netrewind/internal/metrics"
 	"github.com/OmarAlghafri/netrewind/internal/otel"
+	"github.com/OmarAlghafri/netrewind/internal/registry"
 	"github.com/OmarAlghafri/netrewind/internal/store"
 	"github.com/OmarAlghafri/netrewind/internal/update"
 )
@@ -198,9 +199,21 @@ func run(log *slog.Logger, cfg config) error {
 			RulesDir:  cfg.RulesDir,
 		}, version, builder, log, stop),
 	}
+
+	// The registry is a capability report waiting to be read (by the CLI, and
+	// later by a local API), not something the collectors themselves consult -
+	// it is fed the same up/down facts metrics already gets, alongside it
+	// rather than instead of it, so nothing already relying on
+	// netrewind_collector_up changes shape.
+	reg := registry.New(nil)
+	for _, d := range collectorDescriptors {
+		reg.Register(d)
+	}
+
 	for _, c := range collectors {
 		wg.Add(1)
 		meter.SetCollector(c.Name(), true)
+		reg.Up(c.Name())
 		go func(c collect.Collector) {
 			defer wg.Done()
 			// A collector that stops is a source the record no longer has, so
@@ -208,6 +221,7 @@ func run(log *slog.Logger, cfg config) error {
 			defer meter.SetCollector(c.Name(), false)
 			if err := c.Run(ctx, queue); err != nil && !errors.Is(err, context.Canceled) {
 				log.Error("collector failed", "collector", c.Name(), "err", err)
+				reg.Down(c.Name(), err.Error())
 				// The log is not the record. A source that never started, or
 				// that died, leaves a whole family of events missing from the
 				// timeline, and someone reading it later would see the absence
@@ -219,7 +233,9 @@ func run(log *slog.Logger, cfg config) error {
 					WithAttr("collector", c.Name()).
 					WithAttr("reason", err.Error()).
 					WithDedup("system.collector_down|"+c.Name()))
+				return
 			}
+			reg.Down(c.Name(), "stopped")
 		}(c)
 	}
 

@@ -90,13 +90,24 @@ func OpenSQLite(path string) (*SQLite, error) {
 	// One writer. SQLite serialises writes anyway, and this keeps "database is
 	// locked" out of the collector's hot path.
 	db.SetMaxOpenConns(1)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Before schemaDDL - which is written as CREATE TABLE/INDEX IF NOT
+	// EXISTS, safe only for additive changes - bring an older database
+	// forward through any registered migrations, or refuse to open one this
+	// binary cannot understand at all. See migrate.go.
+	if err := ensureSchemaVersion(ctx, db, path); err != nil {
+		db.Close()
+		return nil, err
+	}
+
 	if _, err := db.Exec(schemaDDL + identityDDL + incidentDDL); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("store: apply schema: %w", err)
 	}
 	s := &SQLite{db: db}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	if err := s.SetMeta(ctx, MetaSchemaVersion, fmt.Sprint(event.SchemaVersion)); err != nil {
 		db.Close()
 		return nil, err
