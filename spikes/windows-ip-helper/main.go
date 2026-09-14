@@ -41,12 +41,13 @@ import (
 func main() {
 	duration := flag.Duration("duration", 25*time.Second, "how long to observe for notifications")
 	splitFamily := flag.Bool("split-family", false, "register each notification type twice, once for AF_INET and once for AF_INET6, instead of once for AF_UNSPEC (see ADR 0002's double-initial-notification anomaly: this tests the hypothesis that AF_UNSPEC internally registers per-family, each with its own synthetic initial callback)")
+	flag.BoolVar(&requery, "requery", false, "on every real (non-initial) notification, fetch the full row by its key (GetIfEntry2Ex/GetIpInterfaceEntry/GetUnicastIpAddressEntry) and log the ACTUAL state - the row handed to a notification callback is documented to carry only key fields, so its Connected/DadState values are not meaningful on their own")
 	flag.Parse()
 
 	log.SetFlags(0)
 	start := time.Now()
 	logf("=== NetRewind Windows IP Helper spike ===")
-	logf("start=%s duration=%s split-family=%v pid=%d", start.Format(time.RFC3339Nano), *duration, *splitFamily, syscall.Getpid())
+	logf("start=%s duration=%s split-family=%v requery=%v pid=%d", start.Format(time.RFC3339Nano), *duration, *splitFamily, requery, syscall.Getpid())
 
 	logf("")
 	logf("--- seed: interfaces (GetIfTable2Ex) ---")
@@ -360,6 +361,9 @@ func registerIfaceNotify(rec *recorder, family uint16) (windows.Handle, error) {
 		}
 		rec.record("iface", fmt.Sprintf("reqFamily=%d type=%s family=%d ifIndex=%d luid=%d connected=%v",
 			family, notificationTypeName(notificationType), row.Family, row.InterfaceIndex, row.InterfaceLuid, row.Connected != 0))
+		if requery && notificationType != windows.MibInitialNotification {
+			requeryInterface(row.Family, row.InterfaceLuid, row.InterfaceIndex)
+		}
 		return 0
 	})
 
@@ -380,6 +384,9 @@ func registerAddrNotify(rec *recorder, family uint16) (windows.Handle, error) {
 		ip := inetToIP(row.Address)
 		rec.record("addr", fmt.Sprintf("reqFamily=%d type=%s ifIndex=%d addr=%s dadState=%d",
 			family, notificationTypeName(notificationType), row.InterfaceIndex, ipString(ip), row.DadState))
+		if requery && notificationType != windows.MibInitialNotification {
+			requeryAddress(row)
+		}
 		return 0
 	})
 
@@ -408,4 +415,66 @@ func registerRouteNotify(rec *recorder, family uint16) (windows.Handle, error) {
 	var handle windows.Handle
 	err := windows.NotifyRouteChange2(family, cb, nil, true, &handle)
 	return handle, err
+}
+
+// requery is set by the -requery flag. Microsoft documents that the Row a
+// change callback receives is a key, not a snapshot: NotifyIpInterfaceChange
+// fills only Family/InterfaceLuid/InterfaceIndex, NotifyUnicastIpAddressChange
+// only Address/InterfaceLuid/InterfaceIndex. Everything else in the struct is
+// zero, which is why every notification above prints connected=false and
+// dadState=0 regardless of reality. A real adapter therefore has to fetch the
+// row itself, by that key, before it can say what changed - these two helpers
+// do exactly that so the spike can show the actual before/after state.
+var requery bool
+
+func requeryInterface(family uint16, luid uint64, ifIndex uint32) {
+	var ipRow windows.MibIpInterfaceRow
+	ipRow.Family = family
+	ipRow.InterfaceLuid = luid
+	ipRow.InterfaceIndex = ifIndex
+	if err := windows.GetIpInterfaceEntry(&ipRow); err != nil {
+		logf("  requery GetIpInterfaceEntry(family=%d luid=%d): %v", family, luid, err)
+	} else {
+		logf("  requery GetIpInterfaceEntry: family=%d ifIndex=%d connected=%v metric=%d mtu=%d",
+			ipRow.Family, ipRow.InterfaceIndex, ipRow.Connected != 0, ipRow.Metric, ipRow.NlMtu)
+	}
+	var ifRow windows.MibIfRow2
+	ifRow.InterfaceLuid = luid
+	if err := windows.GetIfEntry2Ex(windows.MibIfEntryNormal, &ifRow); err != nil {
+		logf("  requery GetIfEntry2Ex(luid=%d): %v", luid, err)
+		return
+	}
+	logf("  requery GetIfEntry2Ex: ifIndex=%d alias=%q adminStatus=%s operStatus=%s mediaConnectState=%s",
+		ifRow.InterfaceIndex, windows.UTF16ToString(ifRow.Alias[:]),
+		adminStatusName(ifRow.AdminStatus), operStatusName(ifRow.OperStatus), mediaConnectStateName(ifRow.MediaConnectState))
+}
+
+func requeryAddress(key *windows.MibUnicastIpAddressRow) {
+	var row windows.MibUnicastIpAddressRow
+	row.Address = key.Address
+	row.InterfaceLuid = key.InterfaceLuid
+	row.InterfaceIndex = key.InterfaceIndex
+	if err := windows.GetUnicastIpAddressEntry(&row); err != nil {
+		logf("  requery GetUnicastIpAddressEntry(%s): %v", ipString(inetToIP(key.Address)), err)
+		return
+	}
+	logf("  requery GetUnicastIpAddressEntry: addr=%s dadState=%s prefixOrigin=%d suffixOrigin=%d validLifetime=%d",
+		ipString(inetToIP(row.Address)), dadStateName(row.DadState), row.PrefixOrigin, row.SuffixOrigin, row.ValidLifetime)
+}
+
+// dadStateName renders NL_DAD_STATE (MIB_UNICASTIPADDRESS_ROW.DadState).
+func dadStateName(v uint32) string {
+	switch v {
+	case 0:
+		return "Invalid"
+	case 1:
+		return "Tentative"
+	case 2:
+		return "Duplicate"
+	case 3:
+		return "Deprecated"
+	case 4:
+		return "Preferred"
+	}
+	return fmt.Sprintf("unknown(%d)", v)
 }

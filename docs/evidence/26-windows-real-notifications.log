@@ -1,0 +1,193 @@
+Closes the one thing ADR 0002 said no passive run could prove: that a REAL
+interface/address/route change is delivered through the IP Helper
+notification callbacks, end to end, and how - including the narrowed
+question logs 18/19 left open (does `AF_UNSPEC` deliver a real
+notification once, or once per address family, the way it does its
+synthetic initial one). Also the first real data on burst behaviour and on
+what a notification's Row actually contains.
+
+## Where and how
+
+A separate, physical Windows test machine (Windows 11 Home 26200,
+Intel i5-10300H, admin SSH with key auth), not the build machine. Two of its
+adapters are safe to change freely:
+
+- `Ethernet` (ifIndex 14, Realtek PCIe GbE): cable unplugged, so
+  administrative up/down can be driven without any carrier involved.
+- `Ethernet 2` (ifIndex 16, VirtualBox Host-Only, Up, 192.168.56.1/24):
+  a virtual adapter with real link state, safe for addresses, routes, and
+  admin up/down. No VM was running on it (`VBoxManage list runningvms`
+  empty).
+
+The SSH path (`Wi-Fi`, ifIndex 2) and the WSL `vEthernet` (61) were never
+touched. Adapter states, addresses and routes were verified identical
+before and after each run.
+
+`spike.exe` was built from the working tree of `spikes/windows-ip-helper/`
+(which now carries a `-requery` flag: on each real notification, fetch the
+full row by its key with `GetIpInterfaceEntry`/`GetIfEntry2Ex`/
+`GetUnicastIpAddressEntry` and log the actual state), copied over, and
+run twice for a 105 s window each, while a PowerShell driver applied the
+same timestamped sequence of real changes both times:
+
+    A1  Disable-NetAdapter Ethernet        (admin DOWN, no carrier)     wait 6 s
+    A2  Enable-NetAdapter  Ethernet        (admin UP)                   wait 10 s
+    B1  New-NetIPAddress   Ethernet 2  192.168.56.77/24                 wait 6 s
+    B2  Remove-NetIPAddress            192.168.56.77                    wait 6 s
+    C1  New-NetRoute       10.99.0.0/24 via 192.168.56.2 on Ethernet 2  wait 6 s
+    C2  Remove-NetRoute    10.99.0.0/24                                 wait 6 s
+    D   burst: 10 addresses (192.168.56.101-110) added back-to-back,
+        then removed back-to-back, no sleeps                            wait 10 s
+    E1  Disable-NetAdapter Ethernet 2      (admin DOWN of an Up adapter with an address)
+    E2  Enable-NetAdapter  Ethernet 2      (admin UP)
+
+Run 1: default registration (`AF_UNSPEC`, one handle per notification
+type). Run 2: `-split-family` (AF_INET and AF_INET6 registered separately,
+two handles per type). Everything restored in a `finally` block either
+way. Raw logs (`spike-default.log`, `spike-split.log`, both timelines)
+kept with the results, not committed.
+
+## Headline: real notifications DO arrive, and AF_UNSPEC delivers each one ONCE
+
+    run            NOTIFY lines   initial   REAL
+    AF_UNSPEC         109            6       103
+    per-family        106            6       100
+
+Per step, with the family label folded for addr/route rows (the only
+difference there is `reqFamily=0` vs `2`/`23`, i.e. which registration the
+callback came through) and kept for iface rows (where it is the API's own
+data model - see below):
+
+| step | change | notification | AF_UNSPEC | per-family |
+|---|---|---|---|---|
+| A1 | Realtek admin DOWN | `addr/DeleteInstance/if=14` | 2 | 2 |
+| | | `iface/DeleteInstance/if=14/fam=2` | 1 | 1 |
+| | | `iface/DeleteInstance/if=14/fam=23` | 1 | 1 |
+| | | `iface/ParameterChange/if=14/fam=2` | 1 | 1 |
+| | | `iface/ParameterChange/if=14/fam=23` | 1 | 1 |
+| | | `route/DeleteInstance/if=14` | 5 | 5 |
+| A2 | Realtek admin UP | `addr/AddInstance/if=14` | 2 | 2 |
+| | | `iface/AddInstance/if=14/fam=2`, `/fam=23` | 1, 1 | 1, 1 |
+| | | `iface/ParameterChange/if=14` (both families together) | 3 | 3 |
+| | | `route/AddInstance/if=14` | 5 | 5 |
+| B1 | add 192.168.56.77/24 | `addr/AddInstance/if=16` | 1 | 1 |
+| | | `addr/ParameterChange/if=16` (DAD -> Preferred) | 1 | 1 |
+| | | `route/AddInstance/if=16` (the /32 host route) | 1 | 1 |
+| B2 | remove it | `addr/DeleteInstance/if=16`, `route/DeleteInstance/if=16` | 1, 1 | 1, 1 |
+| C1 | add route | `route/AddInstance/if=16` | 1 | 1 |
+| C2 | remove route | `route/DeleteInstance/if=16` | 1 | 1 |
+| D | burst 10 add + 10 remove | `addr/AddInstance/if=16` | **10** | **10** |
+| | | `addr/DeleteInstance/if=16` | **10** | **10** |
+| E1 | host-only admin DOWN | `addr/DeleteInstance/if=16` | 2 | 2 |
+| | | `iface/DeleteInstance/if=16/fam=2`, `/fam=23` | 1, 1 | 1, 1 |
+| | | `iface/ParameterChange/if=16/fam=2`, `/fam=23` | 1, 1 | 1, 1 |
+| | | `route/DeleteInstance/if=16` | 8 | 8 |
+| E2 | host-only admin UP | `addr/AddInstance/if=16` | 2 | 2 |
+| | | `addr/ParameterChange/if=16` | 2 | 2 |
+| | | `iface/AddInstance/if=16/fam=2`, `/fam=23` | 1, 1 | 1, 1 |
+| | | `iface/ParameterChange/if=16/fam=2`, `/fam=23` | 2, 2 | 2, 2 |
+| | | `route/AddInstance/if=16` | 8 | 8 |
+
+Every substantive count is identical between the two registrations. Where
+the per-family run shows 5 route deletes as 2 (v4) + 3 (v6), the
+`AF_UNSPEC` run shows 5 through its one handle - not 10. The burst of ten
+address adds produced exactly ten `AddInstance` callbacks under both, not
+twenty. **So the answer to the question ADR 0002 narrowed to is: no -
+`AF_UNSPEC` does not duplicate real notifications. Only its synthetic
+initial callback is per-family (log 18). A future adapter can register
+once with `AF_UNSPEC` and does not need to de-duplicate.**
+
+The only rows that differ between runs are `iface/ParameterChange` on
+ifIndex 2 - the Wi-Fi, which nobody touched - at different steps and in
+different numbers (0-4 per step, plus a pair 1.3 s before step A1 and a
+pair after the sequence ended). These are spontaneous parameter changes on
+a live wireless interface (Windows re-evaluating metrics/state as other
+adapters come and go, and on its own). Real-world background noise that
+an adapter must expect and must not turn into `link.*` events.
+
+## Interface notifications are per IP family by design - not a duplicate
+
+An adapter admin change yields TWO `iface` callbacks, one with
+`family=2` and one with `family=23`, in BOTH runs. That is the data model:
+`NotifyIpInterfaceChange` reports `MIB_IPINTERFACE_ROW`s, and one NDIS
+interface has one IPv4 and one IPv6 IP-interface row. The recorder's
+`ports.InterfaceObservation` is per link, not per family, so the future
+adapter keys on `InterfaceLuid` and folds the two rows into one
+observation - a design note, not a bug in either side.
+
+## What `-requery` showed: the callback Row is a key, not a snapshot
+
+Every `iface` callback row said `connected=false` - including for the Wi-Fi
+that was Up the whole time - and every `addr` row said `dadState=0`.
+Exactly what Microsoft documents: the Row passed to a change callback
+carries only key fields. `-requery` fetched the real state by that key:
+
+- B1, address add: `AddInstance` at +0.9 s with the re-queried row at
+  `dadState=Tentative`; then **3.4 s later** three things within 12 ms:
+  `route/AddInstance 192.168.56.77/32` (the host route), and
+  `addr/ParameterChange` whose re-query shows `dadState=Preferred`. So an
+  address is "there" at AddInstance and "usable" at the ParameterChange
+  that follows DAD - an adapter that wants Linux-equivalent
+  `l3.addr_added` semantics should record at Preferred, or record both
+  states.
+- D, the burst: the ten addresses were removed ~0.8 s after being added,
+  before DAD completed - so no `ParameterChange` and no `/32` host routes
+  for any of them (unlike B1). Consistent with the above; also shows the
+  callback queue delivered all 20 events for a change rate of ~12/s with
+  nothing dropped or coalesced.
+- A1, Realtek disable: the notifications arrive in the order
+  `ParameterChange` (both families) -> `DeleteInstance` (v6) ->
+  `DeleteInstance` (v4), and **re-querying races the change itself**:
+  `GetIpInterfaceEntry` already returned `Element not found` at the
+  `ParameterChange`, while `GetIfEntry2Ex` still answered
+  (`adminStatus=up operStatus=down mediaConnectState=disconnected`) and
+  only at the last `DeleteInstance` showed `adminStatus=down
+  mediaConnectState=unknown`. `GetUnicastIpAddressEntry` for the
+  interface's link-local v4/v6 addresses was likewise `Element not
+  found` by the time the callback ran. An adapter must treat "not found"
+  on re-query as "gone", never as an error, and must not assume the
+  state it re-queries is the state that caused the callback.
+
+## Latency and ordering
+
+Time from the PowerShell cmdlet starting to the first related callback:
+
+    A1 1.16 s (Disable-NetAdapter's own duration)   A2 0.22 s   B1 0.90 s (New-NetIPAddress's own)
+    B2 0.05 s   C1 0.08 s   C2 0.05 s   D 0.04 s   E1 0.15 s   E2 0.11 s
+
+i.e. tens of milliseconds once the change is actually made; the larger
+numbers are the cmdlets, not the notification path. Comfortably inside
+the one-second resolution the recorder's timeline cares about.
+
+## What this does and does not close (against ADR 0002's list)
+
+- Real change delivered end to end: **CLOSED** - interface, address and
+  route, v4 and v6, add/delete/parameter-change, all observed.
+- `AF_UNSPEC` real-notification duplication: **CLOSED** - it does not.
+- Burst/loss: **CLOSED for this scale** - 20 events in ~1.6 s, none lost.
+  Not a stress test; nothing here says what happens at thousands/s.
+- Interface-row filter (log 19) against a real transition: the two
+  adapters used here (physical Realtek, VirtualBox host-only) are both in
+  the filter's "keep" class; the disable/enable transitions produced
+  `DeleteInstance`/`AddInstance` on exactly those ifIndexes. Consistent
+  with the filter; not a full re-test of it.
+- Sleep/resume: **NOT tested** - the machine is reached over Wi-Fi; a
+  sleep would drop the SSH connection and a laptop may not wake remotely.
+  Needs a local console or a VM with ACPI control.
+- VPN connect/disconnect: **NOT tested** - no VPN client or configuration
+  exists on that machine, and none should be invented for a test.
+
+## Verification
+
+- `cd spikes/windows-ip-helper && go vet ./... && go build`: clean, from
+  the working tree including the `-requery` code.
+- Both runs exited normally after their 105 s window; `NOTIFY` counts
+  above are `Select-String` counts over the raw logs, the per-step table
+  is from bucketing each `NOTIFY` line's timestamp into the driver's
+  `STEP ... BEGIN` windows (the driver's timeline file was UTF-16 as
+  PowerShell writes it - decoded as such, which is why an earlier pass of
+  the same analysis put every event "outside any step").
+- Adapters after each run: identical to before (`2:Wi-Fi=Up,
+  8:Bluetooth=Disconnected, 14:Ethernet=Disconnected, 16:Ethernet 2=Up,
+  61:vEthernet=Up`); IPv4 on `Ethernet 2` back to only `192.168.56.1`;
+  route `10.99.0.0/24` absent. Re-verified once more after cleanup.

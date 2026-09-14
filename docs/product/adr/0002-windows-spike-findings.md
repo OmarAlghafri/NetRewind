@@ -39,7 +39,7 @@ snapshot") - not the bare development machine this spike ran on. Skipping
 the active test here is therefore consistent with the plan's own intended
 division of labour between 5A (passive, bare machine, cheap) and 5B (active,
 isolated VM, safe-by-construction), not just an extra-cautious one-off
-choice for this session.
+choice for this spike.
 
 ## What was built
 
@@ -308,7 +308,7 @@ discovered too late to work around:
    path is the operator's actual internet connection. The upside (one
    additional confirmed notification, on top of six already-confirmed
    synthetic ones proving the same callback plumbing) did not clear that
-   bar for this session.
+   bar for this spike.
 3. Nothing about *this* decision changes the honest bottom line below - a
    confirmed real-change notification is still the single most important
    piece of missing evidence, and it is explicitly deferred to a proper
@@ -337,26 +337,60 @@ nothing found here is a red flag either.** Specifically:
 - MTU and the "0 means unknown" convention line up with the existing
   `ports.InterfaceObservation` contract with no translation surprises.
 
+**Update, the active-change run has now happened**
+(`docs/evidence/26-windows-real-notifications.log`): on a separate, physical
+Windows 11 test machine, a scripted sequence of real changes (adapter
+admin down/up on a physical NIC and on a virtual one, IPv4 address
+add/remove, route add/remove, a burst of ten addresses added and removed
+back-to-back) was applied twice, once under `AF_UNSPEC` registration and
+once with per-family registration, with the spike's new `-requery` flag
+fetching each notification's real row. 103 and 100 real notifications
+respectively, with every substantive per-step count identical between the
+two. The list below is updated in place.
+
 **Not established by this run, and not to be assumed true from the docs
 alone:**
-- Whether a genuine interface/address/route change is actually delivered
-  through these callbacks end-to-end on this machine - no such change
-  occurred to observe, in either 25s or 60s of passive listening.
+- ~~Whether a genuine interface/address/route change is actually delivered
+  through these callbacks end-to-end~~ **CONFIRMED** (log 26): interface,
+  address and route changes, IPv4 and IPv6, `AddInstance`/`DeleteInstance`/
+  `ParameterChange`, all delivered, tens of milliseconds after the change.
+  Two things the run added that the docs alone would not have: the Row a
+  callback receives is a key only (`connected=false`, `dadState=0` on
+  every single one - re-query by `InterfaceLuid`/address to get the real
+  state, and treat "Element not found" on that re-query as "already gone",
+  because it races the change itself); and an address is `AddInstance` at
+  Tentative and only `ParameterChange` (plus its /32 host route) ~3 s later
+  when DAD completes - `l3.addr_added` semantics belong at the latter.
 - ~~What causes the double initial-notification per registration~~
   **CONFIRMED** (see the family-split update above and
   `docs/evidence/18-windows-notification-family-split.log`): `AF_UNSPEC`
   registers once per real address family internally, each with its own
-  synthetic initial callback. What remains open, narrowed: whether that same
-  per-family duplication also affects REAL (non-initial) notifications -
-  e.g. would a real address change likewise fire twice, and would a future
-  adapter need to de-duplicate?
-- Sleep/resume behaviour - not tested, since none occurred.
-- VPN connect/disconnect behaviour - not tested, since no VPN was configured
-  or active.
-- Loss behaviour under a burst of rapid changes (the netlink collector's
-  `newOverflowReporter` exists precisely because netlink can drop
-  notifications under load - nothing here says whether `iphlpapi`'s
-  callback queue can overflow the same way, or what it does if it does).
+  synthetic initial callback. ~~What remains open, narrowed: whether that same
+  per-family duplication also affects REAL (non-initial) notifications~~
+  **CONFIRMED it does not** (log 26): a burst of ten address adds produced
+  exactly ten `AddInstance` callbacks under `AF_UNSPEC`, and five route
+  deletes that the per-family run reports as 2 (v4) + 3 (v6) arrived as
+  five, not ten, through the single `AF_UNSPEC` handle. Register once with
+  `AF_UNSPEC`; no de-duplication needed. (Interface notifications DO come
+  as one row per IP family - `family=2` and `family=23` for the same LUID -
+  in both modes; that is the API's data model, and the adapter folds them
+  by LUID into one `InterfaceObservation`.)
+- Sleep/resume behaviour - still not tested: the test machine is reached
+  over Wi-Fi and a laptop may not wake remotely; needs a local console or
+  a VM with ACPI control.
+- VPN connect/disconnect behaviour - still not tested: no VPN client or
+  configuration exists on either machine, and none should be invented.
+- ~~Loss behaviour under a burst of rapid changes~~ **Observed at a modest
+  scale** (log 26): 20 events in ~1.6 s (ten adds, ten removes), all
+  delivered, none coalesced, under both registrations. Not a stress test -
+  nothing here says what happens at thousands per second, and the
+  netlink collector's `newOverflowReporter` still has no `iphlpapi`
+  counterpart to compare against.
+- Spontaneous `ParameterChange` notifications on an interface nobody
+  touched (the test machine's Wi-Fi fired pairs of them before, during
+  and after the sequence, at different points in the two runs). Not a
+  problem, but a fact an adapter must be designed around: a parameter
+  change is not a link change.
 - ~~The right filtering rule for the ~6-7x interface-row noise problem~~
   **A tested filter now exists** (see the update above and
   `docs/evidence/19-windows-interface-filtering.log`): 45 shim + 4
@@ -364,16 +398,20 @@ alone:**
   Still not tested against a real transition (no real change occurred in
   any run so far) - only against the static seed snapshot.
 
-**Recommendation:** proceed to a real Phase 5B prototype only far enough to
-run the active-change tests the plan already specifies (IPv4/IPv6 change
-delivery, sleep/resume, VPN connect/disconnect, burst/loss behaviour) inside
-an isolated VM with a snapshot, per the plan's own testing section - and
-treat the interface-row filtering problem as a required design task, not an
-afterthought, before any `WindowsLinkAdapter` is written against
-`internal/ports`. This spike de-risks the "does the binding exist and does
-registration work" question convincingly; it does not yet de-risk "does a
-real change actually arrive," which is the one thing a passive, safety-
-bounded run on a live machine structurally cannot prove by itself.
+**Recommendation (revised after log 26):** the evidence needed to START a
+real `WindowsLinkAdapter` against `internal/ports` now exists: the binding,
+registration, real delivery of interface/address/route changes in both
+families, `AF_UNSPEC` semantics, a tested interface-row filter, and modest
+burst behaviour are all observed on real machines. The design constraints
+that adapter must honour are now concrete rather than hypothetical:
+register once with `AF_UNSPEC`; key on `InterfaceLuid` and fold the v4/v6
+interface rows into one observation; re-query every notification's row and
+treat not-found as gone; record address arrival at DAD completion; ignore
+`ParameterChange` on interfaces whose re-queried admin/oper/media state did
+not change; apply the log 19 filter to the seed table. Still to be tested
+before that adapter is called done, not before it is started: sleep/resume
+and VPN transitions (need a console or an ACPI-controllable VM, and a VPN
+configuration that actually exists), and a real high-rate burst.
 
 ## Verification
 
