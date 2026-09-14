@@ -57,6 +57,32 @@ sudo make image
 gzip -9 dist/netrewind-appliance.img
 ```
 
+## Packages and installers
+
+The tarballs are what the updater fetches; people install from packages.
+With the release binaries in `build/` (`make linux VERSION=<version>`, and
+the `arm64` pair beside them):
+
+```bash
+VERSION=<version> ARCH=amd64  deploy/build-deb.sh    # dist/netrewind_<version>_amd64.deb
+VERSION=<version> ARCH=x86_64 deploy/build-rpm.sh    # dist/netrewind-<version>-1.x86_64.rpm
+make desktop                                         # the desktop installers, for this platform
+```
+
+Copy the desktop installers (`NetRewind_<version>_x64-setup.exe` and the
+`.msi` from a Windows build; `netrewind-desktop` `.deb`/`.rpm`/AppImage from a
+Linux build) into `dist/`, then write one manifest over everything and sign it
+again:
+
+```bash
+(cd dist && sha256sum -- * > SHA256SUMS)
+make sign
+```
+
+`ParseChecksums` keys the manifest by file name, so the updater is
+indifferent to the extra entries and anyone can `sha256sum -c` the whole
+release.
+
 ## Publishing
 
 Upload from the machine that has the key, because the signature has to be made
@@ -64,6 +90,10 @@ there:
 
 - `netrewind-<version>-linux-amd64.tar.gz`
 - `netrewind-<version>-linux-arm64.tar.gz`
+- `netrewind_<version>_<arch>.deb`, `netrewind-<version>-1.<arch>.rpm`
+- `NetRewind_<version>_x64-setup.exe`, `NetRewind_<version>_x64_en-US.msi`
+- `netrewind-desktop_<version>_amd64.deb`, `netrewind-desktop-<version>-1.x86_64.rpm`,
+  `netrewind-desktop_<version>_amd64.AppImage`
 - `netrewind-<version>-appliance-amd64.img.gz` (optional)
 - `SHA256SUMS`
 - `SHA256SUMS.sig` ← without this, recorders with a key configured refuse the release

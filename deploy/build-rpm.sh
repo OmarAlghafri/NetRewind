@@ -46,7 +46,6 @@ Release: 1
 Summary: Network black-box recorder
 License: AGPL-3.0-only
 URL: https://github.com/OmarAlghafri/NetRewind
-BuildArch: $ARCH
 # Weak dependency, same reasoning as deploy/build-deb.sh's Recommends: the
 # policy collector needs nft(8), the rest of the recorder does not, and a
 # host without it gets a collector-not-watching incident, not a dead unit.
@@ -116,7 +115,10 @@ fi
 EOF
 
 mkdir -p "$OUT"
-rpmbuild --define "_topdir $TOPDIR" -bb "$TOPDIR/SPECS/netrewind.spec"
+# --target names the package architecture. The spec carries no BuildArch:
+# rpmbuild checks that line against the build host, which would refuse the
+# aarch64 package this static, cross-compiled binary lets an x86_64 host build.
+rpmbuild --define "_topdir $TOPDIR" --target "$ARCH" -bb "$TOPDIR/SPECS/netrewind.spec"
 find "$TOPDIR/RPMS" -name '*.rpm' -exec cp {} "$OUT/" \;
 echo "==> built:"
 find "$OUT" -name "netrewind-${VERSION}*.rpm"

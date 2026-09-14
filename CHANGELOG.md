@@ -82,6 +82,8 @@ feature is enabled in this release.
   (`netlink` or `iphelper`).
 - Collectors a build cannot run are reported as `unsupported`, distinct from
   `down`.
+- `deploy/build-rpm.sh` builds the `aarch64` package on an `x86_64` host
+  (`rpmbuild --target`; the spec no longer pins `BuildArch`).
 - A frontend test suite (Vitest) and Rust unit tests for the desktop shell run
   in CI alongside the Go suite.
 
