@@ -108,7 +108,14 @@ func producersIn(t *testing.T, root string) map[string]bool {
 	// internal/update is here because the updater is a collector in every way
 	// that matters: it runs under the same supervision and emits events into the
 	// same queue. A kind produced only there would otherwise look unproduced.
-	for _, dir := range []string{"internal/collect", "internal/update", "cmd"} {
+	//
+	// internal/analyze is here because PRODUCT_RELEASE_PLAN_AR.md §4.1 moves
+	// the decision logic that builds events out of the collectors themselves
+	// and into platform-neutral analyzers, so a collector's own file only
+	// translates into internal/ports observations. A kind whose event is
+	// built inside an analyzer would otherwise look unproduced the moment the
+	// collector it used to live in stopped constructing it directly.
+	for _, dir := range []string{"internal/collect", "internal/update", "internal/analyze", "cmd"} {
 		err := filepath.Walk(filepath.Join(root, dir), func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err

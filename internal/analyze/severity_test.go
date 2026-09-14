@@ -1,4 +1,4 @@
-package netlink
+package analyze
 
 import (
 	"testing"
@@ -42,7 +42,7 @@ func TestHowLoudlyAnAddressAppearingIsReported(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := firstSightingSeverity(tc.changedHands, tc.isGateway)
+			got := FirstSightingSeverity(tc.changedHands, tc.isGateway)
 			if got != tc.want {
 				t.Errorf("severity = %s, want %s — %s", got, tc.want, tc.why)
 			}
