@@ -1,0 +1,174 @@
+[23:28:59.511711] === NetRewind Windows IP Helper spike ===
+[23:28:59.511711] start=2026-09-13T23:28:59.511711+04:00 duration=20s split-family=true pid=10636
+[23:28:59.511711] 
+[23:28:59.511711] --- seed: interfaces (GetIfTable2Ex) ---
+[23:28:59.514678] interfaces: 66
+[23:28:59.514678]   ifIndex=26   luid=1688849860263936 alias="Local Area Connection* 8-WFP Native MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=50   luid=1688849877041152 alias="Local Area Connection* 8-Npcap Packet Driver (NPCAP)-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=51   luid=1688849893818368 alias="Local Area Connection* 8-QoS Packet Scheduler-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=52   luid=1688849910595584 alias="Local Area Connection* 9-WFP Native MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=53   luid=1688849927372800 alias="Local Area Connection* 9-Npcap Packet Driver (NPCAP)-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=54   luid=1688849944150016 alias="Local Area Connection* 9-QoS Packet Scheduler-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=55   luid=1688849960927232 alias="Local Area Connection* 10-WFP Native MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=29   luid=1688849977704448 alias="Ethernet-WFP Native MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=30   luid=1688849994481664 alias="GNS3-Loopback-WFP Native MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=31   luid=1688850011258880 alias="Ethernet-Npcap Packet Driver (NPCAP)-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=32   luid=1688850028036096 alias="GNS3-Loopback-Npcap Packet Driver (NPCAP)-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=33   luid=1688850044813312 alias="GNS3-Loopback-VirtualBox NDIS Light-Weight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=34   luid=1688850061590528 alias="Ethernet-QoS Packet Scheduler-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=35   luid=1688850078367744 alias="GNS3-Loopback-QoS Packet Scheduler-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=36   luid=1688850095144960 alias="Ethernet-WFP 802.3 MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=37   luid=1688850111922176 alias="GNS3-Loopback-WFP 802.3 MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=38   luid=1688850128699392 alias="Bluetooth Network Connection 2-Npcap Packet Driver (NPCAP)-0000" mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=6
+[23:28:59.514678]   ifIndex=56   luid=1688850145476608 alias="Local Area Connection* 10-Npcap Packet Driver (NPCAP)-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=57   luid=1688850162253824 alias="Local Area Connection* 10-QoS Packet Scheduler-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=59   luid=1688850179031040 alias="vSwitch (WSL (Hyper-V firewall))-Hyper-V Virtual Switch Extension Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=60   luid=1688850195808256 alias="vSwitch (WSL (Hyper-V firewall))-Virtual Filtering Platform VMSwitch Extension-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=62   luid=1688850212585472 alias="vEthernet (WSL (Hyper-V firewall))-WFP Native MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=63   luid=1688850229362688 alias="vEthernet (WSL (Hyper-V firewall))-Npcap Packet Driver (NPCAP)-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=64   luid=1688850246139904 alias="vEthernet (WSL (Hyper-V firewall))-VirtualBox NDIS Light-Weight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=65   luid=1688850262917120 alias="vEthernet (WSL (Hyper-V firewall))-QoS Packet Scheduler-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=66   luid=1688850279694336 alias="vEthernet (WSL (Hyper-V firewall))-WFP 802.3 MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=2    luid=1689399616077824 alias="Ethernet (Kernel Debugger)"        mtu=0      adminStatus=down     operStatus=notPresent      mediaConnectState=unknown      type=6
+[23:28:59.514678]   ifIndex=12   luid=1689399632855040 alias="Local Area Connection* 8"          mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=17   luid=1689399649632256 alias="Local Area Connection* 9"          mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=7    luid=1689399666409472 alias="Local Area Connection* 10"         mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=4    luid=1689399683186688 alias="GNS3-Loopback"                     mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=10   luid=1689399699963904 alias="Bluetooth Network Connection 2"    mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=6
+[23:28:59.514678]   ifIndex=58   luid=1689399716741120 alias="vSwitch (WSL (Hyper-V firewall))"  mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=9    luid=1689399733518336 alias="Ethernet"                          mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=61   luid=1689399750295552 alias="vEthernet (WSL (Hyper-V firewall))" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=6
+[23:28:59.514678]   ifIndex=21   luid=6474474220158976 alias="Local Area Connection* 7"          mtu=1494   adminStatus=up       operStatus=down            mediaConnectState=unknown      type=23
+[23:28:59.514678]   ifIndex=1    luid=6755399441055744 alias="Loopback Pseudo-Interface 1"       mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=24
+[23:28:59.514678]   ifIndex=39   luid=19984723346456576 alias="Wi-Fi-WFP Native MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=71
+[23:28:59.514678]   ifIndex=40   luid=19984723363233792 alias="Wi-Fi-Virtual WiFi Filter Driver-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=71
+[23:28:59.514678]   ifIndex=41   luid=19984723380011008 alias="Wi-Fi-Native WiFi Filter Driver-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=71
+[23:28:59.514678]   ifIndex=42   luid=19984723396788224 alias="Wi-Fi-Npcap Packet Driver (NPCAP)-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=71
+[23:28:59.514678]   ifIndex=43   luid=19984723413565440 alias="Wi-Fi-VirtualBox NDIS Light-Weight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=71
+[23:28:59.514678]   ifIndex=44   luid=19984723430342656 alias="Wi-Fi-QoS Packet Scheduler-0000"   mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=71
+[23:28:59.514678]   ifIndex=45   luid=19984723447119872 alias="Wi-Fi-WFP 802.3 MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=71
+[23:28:59.514678]   ifIndex=27   luid=19984723463897088 alias="Local Area Connection* 11-WFP Native MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=28   luid=19984723480674304 alias="Local Area Connection* 11-Native WiFi Filter Driver-0000" mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=46   luid=19984723497451520 alias="Local Area Connection* 11-Npcap Packet Driver (NPCAP)-0000" mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=47   luid=19984723514228736 alias="Local Area Connection* 11-VirtualBox NDIS Light-Weight Filter-0000" mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=48   luid=19984723531005952 alias="Local Area Connection* 11-QoS Packet Scheduler-0000" mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=49   luid=19984723547783168 alias="Local Area Connection* 11-WFP 802.3 MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=14   luid=19984723564560384 alias="Local Area Connection* 12-WFP Native MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=16   luid=19984723581337600 alias="Local Area Connection* 12-Native WiFi Filter Driver-0000" mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=22   luid=19984723598114816 alias="Local Area Connection* 12-Npcap Packet Driver (NPCAP)-0000" mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=23   luid=19984723614892032 alias="Local Area Connection* 12-VirtualBox NDIS Light-Weight Filter-0000" mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=24   luid=19984723631669248 alias="Local Area Connection* 12-QoS Packet Scheduler-0000" mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=25   luid=19984723648446464 alias="Local Area Connection* 12-WFP 802.3 MAC Layer LightWeight Filter-0000" mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=8    luid=19985273102270464 alias="Wi-Fi"                             mtu=1500   adminStatus=up       operStatus=up              mediaConnectState=connected    type=71
+[23:28:59.514678]   ifIndex=6    luid=19985273152602112 alias="Local Area Connection* 11"         mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=19   luid=19985273169379328 alias="Local Area Connection* 12"         mtu=1500   adminStatus=up       operStatus=down            mediaConnectState=disconnected type=71
+[23:28:59.514678]   ifIndex=13   luid=36873767409942528 alias="Teredo Tunneling Pseudo-Interface" mtu=0      adminStatus=down     operStatus=notPresent      mediaConnectState=unknown      type=131
+[23:28:59.514678]   ifIndex=5    luid=36873767426719744 alias="Microsoft IP-HTTPS Platform Interface" mtu=0      adminStatus=down     operStatus=notPresent      mediaConnectState=unknown      type=131
+[23:28:59.514678]   ifIndex=3    luid=36873767443496960 alias="6to4 Adapter"                      mtu=0      adminStatus=down     operStatus=notPresent      mediaConnectState=unknown      type=131
+[23:28:59.514678]   ifIndex=15   luid=36873771704909824 alias="Local Area Connection* 3"          mtu=4091   adminStatus=up       operStatus=down            mediaConnectState=unknown      type=131
+[23:28:59.514678]   ifIndex=20   luid=36873771721687040 alias="Local Area Connection* 4"          mtu=1480   adminStatus=up       operStatus=down            mediaConnectState=unknown      type=131
+[23:28:59.514678]   ifIndex=18   luid=36873771738464256 alias="Local Area Connection* 5"          mtu=1460   adminStatus=up       operStatus=down            mediaConnectState=unknown      type=131
+[23:28:59.515276]   ifIndex=11   luid=36873771755241472 alias="Local Area Connection* 6"          mtu=1464   adminStatus=up       operStatus=down            mediaConnectState=unknown      type=131
+[23:28:59.515276] 
+[23:28:59.515276] --- seed: unicast addresses (GetUnicastIpAddressTable) ---
+[23:28:59.515276] unicast addresses: 16
+[23:28:59.515276]   ifIndex=1    addr=127.0.0.1                                prefixOrigin=2  suffixOrigin=2  dadState=4  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=8    addr=192.168.68.56                            prefixOrigin=3  suffixOrigin=3  dadState=4  validLifetimeSec=4038
+[23:28:59.515276]   ifIndex=6    addr=169.254.205.53                           prefixOrigin=2  suffixOrigin=4  dadState=1  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=4    addr=10.99.99.1                               prefixOrigin=1  suffixOrigin=1  dadState=4  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=19   addr=169.254.244.227                          prefixOrigin=2  suffixOrigin=4  dadState=1  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=10   addr=169.254.208.240                          prefixOrigin=2  suffixOrigin=4  dadState=1  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=9    addr=192.168.56.1                             prefixOrigin=1  suffixOrigin=1  dadState=4  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=61   addr=172.28.208.1                             prefixOrigin=1  suffixOrigin=1  dadState=4  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=1    addr=::1                                      prefixOrigin=2  suffixOrigin=2  dadState=4  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=8    addr=fe80::8eb5:7d9a:c280:bfec                prefixOrigin=2  suffixOrigin=4  dadState=4  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=6    addr=fe80::12f:5c35:4141:c82d                 prefixOrigin=2  suffixOrigin=4  dadState=3  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=4    addr=fe80::6929:5061:5f05:637b                prefixOrigin=2  suffixOrigin=4  dadState=4  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=19   addr=fe80::8680:6ccc:aaeb:7622                prefixOrigin=2  suffixOrigin=4  dadState=3  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=10   addr=fe80::da3b:d24e:bb87:2157                prefixOrigin=2  suffixOrigin=4  dadState=3  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=9    addr=fe80::755e:141a:9c86:7fa3                prefixOrigin=2  suffixOrigin=4  dadState=4  validLifetimeSec=4294967295
+[23:28:59.515276]   ifIndex=61   addr=fe80::1c77:5732:de94:8916                prefixOrigin=2  suffixOrigin=4  dadState=4  validLifetimeSec=4294967295
+[23:28:59.515276] 
+[23:28:59.515276] --- seed: routes (GetIpForwardTable2) ---
+[23:28:59.515276] routes: 57
+[23:28:59.515276]   ifIndex=8    dest=0.0.0.0/0                      nextHop=192.168.68.1         metric=0    protocol=3   loopback=false
+[23:28:59.515276]   ifIndex=4    dest=10.99.99.0/24                  nextHop=0.0.0.0              metric=256  protocol=2   loopback=false
+[23:28:59.515276]   ifIndex=4    dest=10.99.99.1/32                  nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515276]   ifIndex=4    dest=10.99.99.255/32                nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515276]   ifIndex=1    dest=127.0.0.0/8                    nextHop=0.0.0.0              metric=256  protocol=2   loopback=false
+[23:28:59.515276]   ifIndex=1    dest=127.0.0.1/32                   nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515276]   ifIndex=1    dest=127.255.255.255/32             nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515276]   ifIndex=61   dest=172.28.208.0/20                nextHop=0.0.0.0              metric=256  protocol=2   loopback=false
+[23:28:59.515276]   ifIndex=61   dest=172.28.208.1/32                nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515276]   ifIndex=61   dest=172.28.223.255/32              nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515276]   ifIndex=9    dest=192.168.56.0/24                nextHop=0.0.0.0              metric=256  protocol=2   loopback=false
+[23:28:59.515276]   ifIndex=9    dest=192.168.56.1/32                nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515276]   ifIndex=9    dest=192.168.56.255/32              nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515276]   ifIndex=8    dest=192.168.68.0/22                nextHop=0.0.0.0              metric=256  protocol=2   loopback=false
+[23:28:59.515276]   ifIndex=8    dest=192.168.68.56/32               nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515276]   ifIndex=8    dest=192.168.71.255/32              nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515276]   ifIndex=1    dest=224.0.0.0/4                    nextHop=0.0.0.0              metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=9    dest=224.0.0.0/4                    nextHop=0.0.0.0              metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=4    dest=224.0.0.0/4                    nextHop=0.0.0.0              metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=10   dest=224.0.0.0/4                    nextHop=0.0.0.0              metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=8    dest=224.0.0.0/4                    nextHop=0.0.0.0              metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=6    dest=224.0.0.0/4                    nextHop=0.0.0.0              metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=19   dest=224.0.0.0/4                    nextHop=0.0.0.0              metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=61   dest=224.0.0.0/4                    nextHop=0.0.0.0              metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=1    dest=255.255.255.255/32             nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=9    dest=255.255.255.255/32             nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=4    dest=255.255.255.255/32             nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=10   dest=255.255.255.255/32             nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=8    dest=255.255.255.255/32             nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=6    dest=255.255.255.255/32             nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=19   dest=255.255.255.255/32             nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=61   dest=255.255.255.255/32             nextHop=0.0.0.0              metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=8    dest=::/0                           nextHop=fe80::523d:d1ff:fe59:aaec metric=256  protocol=3   loopback=false
+[23:28:59.515851]   ifIndex=8    dest=::/64                          nextHop=::                   metric=256  protocol=3   loopback=false
+[23:28:59.515851]   ifIndex=1    dest=::1/128                        nextHop=::                   metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=9    dest=fe80::/64                      nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=4    dest=fe80::/64                      nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=10   dest=fe80::/64                      nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=8    dest=fe80::/64                      nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=6    dest=fe80::/64                      nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=19   dest=fe80::/64                      nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=61   dest=fe80::/64                      nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=6    dest=fe80::12f:5c35:4141:c82d/128   nextHop=::                   metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=61   dest=fe80::1c77:5732:de94:8916/128  nextHop=::                   metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=4    dest=fe80::6929:5061:5f05:637b/128  nextHop=::                   metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=9    dest=fe80::755e:141a:9c86:7fa3/128  nextHop=::                   metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=19   dest=fe80::8680:6ccc:aaeb:7622/128  nextHop=::                   metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=8    dest=fe80::8eb5:7d9a:c280:bfec/128  nextHop=::                   metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=10   dest=fe80::da3b:d24e:bb87:2157/128  nextHop=::                   metric=256  protocol=2   loopback=true
+[23:28:59.515851]   ifIndex=1    dest=ff00::/8                       nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=9    dest=ff00::/8                       nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=4    dest=ff00::/8                       nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=10   dest=ff00::/8                       nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=8    dest=ff00::/8                       nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=6    dest=ff00::/8                       nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=19   dest=ff00::/8                       nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851]   ifIndex=61   dest=ff00::/8                       nextHop=::                   metric=256  protocol=2   loopback=false
+[23:28:59.515851] 
+[23:28:59.515851] --- registering change notifications (split-family=true) ---
+[23:28:59.517533] NOTIFY iface: reqFamily=2 type=InitialNotification row=nil
+[23:28:59.517533] NotifyIpInterfaceChange(AF_INET): registered ok, handle=1789527597312
+[23:28:59.517533] NOTIFY addr: reqFamily=2 type=InitialNotification row=nil
+[23:28:59.517533] NotifyUnicastIpAddressChange(AF_INET): registered ok, handle=1789527662672
+[23:28:59.517533] NOTIFY route: reqFamily=2 type=InitialNotification row=nil
+[23:28:59.517533] NotifyRouteChange2(AF_INET): registered ok, handle=1789527666832
+[23:28:59.517533] NOTIFY iface: reqFamily=23 type=InitialNotification row=nil
+[23:28:59.517533] NotifyIpInterfaceChange(AF_INET6): registered ok, handle=1789527672528
+[23:28:59.518090] NOTIFY addr: reqFamily=23 type=InitialNotification row=nil
+[23:28:59.518090] NotifyUnicastIpAddressChange(AF_INET6): registered ok, handle=1789527682464
+[23:28:59.518090] NOTIFY route: reqFamily=23 type=InitialNotification row=nil
+[23:28:59.518090] NotifyRouteChange2(AF_INET6): registered ok, handle=1789527688112
+[23:28:59.518090] 
+[23:28:59.518090] --- observing for 20s (passive only - no network changes made by this program) ---
+[23:29:19.518435] 
+[23:29:19.518435] --- observation window elapsed at 2026-09-13T23:29:19.5184357+04:00 (elapsed=20.0067247s) ---
+[23:29:19.518435] total notifications received: 6
+[23:29:19.518435]   route          2
+[23:29:19.518435]   iface          2
+[23:29:19.518435]   addr           2
+[23:29:19.518435] 
+[23:29:19.518435] === spike run complete ===
