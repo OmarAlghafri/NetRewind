@@ -50,6 +50,15 @@ nothing accepts. Better to find that here than from the field.
 With no key present it says so loudly and produces an unsigned release rather
 than failing — useful for a test build, and impossible to do by accident.
 
+The binaries are reproducible: built from a clean checkout of the tag with
+the Go version `go.mod` names, they match CI's release artefact file for
+file (1.0.0 was checked this way). Two things break that. Anything untracked
+in the tree — even a stray directory — stamps every binary `vcs.modified`,
+so `git status --porcelain` must print nothing before `make release`. And
+`GOFLAGS=-buildvcs=false` (tempting on a tree mounted from another OS, where
+git refuses the ownership) drops the stamp altogether; configure
+`safe.directory` instead.
+
 For the appliance image:
 
 ```bash
