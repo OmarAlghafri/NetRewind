@@ -83,16 +83,16 @@ Re-ran axe against all 8 pages (both themes) and all 6 wizard steps after
 the fixes, same method: **0 violations everywhere.**
 
 Real keyboard-operability check, done carefully because the first attempt
-was misleading: this session's browser-automation tool's synthetic
+was misleading: the browser-automation tool's synthetic
 `key`/`space`/`Return` presses did not trigger the focused element's React
 handler in this environment (confirmed on a native, unmodified `<button>`
 too - the sidebar language toggle - which also failed to respond to a
-synthetic Return press even before this session touched anything, ruling out
+synthetic Return press even before any change was made, ruling out
 a code regression and pointing at a tool/environment limitation instead of
 a product defect). Dispatching a genuine `KeyboardEvent('keydown', {key:
 ' '})` directly at the focused nav item via `element.dispatchEvent(...)`
 DID correctly trigger navigation and update `aria-current` - confirming the
-fix's logic itself is correct, even though this session could not observe
+fix's logic itself is correct, even though it could not be observed
 it through a literal synthesized hardware keypress in this specific browser
 harness. Documented honestly rather than either claiming a full live
 keyboard test that didn't actually work, or silently skipping verification.
@@ -175,6 +175,6 @@ and a horizontal scrollbar appeared for content wider than the zoomed
 viewport - acceptable under WCAG 1.4.10 (Reflow), which permits scrolling
 in one dimension, not zero. Not a full pass (didn't check all 8 pages at
 multiple zoom levels, and only tested programmatic `zoom` CSS rather than a
-real browser Ctrl+/Ctrl- keyboard zoom, which this session's browser tool
+real browser Ctrl+/Ctrl- keyboard zoom, which the browser tool used here
 does not support triggering), but a real, positive first data point rather
 than an unexamined "not done."

@@ -1,5 +1,5 @@
 Second follow-up to ADR 0002 (spikes/windows-ip-helper): the interface-row
-filtering problem, per docs/agent-state/NEXT_ACTION.md item 5 — the ADR's
+filtering problem — the ADR's
 other named open question, alongside the double-notification anomaly
 resolved in docs/evidence/18-windows-notification-family-split.log.
 

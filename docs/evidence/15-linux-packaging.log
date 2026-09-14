@@ -7,7 +7,7 @@ scripts (not throwaway test scripts), following the same "why" comment style
 as the rest of deploy/. Both built successfully in the netrewind-lab WSL2
 distro after installing dpkg/rpm tooling (`apk add dpkg rpm` - Alpine ships
 both as cross-packaging tools; ~1GB, well within the now-28GB-free disk
-budget, see docs/agent-state/PROGRESS.md).
+budget).
 
 Design choice, and why: rather than wrapping deploy/install.sh as a
 postinst script, both packages use their package manager's NATIVE
@@ -38,7 +38,7 @@ hand-rolled implementation of the same guarantee.
   static and already built without debug info by the real release path.
 - Both packages extracted into isolated temporary directories (`dpkg -x`,
   `rpm2cpio | cpio -idm`) - never installed onto the lab distro's real root,
-  to avoid disturbing the environment the rest of this session's testing
+  to avoid disturbing the environment the rest of the lab testing
   depends on. Verified for real, not just listed:
   - Correct file layout: both binaries at `/usr/local/bin/`, all 19
     `rules/*.yaml` files present under `/etc/netrewind/rules/` with 0640
@@ -59,8 +59,8 @@ upgrade over a previous version, `--uninstall`/erase, and a reboot survival
 check were **not performed**, because the netrewind-lab WSL2 distro is
 Alpine, which runs OpenRC, not systemd - there is no live systemd to
 activate a unit against here, and installing onto this exact distro's real
-root is also the environment this session depends on for the core recorder
-lab, which is a second, independent reason not to install onto it for real.
+root is also the environment the core recorder lab depends on,
+which is a second, independent reason not to install onto it for real.
 This needs a real systemd-based Linux (Ubuntu/Debian for .deb, Fedora/RHEL
 for .rpm), ideally a disposable VM exactly as the plan specifies ("VM
 نظيفة"), which is not available in this environment. AppImage was not

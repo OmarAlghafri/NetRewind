@@ -29,7 +29,7 @@ Verification performed:
 - `npm run build` (Vite): succeeds.
 - `cargo check` then `cargo build` in desktop/src-tauri: both succeed on
   this machine (MSVC toolchain already present; Rust itself was installed
-  via `winget install Rustlang.Rustup`, not present before this session).
+  via `winget install Rustlang.Rustup`, not present before this phase).
 - Visual verification: ran the real Vite dev server and viewed it through
   an actual browser, in both Arabic (RTL) and English (LTR), across all
   five pages. Caught and fixed a real RTL bug this way - an early CSS
@@ -50,5 +50,5 @@ Known limitations, stated plainly:
   in this environment. Manual checks only: keyboard focus/Enter on nav
   items, semantic headings, logical-property RTL layout.
 - The Linux build of this same desktop app (Tauri also targets Linux) was
-  NOT attempted in this session. See 13-disk-space-constraint.log for why,
-  and for what this means for near-term next steps.
+  NOT attempted at this stage (13-disk-space-constraint.log says why); it
+  was built and installed later, see 28-desktop-installers-and-live-e2e.log.

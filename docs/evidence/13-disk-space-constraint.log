@@ -3,7 +3,7 @@ or test result - recorded here because it genuinely changes what can be done
 safely in the remaining phases without the user's input.
 
 This machine's C: drive is a 238 GB volume at roughly 96-98% used
-throughout this session, independent of anything this session did. One
+throughout this phase, independent of anything this work did. One
 ordinary debug build of the new Tauri desktop shell
 (desktop/src-tauri, `cargo build`, no optimisation, no bundling) alone used
 1.9 GB, taking free space from ~8.3 GB down to ~6.6 GB. That build cache was
@@ -30,16 +30,16 @@ None of this needs a password, a signing key, or a business/legal decision -
 it is a plain resource constraint, and it was not treated as a reason to
 stop working. What it does mean: further large, disk-consuming steps
 (a Linux GUI toolchain, a full release/installer build, downloading AI model
-weights) were not attempted in this session without first surfacing this,
+weights) were not attempted at this stage without first surfacing this,
 since doing so on a drive already this full risks a much worse problem than
-anything this session is trying to solve. Lower-disk-footprint work
+anything this work is trying to solve. Lower-disk-footprint work
 continued in the meantime (Go-side packages, tests, documentation, the
 desktop app's Demo-mode frontend, which needed no large downloads beyond the
 one-time Rust/Node toolchain install already accounted for above).
 
-Recommendation for the user, stated once and acted on either way: freeing
+Recommendation, stated once and acted on either way: freeing
 disk space (or pointing future large downloads/builds at a different drive,
-if one exists on this machine) before the next session continues into
+if one exists on this machine) before the work continues into
 Phase 4's Linux packaging validation, the Windows installer build, or Phase
 6's model evaluation would remove this constraint entirely. No other action
 is required to keep the project moving - the phases that do not need large

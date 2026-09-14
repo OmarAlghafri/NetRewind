@@ -16,7 +16,7 @@ loss, callbacks, IPv4/IPv6, sleep/resume, and VPN, on a real machine, not
 just cite the API reference.
 
 This ADR reports what actually happened running that spike on this real
-Windows 11 machine (`omarm`'s development machine, the same one running this
+Windows 11 machine (the development machine, the same one running this
 session), not what the Microsoft documentation promises in the abstract. The
 code lives at `spikes/windows-ip-helper/`, its own Go module, and touches
 nothing under `internal/`, `cmd/`, or the root `go.mod`/`go.sum` - another

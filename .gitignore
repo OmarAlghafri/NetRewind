@@ -62,5 +62,5 @@ ai/eval/models/
 ai/eval/results/
 
 # Working notes kept during development to track phase status and open
-# questions across sessions - useful locally, not project documentation.
+# questions - useful locally, not project documentation.
 docs/agent-state/

@@ -3,7 +3,7 @@
 This is a record of actually building, running, and breaking NetRewind on
 this machine, on 2026-09-13 - not a description of what the code is supposed
 to do. Every command below was actually executed, every output is the real
-output, and every screenshot described below was a real screenshot of the
+output, and every page described below was viewed live in the
 project's own running web interface. Nothing here was fabricated; where
 something could not be demonstrated, that is stated plainly in
 [Limitations](#limitations) rather than glossed over.
@@ -17,12 +17,12 @@ something could not be demonstrated, that is stated plainly in
 | Linux environment | WSL2 distro `netrewind-lab`, Alpine Linux 3.24.1, kernel `6.6.87.2-microsoft-standard-WSL2` - the project's own documented "fast" environment (`docs/dev-environment.md`), already present on this machine with a history of prior release work; used as-is, nothing new created except the documented path-safe junction `C:\netrewind-src` |
 | Kernel capability | BTF present (CO-RE will load), and all three eBPF tracepoints the flow collector needs (`sock/inet_sock_set_state`, `tcp/tcp_retransmit_skb`, `tcp/tcp_probe`) are present. `nft` present, `iptables` absent (not required). See `02-kernel-and-bpf-check.log`. |
 | Go (Linux) | go1.26.3 linux/amd64, clang 22.1.3, gcc, make, git 2.54.0 all present |
-| GNS3 | GNS3 2.2.59 installed, with a VirtualBox "GNS3 VM" and an existing project "NetRewind Causal Lab" (Cisco c3725 dynamips images already extracted from a prior session) - see [Limitations](#limitations) |
+| GNS3 | GNS3 2.2.59 installed, with a VirtualBox "GNS3 VM" and an existing project "NetRewind Causal Lab" (Cisco c3725 dynamips images already extracted from earlier work) - see [Limitations](#limitations) |
 | QEMU | qemu-system-x86_64 present in the WSL2 distro; a previously-built appliance image (`/root/appliance.img`, ~1.5 GB) also present - see [Limitations](#limitations) |
 
 ## Baseline
 
-Established before any fault was injected, per the task's own required order.
+Established before any fault was injected.
 
 1. **Build, format, vet - native Windows.** `gofmt -l`, `go vet ./...`, and
    `GOOS=linux go vet ./...` are all clean; the full `go test ./...` suite
@@ -152,8 +152,8 @@ and `default-route-lost` (95% confidence) incident reconstructions.
 `netrewind serve --db <the full-gate database> --addr 0.0.0.0:8464`,
 reached from the Windows browser through WSL2's automatic localhost
 forwarding (`http://localhost:8464`, verified reachable both from inside
-WSL2 and from Windows before use). Real, live screenshots were taken during
-this session of:
+WSL2 and from Windows before use). The pages were viewed live in a browser
+during this demonstration:
 
 - **Overview** (`/`) - "14 incidents in this window, newest first," leading
   with the rogue-DHCP incident, its causal link, root cause and confidence.
@@ -194,7 +194,7 @@ consistent with the event-level record.
 ## Release / self-update
 
 Not exercised against a real installed system (there is no safe way to do
-that, and the task calls for validating the existing safe mechanism instead
+that; the existing safe mechanism is validated instead
 of improvising one). Its own test suite - checksum parsing, ed25519
 signature verification, a tampered download being refused, a binary that
 does not run being refused before install, path traversal in an archive
@@ -207,26 +207,24 @@ that needs a real published GitHub release). `06-release-update-tests.log`.
 
 Documented honestly rather than worked around:
 
-- **No desktop-screenshot capability in this session.** This session can
-  drive a browser pane and take real screenshots of pages rendered in it,
-  and can read/write files and run commands, but has no way to photograph
-  arbitrary terminal windows or the Windows desktop, and no way to export a
-  browser-pane screenshot to a PNG file on disk. The web UI screenshots
-  described above were real and were visually reviewed live during this
-  session; what is saved to disk for them is the actual raw HTML the server
-  returned (arguably more verifiable - it can be reopened in any browser or
-  diffed), not PNG images. All CLI/build/lab evidence is saved as the actual
-  captured command transcripts rather than photographs of a terminal.
+- **No screenshots were saved from this demonstration.** The web pages
+  above were viewed and reviewed live in a browser, but what is saved to
+  disk for them is the actual raw HTML the server returned (arguably more
+  verifiable - it can be reopened in any browser or diffed), not PNG
+  images. All CLI/build/lab evidence is saved as the actual captured
+  command transcripts rather than photographs of a terminal. Screenshots of
+  the desktop application, taken later from an installed build, are under
+  `docs/screenshots/` (see `28-desktop-installers-and-live-e2e.log`).
 - **GNS3.** A real GNS3 2.2.59 install and a previously-provisioned project
   ("NetRewind Causal Lab", with Cisco c3725 dynamips images already
   extracted from earlier work) both exist on this machine, and the local
   GNS3 server started successfully. Its API requires HTTP authentication
-  this session has no credentials for (confirmed: `/v2/version` itself
+  no credentials were available for (confirmed: `/v2/version` itself
   returns `401 Unauthorized`), so driving the topology or `lab/gns3/inject.py`
   was not attempted - guessing or bypassing credentials was not an option.
   The server process started for this check was stopped again afterward.
-  This is an access limitation, not a defect, and per the task's own
-  instruction not to let GNS3 consume the session, the synthetic
+  This is an access limitation, not a defect; rather than let GNS3
+  consume the demonstration, the synthetic
   namespace lab (fully demonstrated above) stands as the primary evidence.
 - **Appliance / QEMU.** A previously-built appliance image and a working
   `qemu-system-x86_64` both exist. A live boot was attempted
@@ -262,10 +260,10 @@ engine, including an accurate distinction between what it concluded
 (`causes`), what it merely noticed together (`correlates`), and what it
 would not claim a link for at all. It also, unprompted, caught and correctly
 reported a real gap in its own observation caused by an operator mistake
-during this session - which is the single most convincing thing it did,
+during this demonstration - which is the single most convincing thing it did,
 because nobody asked it to. The web interface and metrics endpoint both
 serve the same record faithfully. The release/update mechanism's safety
 properties are proven by its own test suite on two platforms. GNS3 and the
-QEMU appliance boot exist and are real, but were not fully exercised in this
-session for the access and virtualization reasons stated above, not because
+QEMU appliance boot exist and are real, but were not fully exercised in
+this demonstration for the access and virtualization reasons stated above, not because
 anything about them failed.
