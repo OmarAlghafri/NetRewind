@@ -1,0 +1,113 @@
+GUI modernization, Phase 5 (fourth slice): search/sort/filter on the
+Incidents page - execution order §9 Phase 5's own line, "Rebuild
+Incidents (master/detail, search/sort/filter)". This slice is the
+search/sort/filter half; master/detail (a distinct list+detail-panel
+layout paradigm) is not attempted here - see §6 below for why.
+
+## 1. The gap and why routing, not local state
+
+The Incidents page listed every incident inline with no way to narrow a
+long list down. `useRoute.ts`'s `InvestigationContext` (`query`/
+`severities`/`families`/`sort`) has carried these exact fields since
+Phase 3, documented as waiting for "each page's own Phase 3/5 rebuild" -
+the same infrastructure `Evidence.tsx`'s incident-scoped export (the
+previous slice) already started using for `from`/`to`/`selection`.
+Filters live in the URL hash (not local `useState`, the way `Host.tsx`'s
+search box does) deliberately: an investigation someone is filtering
+down is worth bookmarking or sharing, unlike Host's quick one-off lookup.
+
+## 2. What was built
+
+`filterAndSortIncidents(incidents, context, rules, lang)` (new, exported
+for direct testing): search matches the *translated* title (via the
+same `findRule`/`titleFor` used everywhere else this session - typing an
+Arabic phrase in Arabic mode must find the Arabic title containing it,
+not silently search the raw English field nobody is looking at), plus
+the always-technical `rule_id` and root-cause `entity`. Severity/family
+filters are unset-safe (absent means "no filter", not "match nothing").
+Three sort orders: newest (default), severity (error > warn > notice >
+info, ISO 4217-style rank table), confidence - each with newest-first as
+the tiebreaker.
+
+`Incidents.tsx`: a search box (reusing the `.search-box` class `Host.tsx`
+already established), a severity checkbox group, a family checkbox group
+(built from the families actually present in this incident set - no
+point offering a filter for a family with zero incidents), and a sort
+`<select>`. Every control patches the route context via `navigate` and
+re-renders from `filterAndSortIncidents`'s result - no separate draft
+state to keep in sync. A distinct `incidents_no_matches` empty state
+("no incidents match the current filters") from the pre-existing
+`incidents_empty` ("no incidents in this window at all") - a filter
+finding nothing and a genuinely quiet recording are different facts, and
+conflating them would be exactly the "absence looks like nothing
+happened" failure this whole project exists to avoid elsewhere.
+
+## 3. Full regression
+
+    $ npx tsc --noEmit                             clean
+    $ npm test                                     13 files, 91 tests passed
+    $ npm run build                                clean
+    $ npx playwright test                          35 passed (0 failed) -
+        Latin-scanner found nothing new; the 720-1920px layout matrix
+        still passes with the new filter bar's flex-wrap in every page
+
+## 4. Proven, not just passing once
+
+17 tests for this slice: `filterAndSortIncidents` against a fixed
+3-incident fixture (each severity/family/sort/search case asserting the
+*exact* resulting id order, not just a count), five component tests
+(search narrows the rendered list, the distinct no-matches empty state,
+a checkbox click calling `navigate` with the exact patched context, and
+- specifically - unchecking an already-selected severity removing just
+that one value rather than clearing the whole filter array).
+
+The severity-sort rank table was deliberately inverted
+(`{error:3,warn:2,notice:1,info:0}`) to confirm the sort test actually
+depends on the real ranking rather than passing by coincidence of the
+fixture's insertion order - failed with the exact wrong order, then
+passed again once reverted.
+
+## 5. Actually looked at it
+
+Fresh browser tab, demo recording, both languages:
+- Checking "error" alone: list narrows to error-severity incidents only,
+  URL becomes `#/incidents?severities=error`.
+- Adding a "gateway" search on top: narrows further to exactly "The
+  default gateway is being answered by a different machine", URL becomes
+  `#/incidents?severities=error&query=gateway` - both filters compose
+  (AND), matching the unit test's expectation exactly.
+- Switching sort to "Most severe first": URL becomes
+  `#/incidents?sort=severity`, and the first incident shown is the
+  highest-severity one (a DHCP rogue-server incident, error, 92%
+  confidence) - the list genuinely re-sorted, not just the dropdown's own
+  display value changing.
+- Arabic mode: all labels correctly translated ("الخطورة:", "الفئة:",
+  "الترتيب", family names via the existing kind-catalogue's
+  `labelForFamily`), and the sort selection from English mode survived
+  the language switch (route context and UI language are correctly
+  independent state).
+- Console clean throughout.
+
+## 6. What "master/detail" would still need, and why it is not in this slice
+
+The execution order's Phase 5 line names both "master/detail" and
+"search/sort/filter" for Incidents in one breath. This slice delivers
+search/sort/filter completely and lets every filtered incident keep
+rendering as a fully-expanded `IncidentCard` (the layout already in
+place, which the previous two slices' new features - evidence
+disclosure, export - were built directly on top of). A true master/
+detail split (a compact list, click to see one incident's full detail in
+a separate panel) is a distinct layout paradigm change affecting how
+every existing feature on this page presents, not an additive feature -
+attempting it inside this same slice risked conflating two different
+kinds of change and made the diff harder to verify on its own terms.
+Tracked as the remaining half of this Phase 5 line, not silently folded
+into "done" by this commit.
+
+## 7. What remains in Phase 5
+
+Incidents master/detail layout (§6); Rules bilingual catalogue
+improvements; Settings regrouped (the three groups that can be built
+now, per the previous slice's note) with a sticky save/discard bar and
+unsaved-changes guard. No new ADR - client-side filtering/sorting over
+data already in memory, using routing fields that already existed.

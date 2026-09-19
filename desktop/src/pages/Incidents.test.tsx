@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { LanguageProvider } from "../i18n/LanguageContext";
-import { Incidents, contextForIncidentExport } from "./Incidents";
+import { Incidents, contextForIncidentExport, filterAndSortIncidents } from "./Incidents";
 import type { Incident } from "../types";
 
 function english<T>(ui: React.ReactElement<T>) {
@@ -56,6 +56,56 @@ describe("contextForIncidentExport", () => {
   });
 });
 
+// execution order §9 Phase 5: "Rebuild Incidents (... search/sort/filter)".
+describe("filterAndSortIncidents", () => {
+  const set = [
+    incident({ incident_id: "a", title: "Gateway hijacked", severity: "error", confidence: 90, rule_id: "gateway-hijack", root_cause: { kind: "l2.arp_binding_changed", entity: "10.0.0.1", event_id: "e", confidence: 90 }, opened_at: 3 }),
+    incident({ incident_id: "b", title: "A link went down", severity: "warn", confidence: 80, rule_id: "link-down-isolated-hosts", root_cause: { kind: "link.down", entity: "nrlab0", event_id: "e", confidence: 80 }, opened_at: 2 }),
+    incident({ incident_id: "c", title: "DHCP server rogue", severity: "notice", confidence: 60, rule_id: "rogue-dhcp-server", root_cause: { kind: "dhcp.server_seen", entity: "10.0.0.9", event_id: "e", confidence: 60 }, opened_at: 1 }),
+  ];
+
+  it("defaults to newest-first with no context", () => {
+    const result = filterAndSortIncidents(set, {}, [], "en");
+    expect(result.map((i) => i.incident_id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("sorts by severity (error, warn, notice, info), newest first within a tie", () => {
+    const result = filterAndSortIncidents(set, { sort: "severity" }, [], "en");
+    expect(result.map((i) => i.incident_id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("sorts by confidence, highest first", () => {
+    const result = filterAndSortIncidents(set, { sort: "confidence" }, [], "en");
+    expect(result.map((i) => i.incident_id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("filters by severity - an absent filter matches everything", () => {
+    expect(filterAndSortIncidents(set, {}, [], "en")).toHaveLength(3);
+    expect(filterAndSortIncidents(set, { severities: ["error"] }, [], "en").map((i) => i.incident_id)).toEqual(["a"]);
+    expect(filterAndSortIncidents(set, { severities: ["warn", "notice"] }, [], "en").map((i) => i.incident_id)).toEqual(["b", "c"]);
+  });
+
+  it("filters by family (the root cause kind's family)", () => {
+    expect(filterAndSortIncidents(set, { families: ["l2"] }, [], "en").map((i) => i.incident_id)).toEqual(["a"]);
+    expect(filterAndSortIncidents(set, { families: ["dhcp"] }, [], "en").map((i) => i.incident_id)).toEqual(["c"]);
+  });
+
+  it("searches the title case-insensitively", () => {
+    expect(filterAndSortIncidents(set, { query: "gateway" }, [], "en").map((i) => i.incident_id)).toEqual(["a"]);
+    expect(filterAndSortIncidents(set, { query: "GATEWAY" }, [], "en").map((i) => i.incident_id)).toEqual(["a"]);
+  });
+
+  it("searches the rule_id and the root-cause entity too", () => {
+    expect(filterAndSortIncidents(set, { query: "rogue-dhcp" }, [], "en").map((i) => i.incident_id)).toEqual(["c"]);
+    expect(filterAndSortIncidents(set, { query: "10.0.0.9" }, [], "en").map((i) => i.incident_id)).toEqual(["c"]);
+  });
+
+  it("combines a search with a severity filter (both must match)", () => {
+    const result = filterAndSortIncidents(set, { query: "a", severities: ["warn"] }, [], "en");
+    expect(result.map((i) => i.incident_id)).toEqual(["b"]);
+  });
+});
+
 describe("Incidents page", () => {
   it("navigates to evidence with this incident's own window and id when export is clicked", () => {
     const navigate = vi.fn();
@@ -71,5 +121,51 @@ describe("Incidents page", () => {
   it("shows no export button when navigate is not given", () => {
     english(<Incidents incidents={[incident()]} rules={[]} />);
     expect(screen.queryByText("Export this incident's evidence…")).not.toBeInTheDocument();
+  });
+
+  it("shows only the matching incident and hides the rest when a search query is already in the route", () => {
+    english(
+      <Incidents
+        incidents={[incident({ incident_id: "a", title: "Gateway hijacked" }), incident({ incident_id: "b", title: "A link went down" })]}
+        rules={[]}
+        context={{ query: "gateway" }}
+      />,
+    );
+    expect(screen.getByText("Gateway hijacked")).toBeInTheDocument();
+    expect(screen.queryByText("A link went down")).not.toBeInTheDocument();
+  });
+
+  it("shows the no-matches empty state (distinct from the no-incidents-at-all one) when a filter matches nothing", () => {
+    english(<Incidents incidents={[incident()]} rules={[]} context={{ query: "no such incident" }} />);
+    expect(screen.getByText("No incidents match the current filters")).toBeInTheDocument();
+    expect(screen.queryByText("No incidents in this window — that does not necessarily mean nothing went wrong")).not.toBeInTheDocument();
+  });
+
+  it("checking a severity checkbox navigates with that severity added to the route context", () => {
+    const navigate = vi.fn();
+    english(
+      <Incidents
+        incidents={[incident({ severity: "error" })]}
+        rules={[]}
+        context={{ query: "already set" }}
+        navigate={navigate}
+      />,
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "error" }));
+    expect(navigate).toHaveBeenCalledWith("incidents", { query: "already set", severities: ["error"] });
+  });
+
+  it("unchecking an already-selected severity removes it rather than clearing the whole filter", () => {
+    const navigate = vi.fn();
+    english(
+      <Incidents
+        incidents={[incident({ severity: "error" })]}
+        rules={[]}
+        context={{ severities: ["error", "warn"] }}
+        navigate={navigate}
+      />,
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "error" }));
+    expect(navigate).toHaveBeenCalledWith("incidents", { severities: ["warn"] });
   });
 });
