@@ -49,10 +49,11 @@ import (
 // string array - so the model cannot sample a token sequence naming a
 // handle it was never given, let alone a real event_id (which it never
 // sees at all; see harness.HandleMap.RedactEvent). Sent per-request as
-// OpenAI-compatible `response_format.json_schema.schema` rather than via
-// llama-server's server-wide `-jf <file>` startup flag, because `-jf` fixes
-// one schema for the whole server session and cannot vary per case the way
-// this enum must.
+// llama-server's own `response_format.schema` per-request field (see
+// responseFormat's own doc comment for why this is NOT OpenAI's nested
+// shape) rather than via llama-server's server-wide `-jf <file>` startup
+// flag, because `-jf` fixes one schema for the whole server session and
+// cannot vary per case the way this enum must.
 //
 // maxConfidence (0 means "no ceiling for this case") makes the confidence
 // ceiling structural rather than merely graded after the fact: "the model
@@ -295,17 +296,24 @@ type chatCompletionRequest struct {
 	ResponseFormat *responseFormat `json:"response_format,omitempty"`
 }
 
-// responseFormat is llama-server's OpenAI-compatible per-request structured-
-// output field - the mechanism that lets jsonSchemaFor's per-case
-// "evidence_handles" enum actually vary case to case, which a server-wide
-// `-jf <file>` startup flag could not do.
+// responseFormat is llama-server's per-request structured-output field -
+// the mechanism that lets jsonSchemaFor's per-case "evidence_handles" enum
+// actually vary case to case, which a server-wide `-jf <file>` startup flag
+// could not do.
+//
+// llama-server's own shape here is NOT OpenAI's: OpenAI nests the schema
+// under `response_format.json_schema.schema`, but llama.cpp's server
+// (tools/server/README.md, "response_format parameter") puts it directly
+// at `response_format.schema` - `{"type": "json_schema", "schema": {...}}`,
+// no intermediate wrapper object. Sending OpenAI's nested shape here would
+// not error (llama-server simply would not find a "schema" key at the
+// top level of an object it does not recognise) - it would silently
+// constrain nothing at all, defeating every guardrail this schema carries
+// without any visible failure. Confirmed against the server's own README
+// for the exact pinned commit this build (b10948) was built from, not
+// assumed from OpenAI's API alone.
 type responseFormat struct {
-	Type       string         `json:"type"`
-	JSONSchema jsonSchemaBody `json:"json_schema"`
-}
-
-type jsonSchemaBody struct {
-	Name   string         `json:"name"`
+	Type   string         `json:"type"`
 	Schema map[string]any `json:"schema"`
 }
 
@@ -334,7 +342,7 @@ func chatComplete(client *http.Client, serverURL, sysPrompt, userPrompt string, 
 		Temperature:    0,
 		MaxTokens:      maxTokens,
 		CachePrompt:    false,
-		ResponseFormat: &responseFormat{Type: "json_schema", JSONSchema: jsonSchemaBody{Name: "netrewind_analysis", Schema: schema}},
+		ResponseFormat: &responseFormat{Type: "json_schema", Schema: schema},
 		Messages: []chatMessage{
 			{Role: "system", Content: sysPrompt},
 			{Role: "user", Content: userPrompt},

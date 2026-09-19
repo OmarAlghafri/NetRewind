@@ -1,0 +1,80 @@
+Phase 6, fourth slice: a real bug in the per-request JSON-schema mechanism
+(evidence 48), found by reading llama.cpp's own server documentation
+against the real, pinned b10948 build before trusting an assumption
+carried over from OpenAI's API shape.
+
+## 1. The bug
+
+`ai/eval/run/main.go`'s `responseFormat` (built in evidence 48 to carry
+`jsonSchemaFor`'s per-case schema, replacing the server-wide `-jf`
+startup flag so the "evidence_handles" enum and confidence-ceiling
+maximum could vary case to case) was shaped like OpenAI's
+`response_format` field: `{"type": "json_schema", "json_schema": {"name":
+..., "schema": {...}}}` - a schema nested two levels deep under a
+"json_schema" wrapper object.
+
+Checked against `tools/server/README.md` at the exact commit b10948 was
+built from (`5f436dddb440a288ee5611d7d1eca564a6aca9f4`, the commit this
+project has already pinned) rather than assumed: llama-server's own
+`response_format` parameter puts the schema directly at the top level -
+`{"type": "json_schema", "schema": {...}}`, no intermediate wrapper. This
+would not have errored: llama-server would simply not find a "schema" key
+at the top level of the object it actually looks at, and would silently
+apply no constraint at all - every guardrail evidence 48/49 built
+(evidence-handle enum, confidence-ceiling maximum) would have done
+nothing against a real server, with no failure anywhere to notice it by.
+Caught before a single real request was sent to the actual downloaded
+model, while preparing the live benchmark run on the second test machine
+(see evidence 48 §1 and §8 for why that machine, not this one).
+
+## 2. The fix
+
+`responseFormat` now marshals to exactly `{"type": "json_schema",
+"schema": {...}}` - the `jsonSchemaBody` wrapper type is gone entirely,
+not left as unused dead code. The doc comment above `jsonSchemaFor` (which
+had also stated the wrong OpenAI-shaped path) is corrected to point at
+`responseFormat`'s own comment, which cites the exact README section and
+pinned commit this was checked against.
+
+## 3. Full regression
+
+    $ go build ./...                               clean
+    $ go vet ./...                                  clean
+    $ CGO_ENABLED=0 go test ./...                   every package passes
+    $ gofmt -l ai/eval/                             clean
+
+## 4. Proven, not just passing once - a stronger proof than usual
+
+`TestResponseFormatMatchesLlamaServersOwnShapeNotOpenAIs` (new): marshals
+a `responseFormat` and asserts the schema is reachable at the top-level
+`"schema"` key and that no `"json_schema"` wrapper key exists at all.
+
+The deliberate-break proof here caught the regression a level earlier
+than the usual runtime-assertion-fails pattern: reverting `responseFormat`
+to the wrapped OpenAI shape (and fixing up the one production call site
+to match, so the package would build) made the TEST FILE ITSELF fail to
+compile - both this new test and the pre-existing
+`TestChatCompletionRequestSendsThePerCaseSchema` construct a
+`responseFormat{..., Schema: ...}` literal directly, which is simply not
+a valid field on the wrapped type. A compile failure is a stronger
+guarantee than a passing-then-failing runtime assertion: it is not
+possible to even build a version of this package where the test
+compiles against the wrong shape, let alone accidentally ship one.
+Restored immediately after, confirmed all tests pass again from a clean
+build.
+
+## 5. Why this was caught now rather than earlier
+
+Evidence 48 built and unit-tested `jsonSchemaFor`'s output shape and
+`chatComplete`'s request construction entirely against Go's own type
+system and `encoding/json` - correct as far as it went, but nothing in
+that slice's own tests checked the marshaled request against llama-server's
+actual documented API, because no real server existed to check against
+yet in that slice. This is exactly why the standing verification
+discipline distinguishes "passes its own tests" from "verified against
+the real system": the former was true the whole time; the latter needed
+either a real server or, short of that, a direct read of the real
+server's own interface documentation - done here specifically because
+preparing to run against the real, downloaded model surfaced the need to
+double check every assumption the request-building code made, not just
+its internal consistency.

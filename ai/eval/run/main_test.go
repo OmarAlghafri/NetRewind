@@ -254,7 +254,7 @@ func TestChatCompletionRequestSendsThePerCaseSchema(t *testing.T) {
 	body, err := json.Marshal(chatCompletionRequest{
 		Temperature:    0,
 		MaxTokens:      1,
-		ResponseFormat: &responseFormat{Type: "json_schema", JSONSchema: jsonSchemaBody{Name: "x", Schema: jsonSchemaFor([]string{"E1"}, 0)}},
+		ResponseFormat: &responseFormat{Type: "json_schema", Schema: jsonSchemaFor([]string{"E1"}, 0)},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -264,5 +264,32 @@ func TestChatCompletionRequestSendsThePerCaseSchema(t *testing.T) {
 	}
 	if !strings.Contains(string(body), `"response_format"`) {
 		t.Errorf("request body missing response_format entirely: %s", body)
+	}
+}
+
+// TestResponseFormatMatchesLlamaServersOwnShapeNotOpenAIs is the direct
+// regression test for the real bug this session found by reading
+// llama.cpp's own server README instead of assuming OpenAI's API shape:
+// the schema must sit directly at response_format.schema, with no
+// intermediate "json_schema" wrapper object - the wrapped shape would not
+// error, it would just silently constrain nothing.
+func TestResponseFormatMatchesLlamaServersOwnShapeNotOpenAIs(t *testing.T) {
+	body, err := json.Marshal(responseFormat{Type: "json_schema", Schema: map[string]any{"marker": "present"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	schema, ok := decoded["schema"].(map[string]any)
+	if !ok {
+		t.Fatalf("response_format = %s, want a top-level \"schema\" key (llama-server's own shape), not nested under \"json_schema\"", body)
+	}
+	if schema["marker"] != "present" {
+		t.Errorf("schema content = %v, want the actual schema preserved directly under \"schema\"", schema)
+	}
+	if _, wrapped := decoded["json_schema"]; wrapped {
+		t.Error(`response_format has a "json_schema" wrapper key - that is OpenAI's shape, not llama-server's; llama-server would silently ignore this`)
 	}
 }
