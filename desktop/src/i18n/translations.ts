@@ -7,6 +7,7 @@ export type Lang = "ar" | "en";
 export const dict = {
   ar: {
     appName: "نت ريوايند",
+    nav_landmark_label: "التنقل الرئيسي",
     nav_overview: "الصحة",
     nav_incidents: "الحوادث",
     nav_timeline: "الخط الزمني",
@@ -206,6 +207,7 @@ export const dict = {
   },
   en: {
     appName: "NetRewind",
+    nav_landmark_label: "Main navigation",
     nav_overview: "Health",
     nav_incidents: "Incidents",
     nav_timeline: "Timeline",

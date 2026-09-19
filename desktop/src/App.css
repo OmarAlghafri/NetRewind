@@ -54,6 +54,10 @@ html[dir="rtl"] body {
   font-family: "IBM Plex Sans Arabic", var(--font-ui);
 }
 
+html, body, #root {
+  block-size: 100%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -78,33 +82,89 @@ body {
    grid-template-columns as authored (never swapped) plus border-inline-end
    (a logical property, not border-right) is what makes this follow
    direction automatically instead of fighting it with an .order() override
-   in each direction. */
-.app-shell {
+   in each direction.
+
+   ADR 0003: .app-shell used to declare only `min-height: 100vh`, a floor
+   with no ceiling. CSS Grid stretches every row-track to its tallest item,
+   so once .workspace-body's content (e.g. Timeline's 44+ unvirtualized
+   rows) grew past the viewport, the whole grid - sidebar included - grew
+   with it, and the document itself scrolled as one unit: reaching the
+   language toggle meant scrolling past every timeline row first. Measured
+   at 900x600 with the demo recording's Timeline open: document 1692px vs.
+   a 600px viewport, 65% of it unreachable without scrolling through
+   content that has nothing to do with navigation
+   (docs/evidence/29-gui-modernization-phase0-baseline.log).
+
+   `.app-frame` now sets `block-size: 100dvh` (a ceiling) and
+   `overflow: hidden`, so the frame itself can never grow past the
+   viewport; `.sidebar` and `.workspace-body` are each responsible for
+   their own internal scrolling instead. */
+.app-frame {
+  --nav-width: 220px;
   display: grid;
-  grid-template-columns: 220px 1fr;
-  min-height: 100vh;
+  grid-template-columns: var(--nav-width) minmax(0, 1fr);
+  block-size: 100dvh;
+  min-block-size: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 899px) {
+  .app-frame {
+    /* Not yet an icon rail (that needs the icon system Phase 2 adds) - a
+       narrower text column still fits every nav label without truncation
+       or overflow, verified in the visual matrix down to 720px wide. */
+    --nav-width: 180px;
+  }
 }
 
 .sidebar {
+  min-block-size: 0;
+  min-inline-size: 0;
+  display: grid;
+  /* auto/1fr/auto, not flex: this is what keeps the header and footer
+     pinned and gives the middle row - and only the middle row - somewhere
+     to shrink to when it needs its own scrollbar, at any window height. */
+  grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--sidebar-bg);
   border-inline-end: 1px solid var(--border);
-  padding: 16px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+}
+
+.sidebar-header {
+  padding: 16px 12px 8px;
 }
 
 .app-name {
   font-weight: 700;
   font-size: 1.05rem;
-  padding: 8px 10px 16px;
+  padding: 8px 10px 8px;
+}
+
+.sidebar-nav {
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-footer {
+  padding: 12px;
+  border-block-start: 1px solid var(--border);
 }
 
 .nav-item {
+  display: block;
+  inline-size: 100%;
+  text-align: start;
   padding: 9px 12px;
+  border: none;
   border-radius: 6px;
   cursor: pointer;
+  background: none;
   color: var(--text-muted);
+  font: inherit;
   font-size: 0.94rem;
 }
 
@@ -123,8 +183,29 @@ body {
   outline-offset: 2px;
 }
 
-.main {
-  padding: 24px 32px;
+.workspace {
+  min-inline-size: 0;
+  min-block-size: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.workspace-header {
+  min-inline-size: 0;
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  background: var(--bg);
+  padding: 24px 32px 0;
+  max-width: 980px;
+}
+
+.workspace-body {
+  min-block-size: 0;
+  min-inline-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 32px 24px;
   max-width: 980px;
 }
 
@@ -405,8 +486,9 @@ body {
 .lang-toggle {
   display: flex;
   gap: 6px;
-  margin-top: auto;
-  padding-top: 12px;
+  /* No longer needs `margin-top: auto` to reach the bottom of the sidebar
+     column: .sidebar-footer (ADR 0003) already pins it there structurally,
+     at any content length or window height. */
 }
 
 .lang-toggle button {
@@ -451,13 +533,21 @@ body {
    so this renders correctly unmirrored in both RTL Arabic and LTR English,
    same as the rest of the app (ADR 0001). */
 .wizard-overlay {
-  min-height: 100vh;
+  block-size: 100dvh;
+  min-block-size: 0;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 32px;
 }
 
+/* The privacy step's body text alone overflows a 720x480 window (the
+   smallest supported size) inside the old plain `padding: 28px 32px`
+   card. Same fix as the app shell (ADR 0003): a bounded height, and only
+   .wizard-step-body scrolls, so .wizard-progress and .wizard-actions -
+   including Skip, the one action that needs no scrolling to reach even on
+   day one - stay pinned. */
 .wizard-card {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -465,6 +555,16 @@ body {
   padding: 28px 32px;
   max-width: 620px;
   width: 100%;
+  max-block-size: 100%;
+  min-block-size: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wizard-step-body {
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .wizard-progress {

@@ -20,7 +20,7 @@ import { launchOptions } from "./data/tauri";
 const PAGES: Page[] = ["overview", "incidents", "timeline", "host", "rules", "evidence", "diagnostics", "settings"];
 
 function Shell() {
-  const { dir, setLang } = useLanguage();
+  const { dir, setLang, t } = useLanguage();
   const [page, setPage] = useState<Page>("overview");
   const [onboardingComplete, setOnboardingComplete] = useState<boolean>(readOnboardingComplete);
   const [settings, setSettingsState] = useState<SourceSettings>(readSettings);
@@ -70,7 +70,28 @@ function Shell() {
   // a live recorder over IPC, or a verified bundle file.
   const record = useRecord(settings);
 
-  if (!launched) return null; // one frame, until the launch options are known
+  // One frame, until the launch options are known - a real shell outline
+  // instead of a blank window (§4.1: "first paint is never blank"). Not a
+  // fully designed loading skeleton (that component lands with the rest of
+  // the component library) - just the frame shape, so the window never
+  // looks broken or unresponsive for the single frame this actually takes.
+  if (!launched) {
+    return (
+      <div className="app-frame">
+        <div className="sidebar">
+          <div className="sidebar-header">
+            <div className="app-name">{t("appName")}</div>
+          </div>
+          <div className="sidebar-nav" />
+          <div className="sidebar-footer" />
+        </div>
+        <div className="workspace">
+          <div className="workspace-header" />
+          <div className="workspace-body" />
+        </div>
+      </div>
+    );
+  }
 
   const openBundle = (path: string) => {
     if (settings.kind !== "bundle") setPreviousKind(settings.kind);
@@ -95,32 +116,41 @@ function Shell() {
   }
 
   return (
-    <div className="app-shell">
+    // ADR 0003: .app-frame bounds the whole shell to the viewport
+    // (block-size: 100dvh; overflow: hidden) instead of only setting a
+    // floor as the old .app-shell did. .workspace-body is the one normal
+    // vertical scroll region in the main window - the sidebar scrolls
+    // independently inside itself (Sidebar.tsx) and never needs to.
+    <div className="app-frame">
       <Sidebar page={page} onNavigate={setPage} />
-      <main className="main">
-        <SourceBanner settings={settings} record={record} onSwitchToDemo={switchToDemo} />
-        {page === "overview" && <Overview record={record} settings={settings} />}
-        {page === "incidents" && <Incidents incidents={record.incidents} />}
-        {page === "timeline" && <Timeline events={record.events} />}
-        {page === "host" && <Host events={record.events} />}
-        {page === "rules" && <Rules incidents={record.incidents} rules={record.rules} />}
-        {page === "evidence" && (
-          <Evidence record={record} settings={settings} onOpenBundle={openBundle} onCloseBundle={closeBundle} />
-        )}
-        {page === "settings" && (
-          <Settings
-            settings={settings}
-            onChange={setSettings}
-            onReopenWizard={() => {
-              writeOnboardingComplete(false);
-              setOnboardingComplete(false);
-            }}
-          />
-        )}
-        {page === "diagnostics" && (
-          <Diagnostics events={record.events} incidents={record.incidents} settings={settings} record={record} />
-        )}
-      </main>
+      <div className="workspace">
+        <div className="workspace-header">
+          <SourceBanner settings={settings} record={record} onSwitchToDemo={switchToDemo} />
+        </div>
+        <main className="workspace-body">
+          {page === "overview" && <Overview record={record} settings={settings} />}
+          {page === "incidents" && <Incidents incidents={record.incidents} />}
+          {page === "timeline" && <Timeline events={record.events} />}
+          {page === "host" && <Host events={record.events} />}
+          {page === "rules" && <Rules incidents={record.incidents} rules={record.rules} />}
+          {page === "evidence" && (
+            <Evidence record={record} settings={settings} onOpenBundle={openBundle} onCloseBundle={closeBundle} />
+          )}
+          {page === "settings" && (
+            <Settings
+              settings={settings}
+              onChange={setSettings}
+              onReopenWizard={() => {
+                writeOnboardingComplete(false);
+                setOnboardingComplete(false);
+              }}
+            />
+          )}
+          {page === "diagnostics" && (
+            <Diagnostics events={record.events} incidents={record.incidents} settings={settings} record={record} />
+          )}
+        </main>
+      </div>
     </div>
   );
 }

@@ -17,34 +17,40 @@ const ITEMS: { page: Page; key: DictKey }[] = [
 export function Sidebar({ page, onNavigate }: { page: Page; onNavigate: (p: Page) => void }) {
   const { t, lang, setLang } = useLanguage();
   return (
-    <nav className="sidebar">
-      <div className="app-name">{t("appName")}</div>
-      {ITEMS.map((item) => (
-        <div
-          key={item.page}
-          className={`nav-item${page === item.page ? " active" : ""}`}
-          onClick={() => onNavigate(item.page)}
-          role="button"
-          tabIndex={0}
-          aria-current={page === item.page ? "page" : undefined}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault(); // Space otherwise scrolls the page, same as a native button suppresses it
-              onNavigate(item.page);
-            }
-          }}
-        >
-          {t(item.key)}
-        </div>
-      ))}
-      <div className="lang-toggle">
-        <button className={lang === "ar" ? "active" : ""} onClick={() => setLang("ar")}>
-          العربية
-        </button>
-        <button className={lang === "en" ? "active" : ""} onClick={() => setLang("en")}>
-          English
-        </button>
+    // ADR 0003: three independent grid rows instead of one flex column -
+    // header and footer (.lang-toggle) are always visible; only .sidebar-nav
+    // scrolls, and only if it ever has more items than fit (it does not,
+    // today, but the structure no longer depends on that staying true).
+    // Nav items are native <button>s now, not `<div role="button">` with
+    // hand-rolled Enter/Space handling - real focus and activation
+    // semantics, for free.
+    <div className="sidebar">
+      <div className="sidebar-header">
+        <div className="app-name">{t("appName")}</div>
       </div>
-    </nav>
+      <nav className="sidebar-nav" aria-label={t("nav_landmark_label")}>
+        {ITEMS.map((item) => (
+          <button
+            key={item.page}
+            type="button"
+            className={`nav-item${page === item.page ? " active" : ""}`}
+            onClick={() => onNavigate(item.page)}
+            aria-current={page === item.page ? "page" : undefined}
+          >
+            {t(item.key)}
+          </button>
+        ))}
+      </nav>
+      <div className="sidebar-footer">
+        <div className="lang-toggle">
+          <button className={lang === "ar" ? "active" : ""} onClick={() => setLang("ar")}>
+            العربية
+          </button>
+          <button className={lang === "en" ? "active" : ""} onClick={() => setLang("en")}>
+            English
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
