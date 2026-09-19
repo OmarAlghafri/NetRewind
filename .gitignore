@@ -64,3 +64,9 @@ ai/eval/results/
 # Working notes kept during development to track phase status and open
 # questions - useful locally, not project documentation.
 docs/agent-state/
+
+# Playwright's own run output - traces, HTML report, failure screenshots.
+# Regenerable by re-running the suite; a screenshot worth keeping as
+# evidence is copied by hand into docs/evidence/gui-modernization/.
+desktop/test-results/
+desktop/playwright-report/
