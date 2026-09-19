@@ -4,6 +4,8 @@ import type { Incident } from "../types";
 import { nsToDate } from "../types";
 import type { RuleSummary } from "../data/types";
 import { IncidentCard } from "../components/IncidentCard";
+import { InspectorPanel } from "../components/InspectorPanel";
+import { SeverityBadge } from "../components/SeverityBadge";
 import { findRule, titleFor } from "../i18n/rulesCatalogue";
 import { labelForFamily } from "../i18n/kindCatalogue";
 import type { Page } from "../components/Sidebar";
@@ -88,6 +90,49 @@ export function filterAndSortIncidents(
 
 const SEVERITY_OPTIONS = ["error", "warn", "notice", "info"] as const;
 
+function formatTime(ns: number, lang: Lang): string {
+  return nsToDate(ns).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour12: false });
+}
+
+/**
+ * The "master" half of master/detail (execution order §9 Phase 5): a
+ * compact, single-line summary - time, severity, translated title,
+ * confidence - deliberately without the chain/evidence/advice detail
+ * `IncidentCard` renders, so a list long enough to need this view is not
+ * just the same list at a smaller font.
+ */
+function IncidentRow({
+  incident,
+  rule,
+  selected,
+  onSelect,
+  lang,
+}: {
+  incident: Incident;
+  rule: RuleSummary | undefined;
+  selected: boolean;
+  onSelect: () => void;
+  lang: Lang;
+}) {
+  const { t } = useLanguage();
+  const title = titleFor(rule, lang, incident.title);
+  return (
+    <button
+      type="button"
+      className={`incident-row${selected ? " incident-row-selected" : ""}`}
+      onClick={onSelect}
+      aria-pressed={selected}
+    >
+      <span className="ltr-field">{formatTime(incident.opened_at, lang)}</span>
+      <SeverityBadge severity={incident.severity} />
+      <span className="incident-row-title">{title}</span>
+      <span className="incident-row-confidence">
+        {t("confidence")}: <span className="ltr-field">{incident.confidence}%</span>
+      </span>
+    </button>
+  );
+}
+
 export function Incidents({
   incidents,
   rules,
@@ -110,6 +155,15 @@ export function Incidents({
     const current = list ?? [];
     return current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
   };
+
+  // Master/detail (execution order §9 Phase 5) is opt-in, entered by
+  // selecting a row: with nothing selected the page renders exactly as it
+  // always has (every filtered incident as a full IncidentCard) - no
+  // regression to the default experience, and every test written before
+  // this feature existed keeps passing unchanged because none of them
+  // ever set context.selection.
+  const selected = context.selection ? filtered.find((inc) => inc.incident_id === context.selection) : undefined;
+  const select = (id: string | undefined) => patch({ selection: id });
 
   return (
     <div>
@@ -178,9 +232,58 @@ export function Incidents({
         <div className="empty-state">{t("incidents_empty")}</div>
       ) : filtered.length === 0 ? (
         <div className="empty-state">{t("incidents_no_matches")}</div>
+      ) : selected ? (
+        <div className="incidents-layout">
+          <div className="incidents-list">
+            {filtered.map((inc) => (
+              <IncidentRow
+                key={inc.incident_id}
+                incident={inc}
+                rule={findRule(inc.rule_id, rules)}
+                selected={inc.incident_id === selected.incident_id}
+                onSelect={() => select(inc.incident_id === selected.incident_id ? undefined : inc.incident_id)}
+                lang={lang}
+              />
+            ))}
+          </div>
+          <InspectorPanel title={titleFor(findRule(selected.rule_id, rules), lang, selected.title)} onClose={() => select(undefined)}>
+            <IncidentCard incident={selected} rules={rules} onExport={onExport} />
+          </InspectorPanel>
+        </div>
       ) : (
-        filtered.map((inc) => <IncidentCard key={inc.incident_id} incident={inc} rules={rules} onExport={onExport} />)
+        filtered.map((inc) => (
+          <IncidentRowEntry key={inc.incident_id} incident={inc} rules={rules} onExport={onExport} onSelect={select} />
+        ))
       )}
+    </div>
+  );
+}
+
+/**
+ * The default (nothing selected) rendering: the full IncidentCard, same
+ * as before master/detail existed, plus a small affordance to enter
+ * master/detail by selecting this incident - a link the size of the
+ * title, not a whole extra row, so it does not compete with the
+ * export button for attention.
+ */
+function IncidentRowEntry({
+  incident,
+  rules,
+  onExport,
+  onSelect,
+}: {
+  incident: Incident;
+  rules: RuleSummary[];
+  onExport?: (incident: Incident) => void;
+  onSelect: (id: string) => void;
+}) {
+  const { t } = useLanguage();
+  return (
+    <div className="incident-card-wrapper">
+      <IncidentCard incident={incident} rules={rules} onExport={onExport} />
+      <button type="button" className="incident-focus-link" onClick={() => onSelect(incident.incident_id)}>
+        {t("incidents_focus_link")}
+      </button>
     </div>
   );
 }

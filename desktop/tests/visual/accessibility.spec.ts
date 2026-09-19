@@ -51,4 +51,19 @@ for (const lang of ["ar", "en"] as const) {
       if (await nextBtn.isVisible()) await nextBtn.click();
     }
   });
+
+  // Incidents' master/detail (execution order §9 Phase 5) is opt-in - only
+  // reached by selecting a row - so the shell-level scan above never
+  // exercises it. A click-triggered UI state is exactly the kind of new
+  // attack surface a once-per-page scan misses, so it gets its own check.
+  test(`Incidents master/detail has no serious/critical axe violations - ${lang}`, async ({ page }) => {
+    await openShell(page, { lang });
+    await page.goto("/#/incidents");
+    await page.waitForSelector(".incident-card-wrapper");
+    await page.locator(".incident-focus-link").first().click();
+    await page.waitForSelector(".inspector-panel");
+    const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
 }

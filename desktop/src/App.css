@@ -679,6 +679,112 @@ body {
   max-width: none;
 }
 
+/* Master/detail (execution order §9 Phase 5). Side by side at normal
+   width; the existing 899px breakpoint (App.css's .app-frame rule above)
+   is reused here rather than inventing a second one, so the list stacks
+   above the panel instead of squeezing both into an unreadable column. */
+.incidents-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+@media (max-width: 899px) {
+  .incidents-layout {
+    flex-direction: column;
+  }
+}
+
+.incidents-list {
+  flex: 0 0 320px;
+  min-width: 0;
+  max-height: 70vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+}
+
+@media (max-width: 899px) {
+  .incidents-list {
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: 40vh;
+  }
+}
+
+.incident-row {
+  display: block;
+  width: 100%;
+  text-align: start;
+  padding: 8px 12px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.incident-row:last-child {
+  border-bottom: none;
+}
+
+/* .incidents-list (the container) is --bg-elevated, so a row's own hover/
+   selected state uses --bg instead - the page's base tone, which reads as
+   a visible shift rather than matching the surface it sits on. */
+.incident-row:hover {
+  background: var(--bg);
+}
+
+.incident-row-selected {
+  background: var(--bg);
+  border-inline-start: 3px solid var(--accent);
+}
+
+.incident-row-title {
+  display: block;
+  margin: 4px 0;
+  font-weight: 600;
+}
+
+.incident-row-confidence {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.inspector-panel {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  padding: 12px;
+}
+
+.inspector-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.incident-card-wrapper {
+  position: relative;
+}
+
+.incident-focus-link {
+  display: inline-block;
+  margin-top: 6px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+  text-decoration: underline;
+}
+
 /* First-run wizard (PRODUCT_RELEASE_PLAN_AR.md §5, Phase 2: "wizard أول
    تشغيل"). A full-viewport overlay shown before the normal app shell;
    reuses the existing .card/.page-title/.capability-row primitives above

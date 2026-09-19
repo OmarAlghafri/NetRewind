@@ -169,3 +169,78 @@ describe("Incidents page", () => {
     expect(navigate).toHaveBeenCalledWith("incidents", { severities: ["warn"] });
   });
 });
+
+// execution order §9 Phase 5: "Rebuild Incidents (master/detail, ...)".
+describe("Incidents master/detail", () => {
+  const two = [
+    incident({ incident_id: "a", title: "Gateway hijacked" }),
+    incident({ incident_id: "b", title: "A link went down" }),
+  ];
+
+  it("renders every incident as a full card, with no compact list or panel, when nothing is selected", () => {
+    english(<Incidents incidents={two} rules={[]} />);
+    expect(screen.queryByRole("region", { name: /Gateway hijacked|A link went down/ })).not.toBeInTheDocument();
+    // Both full cards' own titles are present (IncidentCard renders the
+    // title directly, not inside the compact row).
+    expect(screen.getAllByText("Gateway hijacked")).toHaveLength(1);
+    expect(screen.getAllByText("A link went down")).toHaveLength(1);
+  });
+
+  it("selecting an incident's focus link switches to master/detail and shows it in the panel", () => {
+    const navigate = vi.fn();
+    english(<Incidents incidents={two} rules={[]} context={{}} navigate={navigate} />);
+    const [firstFocusLink] = screen.getAllByText("Show this incident in a side panel with the rest of the list");
+    fireEvent.click(firstFocusLink);
+    expect(navigate).toHaveBeenCalledWith("incidents", { selection: "a" });
+  });
+
+  it("shows the compact list plus the InspectorPanel with the selected incident's full detail", () => {
+    english(<Incidents incidents={two} rules={[]} context={{ selection: "a" }} />);
+    // The panel (a labelled region) carries the selected incident's title.
+    expect(screen.getByRole("region", { name: "Gateway hijacked" })).toBeInTheDocument();
+    // Both incidents still appear as compact rows in the list beside it.
+    expect(screen.getByRole("button", { name: /Gateway hijacked/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /A link went down/ })).toBeInTheDocument();
+  });
+
+  it("clicking a different row in the list changes the selection", () => {
+    const navigate = vi.fn();
+    english(<Incidents incidents={two} rules={[]} context={{ selection: "a" }} navigate={navigate} />);
+    fireEvent.click(screen.getByRole("button", { name: /A link went down/ }));
+    expect(navigate).toHaveBeenCalledWith("incidents", { selection: "b" });
+  });
+
+  it("clicking the already-selected row again deselects it", () => {
+    const navigate = vi.fn();
+    english(<Incidents incidents={two} rules={[]} context={{ selection: "a" }} navigate={navigate} />);
+    fireEvent.click(screen.getByRole("button", { name: /Gateway hijacked/ }));
+    expect(navigate).toHaveBeenCalledWith("incidents", { selection: undefined });
+  });
+
+  it("the panel's close button clears the selection", () => {
+    const navigate = vi.fn();
+    english(<Incidents incidents={two} rules={[]} context={{ selection: "a" }} navigate={navigate} />);
+    fireEvent.click(screen.getByRole("button", { name: "Close panel" }));
+    expect(navigate).toHaveBeenCalledWith("incidents", { selection: undefined });
+  });
+
+  it("falls back to the default full-card list when the selected id does not match any incident", () => {
+    english(<Incidents incidents={two} rules={[]} context={{ selection: "no-such-id" }} />);
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Gateway hijacked")).toHaveLength(1);
+  });
+
+  it("falls back to the default list when the selected incident has been filtered out", () => {
+    const set = [
+      incident({ incident_id: "a", title: "Gateway hijacked", severity: "error" }),
+      incident({ incident_id: "b", title: "A link went down", severity: "warn" }),
+    ];
+    // "a" is selected, but the severity filter excludes it - the panel
+    // must not claim to show an incident that is not even in the
+    // filtered list any more.
+    english(<Incidents incidents={set} rules={[]} context={{ selection: "a", severities: ["warn"] }} />);
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+    expect(screen.queryByText("Gateway hijacked")).not.toBeInTheDocument();
+    expect(screen.getAllByText("A link went down")).toHaveLength(1);
+  });
+});

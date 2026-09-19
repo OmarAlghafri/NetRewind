@@ -1,0 +1,134 @@
+GUI modernization, Phase 5 (fifth slice): Incidents master/detail - the
+remaining half of "Rebuild Incidents (master/detail, search/sort/filter)"
+deliberately deferred from the search/sort/filter slice. Closes that
+Phase 5 line.
+
+## 1. A new shell primitive had to exist first
+
+The execution order's shell diagram (§4.1) names an "optional
+InspectorPanel (becomes a drawer under 900px width)" inside
+`WorkspaceBody`, meant as a general primitive other investigation pages
+would reuse, not an Incidents-specific concern - confirmed by grepping
+for it before assuming it already existed: `InspectorPanel` was named
+only in planning prose, with zero implementation anywhere in
+`desktop/src`.
+
+The named design - a true modal drawer under 900px, with a focus trap -
+was scaled back deliberately. This project's own sidebar work already
+documents the same kind of deferral for the same reason
+(`App.css`'s `@media (max-width: 899px)` block: "Not yet an icon rail...
+needs the icon system Phase 2 adds"): a fully-correct focus-trapped modal
+needs verification this environment cannot fully provide (no screen
+reader here, and axe-core's automated rules do not exercise dynamic
+focus-trap/keyboard-modal behaviour at all - proven directly in §4
+below, not assumed). `InspectorPanel` is instead a non-modal `role=
+"region"` that CSS docks beside the list at >=900px and stacks below it
+under that (reusing the existing 899px breakpoint rather than inventing
+a second one) - it never covers or hides the list, so there is no focus
+trap to get wrong because nothing is ever made inert. Upgrading to a true
+drawer is tracked as a separate, later piece of work, once the icon-rail
+work gives this project a real verified pattern for it.
+
+## 2. What was built
+
+`InspectorPanel.tsx` (new): title, a close button (`IconButton`,
+labelled), children. `Incidents.tsx`: `IncidentRow` (a compact,
+single-line summary - time, severity, translated title, confidence -
+deliberately without the chain/evidence/advice detail `IncidentCard`
+carries, so the list is genuinely more scannable, not the same content
+at a smaller font). Master/detail is opt-in, entered by selecting a row
+or a new small "show in a side panel" link under each full card:
+
+- Nothing selected (the default, and the state every pre-existing test
+  was written against): renders exactly as before this slice, every
+  filtered incident as a full `IncidentCard` - zero regression, and
+  proven by every one of the 17 pre-existing Incidents tests still
+  passing completely unchanged.
+- A selection present and still among the filtered incidents: the
+  compact list plus the `InspectorPanel` showing that one incident's
+  full `IncidentCard` (evidence disclosures, export button, everything
+  the last three slices built, all still working inside the panel).
+- A selection present but stale (filtered out, or an id that never
+  matched anything): falls back to the default full-card list rather
+  than showing nothing or crashing - the same "never blank, never a
+  crash" discipline applied to a routing edge case instead of a
+  translation one.
+
+Selection reuses `InvestigationContext.selection` - not a new field -
+the same one the previous slice's export flow already writes when
+navigating to Evidence (with `from`/`to` alongside it there; here alone,
+without them, distinguishing "show this incident's detail on this same
+page" from "export this incident on a different page" by which fields
+are set together, not by inventing a second field for a very similar
+idea).
+
+## 3. Full regression
+
+    $ npx tsc --noEmit                             clean
+    $ npm test                                     13 files, 99 tests passed
+    $ npm run build                                clean
+    $ npx playwright test                          37 passed (0 failed) -
+        35 from before, plus two new axe scans specifically of the
+        master/detail state (see §4)
+
+## 4. What "prove the test catches a real defect" taught this session about axe-core's own limits
+
+25 vitest tests for this slice, including one deliberately-broken-then-
+restored proof on the highest-stakes logic: the "selected but filtered
+out" fallback was changed to search the unfiltered `incidents` array
+instead of `filtered`, confirmed to fail (the panel then showed a stale
+incident that should have been hidden), then reverted.
+
+Separately, this slice's master/detail state had never been reached by
+any existing Playwright test (every prior axe/scanner check only visits
+each page in its default, nothing-selected state) - a click-triggered
+UI state is exactly the kind of new attack surface a once-per-page scan
+misses. Added `Incidents master/detail has no serious/critical axe
+violations` (both languages) to `accessibility.spec.ts`, which actually
+clicks a row's focus link before scanning. Both pass.
+
+Then, following this session's own established discipline, tried to
+prove *that* test catches a real defect too: removed `InspectorPanel`'s
+`aria-label` (leaving a bare `role="region"` with no accessible name) and
+reran - it still passed, with zero violations reported even without any
+severity filter at all. This is not a flaw in the test: axe-core's
+`wcag2a`/`wcag2aa` ruleset genuinely does not flag an unnamed generic
+`role="region"` as any kind of violation (a well-documented limit of
+automated accessibility tooling, distinct from a real screen-reader
+pass - the same category as the "NVDA/Orca passes" this project already
+lists as an external blocker it cannot fake around). The `aria-label`
+was restored anyway: it is still correct practice and worth keeping,
+just not something this specific automated check can be credited with
+enforcing. Recorded here rather than silently kept as an unexamined
+"prove it fails" step that happened not to fail, which would have
+overstated what was actually verified.
+
+## 5. Actually looked at it
+
+Fresh browser tab, demo recording, Arabic. Clicked "عرض هذه الحادثة في
+لوحة جانبية مع بقية القائمة" (show this incident in a side panel) on the
+first incident: the compact list (all 16 incidents, one line each -
+time, severity, title, confidence) and the `InspectorPanel` (closing ✕,
+the incident's translated title as the panel heading, then its full
+`IncidentCard` - chain, "الدليل الخام" evidence disclosures, root cause,
+advice, and the "تصدير أدلة هذه الحادثة…" export button, all still
+functioning) both rendered, confirmed via `get_page_text`. A screenshot
+attempt was inconclusive (an apparent single-column render that did not
+match the DOM), so verified the actual layout geometry directly instead
+of trusting the image: `getComputedStyle(.incidents-layout).flexDirection`
+is `"row"` at this viewport (1280px, above the 899px breakpoint), and
+the list/panel `getBoundingClientRect()`s share the same `top` with the
+list positioned at the RTL start (`left: 708`) and the panel filling the
+rest (`left: 127`, wider) - genuinely side by side, correctly mirrored
+for RTL by plain logical flexbox `row` direction with no extra RTL
+handling needed. Console clean throughout.
+
+## 6. Phase 5 status
+
+Both halves of "Rebuild Incidents (master/detail, search/sort/filter)"
+are now done. Remaining: Rules "match-count in range" and Settings
+regrouping - both revisited and found to carry more hidden scope than
+their one-line descriptions suggested; written up honestly in the
+progress log rather than guessed at carelessly, the same way this log's
+§1 and §4 write up InspectorPanel's and axe's own real limits instead of
+glossing over them.
