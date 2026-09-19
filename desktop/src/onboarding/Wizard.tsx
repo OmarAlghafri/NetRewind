@@ -46,12 +46,20 @@ export function Wizard({
           ))}
         </div>
 
-        {stepId === "language" && <LanguageStep />}
-        {stepId === "privacy" && <PrivacyStep />}
-        {stepId === "agent" && <AgentChoiceStep settings={settings} onChange={onChangeSettings} />}
-        {stepId === "permissions" && <PermissionsStep settings={settings} record={record} />}
-        {stepId === "capability" && <CapabilityStep record={record} />}
-        {stepId === "sample" && <SampleInvestigationStep incidents={record.incidents} />}
+        {/* The only region that scrolls inside the card: pins wizard-progress
+            above and wizard-actions (back/next/skip) below at any window
+            height, instead of requiring a scroll of the whole card to reach
+            them - the same containment pattern as the app shell (ADR 0003),
+            applied here because the privacy step's body text alone
+            overflows a 720x480 window without it. */}
+        <div className="wizard-step-body">
+          {stepId === "language" && <LanguageStep />}
+          {stepId === "privacy" && <PrivacyStep />}
+          {stepId === "agent" && <AgentChoiceStep settings={settings} onChange={onChangeSettings} />}
+          {stepId === "permissions" && <PermissionsStep settings={settings} record={record} />}
+          {stepId === "capability" && <CapabilityStep record={record} />}
+          {stepId === "sample" && <SampleInvestigationStep incidents={record.incidents} />}
+        </div>
 
         <div className="wizard-actions">
           <button className="wizard-btn wizard-btn-ghost" onClick={onFinish}>
