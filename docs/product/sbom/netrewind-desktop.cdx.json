@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
   "version": 1,
-  "serialNumber": "urn:uuid:7f54ecbf-13f4-4a63-89b7-5f76b582ebf7",
+  "serialNumber": "urn:uuid:d54415c1-878b-45c6-a8aa-95ec8976995d",
   "metadata": {
-    "timestamp": "2026-09-19T08:04:00.194Z",
+    "timestamp": "2026-09-19T15:36:10.722Z",
     "tools": {
       "components": [
         {
@@ -98,9 +98,9 @@
     "component": {
       "type": "application",
       "name": "netrewind-desktop",
-      "version": "1.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0",
-      "purl": "pkg:npm/netrewind-desktop@1.0.0",
+      "version": "1.1.0",
+      "bom-ref": "netrewind-desktop@1.1.0",
+      "purl": "pkg:npm/netrewind-desktop@1.1.0",
       "properties": [
         {
           "name": "cdx:npm:package:private",
@@ -119,7 +119,7 @@
       "name": "playwright",
       "group": "@axe-core",
       "version": "4.13.0",
-      "bom-ref": "netrewind-desktop@1.0.0|@axe-core/playwright@4.13.0",
+      "bom-ref": "netrewind-desktop@1.1.0|@axe-core/playwright@4.13.0",
       "description": "Provides a method to inject and analyze web pages using axe",
       "licenses": [
         {
@@ -174,7 +174,7 @@
       "name": "test",
       "group": "@playwright",
       "version": "1.63.0",
-      "bom-ref": "netrewind-desktop@1.0.0|@playwright/test@1.63.0",
+      "bom-ref": "netrewind-desktop@1.1.0|@playwright/test@1.63.0",
       "author": "Microsoft Corporation",
       "description": "A high-level API to automate web browsers",
       "licenses": [
@@ -234,7 +234,7 @@
       "name": "api",
       "group": "@tauri-apps",
       "version": "2.11.1",
-      "bom-ref": "netrewind-desktop@1.0.0|@tauri-apps/api@2.11.1",
+      "bom-ref": "netrewind-desktop@1.1.0|@tauri-apps/api@2.11.1",
       "description": "Tauri API definitions",
       "licenses": [
         {
@@ -283,7 +283,7 @@
       "name": "cli",
       "group": "@tauri-apps",
       "version": "2.11.4",
-      "bom-ref": "netrewind-desktop@1.0.0|@tauri-apps/cli@2.11.4",
+      "bom-ref": "netrewind-desktop@1.1.0|@tauri-apps/cli@2.11.4",
       "description": "Command line interface for building Tauri apps",
       "licenses": [
         {
@@ -340,7 +340,7 @@
       "name": "plugin-dialog",
       "group": "@tauri-apps",
       "version": "2.7.3",
-      "bom-ref": "netrewind-desktop@1.0.0|@tauri-apps/plugin-dialog@2.7.3",
+      "bom-ref": "netrewind-desktop@1.1.0|@tauri-apps/plugin-dialog@2.7.3",
       "licenses": [
         {
           "expression": "MIT OR Apache-2.0",
@@ -388,7 +388,7 @@
       "name": "plugin-opener",
       "group": "@tauri-apps",
       "version": "2.5.5",
-      "bom-ref": "netrewind-desktop@1.0.0|@tauri-apps/plugin-opener@2.5.5",
+      "bom-ref": "netrewind-desktop@1.1.0|@tauri-apps/plugin-opener@2.5.5",
       "description": "Open files and URLs using their default application.",
       "licenses": [
         {
@@ -437,7 +437,7 @@
       "name": "jest-dom",
       "group": "@testing-library",
       "version": "6.9.1",
-      "bom-ref": "netrewind-desktop@1.0.0|@testing-library/jest-dom@6.9.1",
+      "bom-ref": "netrewind-desktop@1.1.0|@testing-library/jest-dom@6.9.1",
       "author": "Ernesto Garcia",
       "description": "Custom jest matchers to test the state of the DOM",
       "licenses": [
@@ -504,7 +504,7 @@
           "type": "library",
           "name": "dom-accessibility-api",
           "version": "0.6.3",
-          "bom-ref": "netrewind-desktop@1.0.0|@testing-library/jest-dom@6.9.1|dom-accessibility-api@0.6.3",
+          "bom-ref": "netrewind-desktop@1.1.0|@testing-library/jest-dom@6.9.1|dom-accessibility-api@0.6.3",
           "description": "Implements https://w3c.github.io/accname/",
           "licenses": [
             {
@@ -561,7 +561,7 @@
       "name": "react",
       "group": "@testing-library",
       "version": "16.3.3",
-      "bom-ref": "netrewind-desktop@1.0.0|@testing-library/react@16.3.3",
+      "bom-ref": "netrewind-desktop@1.1.0|@testing-library/react@16.3.3",
       "author": "Kent C. Dodds",
       "description": "Simple and complete React DOM testing utilities that encourage good testing practices.",
       "licenses": [
@@ -621,7 +621,7 @@
       "name": "node",
       "group": "@types",
       "version": "26.5.1",
-      "bom-ref": "netrewind-desktop@1.0.0|@types/node@26.5.1",
+      "bom-ref": "netrewind-desktop@1.1.0|@types/node@26.5.1",
       "description": "TypeScript definitions for node",
       "licenses": [
         {
@@ -676,7 +676,7 @@
       "name": "react-dom",
       "group": "@types",
       "version": "19.3.0",
-      "bom-ref": "netrewind-desktop@1.0.0|@types/react-dom@19.3.0",
+      "bom-ref": "netrewind-desktop@1.1.0|@types/react-dom@19.3.0",
       "description": "TypeScript definitions for react-dom",
       "licenses": [
         {
@@ -731,7 +731,7 @@
       "name": "react",
       "group": "@types",
       "version": "19.3.0",
-      "bom-ref": "netrewind-desktop@1.0.0|@types/react@19.3.0",
+      "bom-ref": "netrewind-desktop@1.1.0|@types/react@19.3.0",
       "description": "TypeScript definitions for react",
       "licenses": [
         {
@@ -786,7 +786,7 @@
       "name": "plugin-react",
       "group": "@vitejs",
       "version": "6.1.1",
-      "bom-ref": "netrewind-desktop@1.0.0|@vitejs/plugin-react@6.1.1",
+      "bom-ref": "netrewind-desktop@1.1.0|@vitejs/plugin-react@6.1.1",
       "author": "Evan You",
       "description": "The default Vite plugin for React projects",
       "licenses": [
@@ -845,7 +845,7 @@
       "type": "library",
       "name": "jsdom",
       "version": "26.1.0",
-      "bom-ref": "netrewind-desktop@1.0.0|jsdom@26.1.0",
+      "bom-ref": "netrewind-desktop@1.1.0|jsdom@26.1.0",
       "description": "A JavaScript implementation of many web standards",
       "licenses": [
         {
@@ -903,7 +903,7 @@
       "type": "library",
       "name": "react-dom",
       "version": "19.3.0",
-      "bom-ref": "netrewind-desktop@1.0.0|react-dom@19.3.0",
+      "bom-ref": "netrewind-desktop@1.1.0|react-dom@19.3.0",
       "description": "React package for working with the DOM.",
       "licenses": [
         {
@@ -953,7 +953,7 @@
       "type": "library",
       "name": "react",
       "version": "19.3.0",
-      "bom-ref": "netrewind-desktop@1.0.0|react@19.3.0",
+      "bom-ref": "netrewind-desktop@1.1.0|react@19.3.0",
       "description": "React is a JavaScript library for building user interfaces.",
       "licenses": [
         {
@@ -1007,7 +1007,7 @@
       "type": "library",
       "name": "typescript",
       "version": "6.0.3",
-      "bom-ref": "netrewind-desktop@1.0.0|typescript@6.0.3",
+      "bom-ref": "netrewind-desktop@1.1.0|typescript@6.0.3",
       "author": "Microsoft Corp.",
       "description": "TypeScript is a language for application scale JavaScript development",
       "licenses": [
@@ -1066,7 +1066,7 @@
       "type": "library",
       "name": "vite",
       "version": "8.3.0",
-      "bom-ref": "netrewind-desktop@1.0.0|vite@8.3.0",
+      "bom-ref": "netrewind-desktop@1.1.0|vite@8.3.0",
       "author": "Evan You",
       "description": "Native-ESM powered web dev build tool",
       "licenses": [
@@ -1125,7 +1125,7 @@
       "type": "library",
       "name": "vitest",
       "version": "5.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|vitest@5.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|vitest@5.0.0",
       "author": "Anthony Fu",
       "description": "Next generation testing framework powered by Vite",
       "licenses": [
@@ -1184,7 +1184,7 @@
       "type": "library",
       "name": "axe-core",
       "version": "4.13.0",
-      "bom-ref": "netrewind-desktop@1.0.0|axe-core@4.13.0",
+      "bom-ref": "netrewind-desktop@1.1.0|axe-core@4.13.0",
       "description": "Accessibility engine for automated Web UI testing",
       "licenses": [
         {
@@ -1242,7 +1242,7 @@
       "type": "library",
       "name": "playwright-core",
       "version": "1.63.0",
-      "bom-ref": "netrewind-desktop@1.0.0|playwright-core@1.63.0",
+      "bom-ref": "netrewind-desktop@1.1.0|playwright-core@1.63.0",
       "author": "Microsoft Corporation",
       "description": "A high-level API to automate web browsers",
       "licenses": [
@@ -1301,7 +1301,7 @@
       "type": "library",
       "name": "playwright",
       "version": "1.63.0",
-      "bom-ref": "netrewind-desktop@1.0.0|playwright@1.63.0",
+      "bom-ref": "netrewind-desktop@1.1.0|playwright@1.63.0",
       "author": "Microsoft Corporation",
       "description": "A high-level API to automate web browsers",
       "licenses": [
@@ -1361,7 +1361,7 @@
       "name": "cli-win32-x64-msvc",
       "group": "@tauri-apps",
       "version": "2.11.4",
-      "bom-ref": "netrewind-desktop@1.0.0|@tauri-apps/cli-win32-x64-msvc@2.11.4",
+      "bom-ref": "netrewind-desktop@1.1.0|@tauri-apps/cli-win32-x64-msvc@2.11.4",
       "description": "Command line interface for building Tauri apps",
       "scope": "optional",
       "licenses": [
@@ -1419,7 +1419,7 @@
       "name": "css-tools",
       "group": "@adobe",
       "version": "4.5.0",
-      "bom-ref": "netrewind-desktop@1.0.0|@adobe/css-tools@4.5.0",
+      "bom-ref": "netrewind-desktop@1.1.0|@adobe/css-tools@4.5.0",
       "author": "TJ Holowaychuk",
       "description": "A modern CSS parser and stringifier with TypeScript support",
       "licenses": [
@@ -1474,7 +1474,7 @@
       "type": "library",
       "name": "aria-query",
       "version": "5.3.0",
-      "bom-ref": "netrewind-desktop@1.0.0|aria-query@5.3.0",
+      "bom-ref": "netrewind-desktop@1.1.0|aria-query@5.3.0",
       "author": "Jesse Beach",
       "description": "Programmatic access to the ARIA specification",
       "licenses": [
@@ -1529,7 +1529,7 @@
       "type": "library",
       "name": "css.escape",
       "version": "1.5.1",
-      "bom-ref": "netrewind-desktop@1.0.0|css.escape@1.5.1",
+      "bom-ref": "netrewind-desktop@1.1.0|css.escape@1.5.1",
       "author": "Mathias Bynens",
       "description": "A robust polyfill for the `CSS.escape` utility method as defined in CSSOM.",
       "licenses": [
@@ -1584,7 +1584,7 @@
       "type": "library",
       "name": "picocolors",
       "version": "1.1.1",
-      "bom-ref": "netrewind-desktop@1.0.0|picocolors@1.1.1",
+      "bom-ref": "netrewind-desktop@1.1.0|picocolors@1.1.1",
       "author": "Alexey Raspopov",
       "description": "The tiniest and the fastest library for terminal output formatting with ANSI colors",
       "licenses": [
@@ -1639,7 +1639,7 @@
       "type": "library",
       "name": "redent",
       "version": "3.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|redent@3.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|redent@3.0.0",
       "author": "Sindre Sorhus",
       "description": "Strip redundant indentation and indent the string",
       "licenses": [
@@ -1699,7 +1699,7 @@
       "name": "runtime",
       "group": "@babel",
       "version": "7.29.7",
-      "bom-ref": "netrewind-desktop@1.0.0|@babel/runtime@7.29.7",
+      "bom-ref": "netrewind-desktop@1.1.0|@babel/runtime@7.29.7",
       "author": "The Babel Team",
       "description": "babel's modular runtime helpers",
       "licenses": [
@@ -1759,7 +1759,7 @@
       "name": "dom",
       "group": "@testing-library",
       "version": "10.4.2",
-      "bom-ref": "netrewind-desktop@1.0.0|@testing-library/dom@10.4.2",
+      "bom-ref": "netrewind-desktop@1.1.0|@testing-library/dom@10.4.2",
       "author": "Kent C. Dodds",
       "description": "Simple and complete DOM testing utilities that encourage good testing practices.",
       "licenses": [
@@ -1818,7 +1818,7 @@
       "type": "library",
       "name": "undici-types",
       "version": "8.9.0",
-      "bom-ref": "netrewind-desktop@1.0.0|undici-types@8.9.0",
+      "bom-ref": "netrewind-desktop@1.1.0|undici-types@8.9.0",
       "description": "A stand-alone types package for Undici",
       "licenses": [
         {
@@ -1872,7 +1872,7 @@
       "type": "library",
       "name": "csstype",
       "version": "3.2.3",
-      "bom-ref": "netrewind-desktop@1.0.0|csstype@3.2.3",
+      "bom-ref": "netrewind-desktop@1.1.0|csstype@3.2.3",
       "author": "Fredrik Nicol",
       "description": "Strict TypeScript and Flow types for style based on MDN data",
       "licenses": [
@@ -1928,7 +1928,7 @@
       "name": "pluginutils",
       "group": "@rolldown",
       "version": "1.0.1",
-      "bom-ref": "netrewind-desktop@1.0.0|@rolldown/pluginutils@1.0.1",
+      "bom-ref": "netrewind-desktop@1.1.0|@rolldown/pluginutils@1.0.1",
       "description": "Plugin utilities for Rolldown",
       "licenses": [
         {
@@ -1982,7 +1982,7 @@
       "type": "library",
       "name": "cssstyle",
       "version": "4.6.0",
-      "bom-ref": "netrewind-desktop@1.0.0|cssstyle@4.6.0",
+      "bom-ref": "netrewind-desktop@1.1.0|cssstyle@4.6.0",
       "description": "CSSStyleDeclaration Object Model implementation",
       "licenses": [
         {
@@ -2040,7 +2040,7 @@
       "type": "library",
       "name": "data-urls",
       "version": "5.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|data-urls@5.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|data-urls@5.0.0",
       "author": "Domenic Denicola",
       "description": "Parses data: URLs",
       "licenses": [
@@ -2099,7 +2099,7 @@
       "type": "library",
       "name": "decimal.js",
       "version": "10.6.0",
-      "bom-ref": "netrewind-desktop@1.0.0|decimal.js@10.6.0",
+      "bom-ref": "netrewind-desktop@1.1.0|decimal.js@10.6.0",
       "author": "Michael Mclaughlin",
       "description": "An arbitrary-precision Decimal type for JavaScript.",
       "licenses": [
@@ -2154,7 +2154,7 @@
       "type": "library",
       "name": "html-encoding-sniffer",
       "version": "4.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|html-encoding-sniffer@4.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|html-encoding-sniffer@4.0.0",
       "author": "Domenic Denicola",
       "description": "Sniff the encoding from a HTML byte stream",
       "licenses": [
@@ -2213,7 +2213,7 @@
       "type": "library",
       "name": "http-proxy-agent",
       "version": "7.0.2",
-      "bom-ref": "netrewind-desktop@1.0.0|http-proxy-agent@7.0.2",
+      "bom-ref": "netrewind-desktop@1.1.0|http-proxy-agent@7.0.2",
       "author": "Nathan Rajlich",
       "description": "An HTTP(s) proxy `http.Agent` implementation for HTTP",
       "licenses": [
@@ -2272,7 +2272,7 @@
       "type": "library",
       "name": "https-proxy-agent",
       "version": "7.0.6",
-      "bom-ref": "netrewind-desktop@1.0.0|https-proxy-agent@7.0.6",
+      "bom-ref": "netrewind-desktop@1.1.0|https-proxy-agent@7.0.6",
       "author": "Nathan Rajlich",
       "description": "An HTTP(s) proxy `http.Agent` implementation for HTTPS",
       "licenses": [
@@ -2331,7 +2331,7 @@
       "type": "library",
       "name": "is-potential-custom-element-name",
       "version": "1.0.1",
-      "bom-ref": "netrewind-desktop@1.0.0|is-potential-custom-element-name@1.0.1",
+      "bom-ref": "netrewind-desktop@1.1.0|is-potential-custom-element-name@1.0.1",
       "author": "Mathias Bynens",
       "description": "Check whether a given string matches the `PotentialCustomElementName` production as defined in the HTML Standard.",
       "licenses": [
@@ -2386,7 +2386,7 @@
       "type": "library",
       "name": "nwsapi",
       "version": "2.2.27",
-      "bom-ref": "netrewind-desktop@1.0.0|nwsapi@2.2.27",
+      "bom-ref": "netrewind-desktop@1.1.0|nwsapi@2.2.27",
       "author": "Diego Perini",
       "description": "Fast CSS Selectors API Engine",
       "licenses": [
@@ -2448,7 +2448,7 @@
       "type": "library",
       "name": "parse5",
       "version": "7.3.0",
-      "bom-ref": "netrewind-desktop@1.0.0|parse5@7.3.0",
+      "bom-ref": "netrewind-desktop@1.1.0|parse5@7.3.0",
       "author": "Ivan Nikulin",
       "description": "HTML parser and serializer.",
       "licenses": [
@@ -2503,7 +2503,7 @@
       "type": "library",
       "name": "rrweb-cssom",
       "version": "0.8.0",
-      "bom-ref": "netrewind-desktop@1.0.0|rrweb-cssom@0.8.0",
+      "bom-ref": "netrewind-desktop@1.1.0|rrweb-cssom@0.8.0",
       "author": "Nikita Vasilyev",
       "description": "CSS Object Model implementation and CSS parser",
       "licenses": [
@@ -2558,7 +2558,7 @@
       "type": "library",
       "name": "saxes",
       "version": "6.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|saxes@6.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|saxes@6.0.0",
       "author": "Louis-Dominique Dubeau",
       "description": "An evented streaming XML parser in JavaScript",
       "licenses": [
@@ -2617,7 +2617,7 @@
       "type": "library",
       "name": "symbol-tree",
       "version": "3.2.4",
-      "bom-ref": "netrewind-desktop@1.0.0|symbol-tree@3.2.4",
+      "bom-ref": "netrewind-desktop@1.1.0|symbol-tree@3.2.4",
       "author": "Joris van der Wel",
       "description": "Turn any collection of objects into its own efficient tree or linked list using Symbol",
       "licenses": [
@@ -2672,7 +2672,7 @@
       "type": "library",
       "name": "tough-cookie",
       "version": "5.1.2",
-      "bom-ref": "netrewind-desktop@1.0.0|tough-cookie@5.1.2",
+      "bom-ref": "netrewind-desktop@1.1.0|tough-cookie@5.1.2",
       "author": "Jeremy Stashewsky",
       "description": "RFC6265 Cookies and Cookie Jar for node.js",
       "licenses": [
@@ -2731,7 +2731,7 @@
       "type": "library",
       "name": "w3c-xmlserializer",
       "version": "5.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|w3c-xmlserializer@5.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|w3c-xmlserializer@5.0.0",
       "description": "A per-spec XML serializer implementation",
       "licenses": [
         {
@@ -2789,7 +2789,7 @@
       "type": "library",
       "name": "webidl-conversions",
       "version": "7.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|webidl-conversions@7.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|webidl-conversions@7.0.0",
       "author": "Domenic Denicola",
       "description": "Implements the WebIDL algorithms for converting to and from JavaScript values",
       "licenses": [
@@ -2848,7 +2848,7 @@
       "type": "library",
       "name": "whatwg-encoding",
       "version": "3.1.1",
-      "bom-ref": "netrewind-desktop@1.0.0|whatwg-encoding@3.1.1",
+      "bom-ref": "netrewind-desktop@1.1.0|whatwg-encoding@3.1.1",
       "author": "Domenic Denicola",
       "description": "Decode strings according to the WHATWG Encoding Standard",
       "licenses": [
@@ -2907,7 +2907,7 @@
       "type": "library",
       "name": "whatwg-mimetype",
       "version": "4.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|whatwg-mimetype@4.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|whatwg-mimetype@4.0.0",
       "author": "Domenic Denicola",
       "description": "Parses, serializes, and manipulates MIME types, according to the WHATWG MIME Sniffing Standard",
       "licenses": [
@@ -2966,7 +2966,7 @@
       "type": "library",
       "name": "whatwg-url",
       "version": "14.2.0",
-      "bom-ref": "netrewind-desktop@1.0.0|whatwg-url@14.2.0",
+      "bom-ref": "netrewind-desktop@1.1.0|whatwg-url@14.2.0",
       "author": "Sebastian Mayr",
       "description": "An implementation of the WHATWG URL Standard's URL API and parsing machinery",
       "licenses": [
@@ -3025,7 +3025,7 @@
       "type": "library",
       "name": "ws",
       "version": "8.21.3",
-      "bom-ref": "netrewind-desktop@1.0.0|ws@8.21.3",
+      "bom-ref": "netrewind-desktop@1.1.0|ws@8.21.3",
       "author": "Einar Otto Stangvik",
       "description": "Simple to use, blazing fast and thoroughly tested websocket client and server for Node.js",
       "licenses": [
@@ -3084,7 +3084,7 @@
       "type": "library",
       "name": "xml-name-validator",
       "version": "5.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|xml-name-validator@5.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|xml-name-validator@5.0.0",
       "author": "Domenic Denicola",
       "description": "Validates whether a string matches the production for an XML name or qualified name",
       "licenses": [
@@ -3143,7 +3143,7 @@
       "type": "library",
       "name": "scheduler",
       "version": "0.28.0",
-      "bom-ref": "netrewind-desktop@1.0.0|scheduler@0.28.0",
+      "bom-ref": "netrewind-desktop@1.1.0|scheduler@0.28.0",
       "description": "Cooperative scheduler for the browser environment.",
       "licenses": [
         {
@@ -3193,7 +3193,7 @@
       "type": "library",
       "name": "lightningcss",
       "version": "1.33.0",
-      "bom-ref": "netrewind-desktop@1.0.0|lightningcss@1.33.0",
+      "bom-ref": "netrewind-desktop@1.1.0|lightningcss@1.33.0",
       "description": "A CSS parser, transformer, and minifier written in Rust",
       "licenses": [
         {
@@ -3251,7 +3251,7 @@
       "type": "library",
       "name": "picomatch",
       "version": "4.0.7",
-      "bom-ref": "netrewind-desktop@1.0.0|picomatch@4.0.7",
+      "bom-ref": "netrewind-desktop@1.1.0|picomatch@4.0.7",
       "author": "Jon Schlinkert",
       "description": "Blazing fast and accurate glob matcher written in JavaScript, with no dependencies and full support for standard and extended Bash glob features, including braces, extglobs, POSIX brackets, and regular expressions.",
       "licenses": [
@@ -3310,7 +3310,7 @@
       "type": "library",
       "name": "postcss",
       "version": "8.5.28",
-      "bom-ref": "netrewind-desktop@1.0.0|postcss@8.5.28",
+      "bom-ref": "netrewind-desktop@1.1.0|postcss@8.5.28",
       "author": "Andrey Sitnik",
       "description": "Tool for transforming styles with JS plugins",
       "licenses": [
@@ -3369,7 +3369,7 @@
       "type": "library",
       "name": "rolldown",
       "version": "1.2.8",
-      "bom-ref": "netrewind-desktop@1.0.0|rolldown@1.2.8",
+      "bom-ref": "netrewind-desktop@1.1.0|rolldown@1.2.8",
       "description": "Fast JavaScript/TypeScript bundler in Rust with Rollup-compatible API.",
       "licenses": [
         {
@@ -3427,7 +3427,7 @@
       "type": "library",
       "name": "tinyglobby",
       "version": "0.2.17",
-      "bom-ref": "netrewind-desktop@1.0.0|tinyglobby@0.2.17",
+      "bom-ref": "netrewind-desktop@1.1.0|tinyglobby@0.2.17",
       "author": "Superchupu",
       "description": "A fast and minimal alternative to globby and fast-glob",
       "licenses": [
@@ -3487,7 +3487,7 @@
       "name": "chai",
       "group": "@types",
       "version": "5.2.3",
-      "bom-ref": "netrewind-desktop@1.0.0|@types/chai@5.2.3",
+      "bom-ref": "netrewind-desktop@1.1.0|@types/chai@5.2.3",
       "description": "TypeScript definitions for chai",
       "licenses": [
         {
@@ -3542,7 +3542,7 @@
       "name": "mocker",
       "group": "@vitest",
       "version": "5.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|@vitest/mocker@5.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|@vitest/mocker@5.0.0",
       "description": "Vitest module mocker implementation",
       "licenses": [
         {
@@ -3596,7 +3596,7 @@
       "type": "library",
       "name": "chai",
       "version": "6.2.2",
-      "bom-ref": "netrewind-desktop@1.0.0|chai@6.2.2",
+      "bom-ref": "netrewind-desktop@1.1.0|chai@6.2.2",
       "author": "Jake Luer",
       "description": "BDD/TDD assertion library for node.js and the browser. Test framework agnostic.",
       "licenses": [
@@ -3655,7 +3655,7 @@
       "type": "library",
       "name": "es-module-lexer",
       "version": "2.3.2",
-      "bom-ref": "netrewind-desktop@1.0.0|es-module-lexer@2.3.2",
+      "bom-ref": "netrewind-desktop@1.1.0|es-module-lexer@2.3.2",
       "author": "Guy Bedford",
       "description": "Lexes ES modules returning their import/export metadata",
       "licenses": [
@@ -3710,7 +3710,7 @@
       "type": "library",
       "name": "expect-type",
       "version": "1.4.0",
-      "bom-ref": "netrewind-desktop@1.0.0|expect-type@1.4.0",
+      "bom-ref": "netrewind-desktop@1.1.0|expect-type@1.4.0",
       "licenses": [
         {
           "license": {
@@ -3767,7 +3767,7 @@
       "type": "library",
       "name": "magic-string",
       "version": "1.3.1",
-      "bom-ref": "netrewind-desktop@1.0.0|magic-string@1.3.1",
+      "bom-ref": "netrewind-desktop@1.1.0|magic-string@1.3.1",
       "author": "Rich Harris",
       "description": "Modify strings, generate sourcemaps",
       "licenses": [
@@ -3822,7 +3822,7 @@
       "type": "library",
       "name": "obug",
       "version": "2.2.1",
-      "bom-ref": "netrewind-desktop@1.0.0|obug@2.2.1",
+      "bom-ref": "netrewind-desktop@1.1.0|obug@2.2.1",
       "author": "Kevin Deng",
       "description": "A lightweight JavaScript debugging utility, forked from debug, featuring TypeScript and ESM support.",
       "licenses": [
@@ -3881,7 +3881,7 @@
       "type": "library",
       "name": "std-env",
       "version": "4.2.0",
-      "bom-ref": "netrewind-desktop@1.0.0|std-env@4.2.0",
+      "bom-ref": "netrewind-desktop@1.1.0|std-env@4.2.0",
       "description": "Runtime agnostic JS utils",
       "licenses": [
         {
@@ -3935,7 +3935,7 @@
       "type": "library",
       "name": "tinybench",
       "version": "6.1.4",
-      "bom-ref": "netrewind-desktop@1.0.0|tinybench@6.1.4",
+      "bom-ref": "netrewind-desktop@1.1.0|tinybench@6.1.4",
       "description": "🔎 A simple, tiny and lightweight benchmarking library!",
       "licenses": [
         {
@@ -3993,7 +3993,7 @@
       "type": "library",
       "name": "tinyexec",
       "version": "1.3.0",
-      "bom-ref": "netrewind-desktop@1.0.0|tinyexec@1.3.0",
+      "bom-ref": "netrewind-desktop@1.1.0|tinyexec@1.3.0",
       "author": "James Garbutt",
       "description": "A minimal library for executing processes in Node",
       "licenses": [
@@ -4052,7 +4052,7 @@
       "type": "library",
       "name": "why-is-node-running",
       "version": "2.3.0",
-      "bom-ref": "netrewind-desktop@1.0.0|why-is-node-running@2.3.0",
+      "bom-ref": "netrewind-desktop@1.1.0|why-is-node-running@2.3.0",
       "author": "Mathias Buus",
       "description": "Node is running but you don't know why? why-is-node-running is here to help you.",
       "licenses": [
@@ -4111,7 +4111,7 @@
       "type": "library",
       "name": "dequal",
       "version": "2.0.3",
-      "bom-ref": "netrewind-desktop@1.0.0|dequal@2.0.3",
+      "bom-ref": "netrewind-desktop@1.1.0|dequal@2.0.3",
       "author": "Luke Edwards",
       "description": "A tiny (304B to 489B) utility for check for deep equality",
       "licenses": [
@@ -4170,7 +4170,7 @@
       "type": "library",
       "name": "indent-string",
       "version": "4.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|indent-string@4.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|indent-string@4.0.0",
       "author": "Sindre Sorhus",
       "description": "Indent each line in a string",
       "licenses": [
@@ -4229,7 +4229,7 @@
       "type": "library",
       "name": "strip-indent",
       "version": "3.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|strip-indent@3.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|strip-indent@3.0.0",
       "author": "Sindre Sorhus",
       "description": "Strip leading whitespace from each line in a string",
       "licenses": [
@@ -4289,7 +4289,7 @@
       "name": "code-frame",
       "group": "@babel",
       "version": "7.29.7",
-      "bom-ref": "netrewind-desktop@1.0.0|@babel/code-frame@7.29.7",
+      "bom-ref": "netrewind-desktop@1.1.0|@babel/code-frame@7.29.7",
       "author": "The Babel Team",
       "description": "Generate errors that contain a code frame that point to source locations.",
       "licenses": [
@@ -4349,7 +4349,7 @@
       "name": "aria-query",
       "group": "@types",
       "version": "5.0.4",
-      "bom-ref": "netrewind-desktop@1.0.0|@types/aria-query@5.0.4",
+      "bom-ref": "netrewind-desktop@1.1.0|@types/aria-query@5.0.4",
       "description": "TypeScript definitions for aria-query",
       "licenses": [
         {
@@ -4403,7 +4403,7 @@
       "type": "library",
       "name": "dom-accessibility-api",
       "version": "0.5.16",
-      "bom-ref": "netrewind-desktop@1.0.0|dom-accessibility-api@0.5.16",
+      "bom-ref": "netrewind-desktop@1.1.0|dom-accessibility-api@0.5.16",
       "description": "Implements https://w3c.github.io/accname/",
       "licenses": [
         {
@@ -4457,7 +4457,7 @@
       "type": "library",
       "name": "lz-string",
       "version": "1.5.0",
-      "bom-ref": "netrewind-desktop@1.0.0|lz-string@1.5.0",
+      "bom-ref": "netrewind-desktop@1.1.0|lz-string@1.5.0",
       "author": "pieroxy",
       "description": "LZ-based compression algorithm",
       "licenses": [
@@ -4512,7 +4512,7 @@
       "type": "library",
       "name": "pretty-format",
       "version": "27.5.1",
-      "bom-ref": "netrewind-desktop@1.0.0|pretty-format@27.5.1",
+      "bom-ref": "netrewind-desktop@1.1.0|pretty-format@27.5.1",
       "author": "James Kyle",
       "description": "Stringify any JavaScript value.",
       "licenses": [
@@ -4572,7 +4572,7 @@
       "name": "css-color",
       "group": "@asamuzakjp",
       "version": "3.2.0",
-      "bom-ref": "netrewind-desktop@1.0.0|@asamuzakjp/css-color@3.2.0",
+      "bom-ref": "netrewind-desktop@1.1.0|@asamuzakjp/css-color@3.2.0",
       "author": "asamuzaK",
       "description": "CSS color - Resolve and convert CSS colors.",
       "licenses": [
@@ -4627,7 +4627,7 @@
       "type": "library",
       "name": "agent-base",
       "version": "7.1.4",
-      "bom-ref": "netrewind-desktop@1.0.0|agent-base@7.1.4",
+      "bom-ref": "netrewind-desktop@1.1.0|agent-base@7.1.4",
       "author": "Nathan Rajlich",
       "description": "Turn a function into an `http.Agent` instance",
       "licenses": [
@@ -4686,7 +4686,7 @@
       "type": "library",
       "name": "debug",
       "version": "4.4.3",
-      "bom-ref": "netrewind-desktop@1.0.0|debug@4.4.3",
+      "bom-ref": "netrewind-desktop@1.1.0|debug@4.4.3",
       "author": "Josh Junon",
       "description": "Lightweight debugging utility for Node.js and the browser",
       "licenses": [
@@ -4745,7 +4745,7 @@
       "type": "library",
       "name": "entities",
       "version": "6.0.1",
-      "bom-ref": "netrewind-desktop@1.0.0|entities@6.0.1",
+      "bom-ref": "netrewind-desktop@1.1.0|entities@6.0.1",
       "author": "Felix Boehm",
       "description": "Encode & decode XML and HTML entities with ease & speed",
       "licenses": [
@@ -4804,7 +4804,7 @@
       "type": "library",
       "name": "xmlchars",
       "version": "2.2.0",
-      "bom-ref": "netrewind-desktop@1.0.0|xmlchars@2.2.0",
+      "bom-ref": "netrewind-desktop@1.1.0|xmlchars@2.2.0",
       "author": "Louis-Dominique Dubeau",
       "description": "Utilities for determining if characters belong to character classes defined by the XML specs.",
       "licenses": [
@@ -4859,7 +4859,7 @@
       "type": "library",
       "name": "tldts",
       "version": "6.1.86",
-      "bom-ref": "netrewind-desktop@1.0.0|tldts@6.1.86",
+      "bom-ref": "netrewind-desktop@1.1.0|tldts@6.1.86",
       "author": "Rémi Berson",
       "description": "Library to work against complex domain names, subdomains and URIs.",
       "licenses": [
@@ -4914,7 +4914,7 @@
       "type": "library",
       "name": "iconv-lite",
       "version": "0.6.3",
-      "bom-ref": "netrewind-desktop@1.0.0|iconv-lite@0.6.3",
+      "bom-ref": "netrewind-desktop@1.1.0|iconv-lite@0.6.3",
       "author": "Alexander Shtuchkin",
       "description": "Convert character encodings in pure javascript.",
       "licenses": [
@@ -4973,7 +4973,7 @@
       "type": "library",
       "name": "tr46",
       "version": "5.1.1",
-      "bom-ref": "netrewind-desktop@1.0.0|tr46@5.1.1",
+      "bom-ref": "netrewind-desktop@1.1.0|tr46@5.1.1",
       "author": "Sebastian Mayr",
       "description": "An implementation of the Unicode UTS #46: Unicode IDNA Compatibility Processing",
       "licenses": [
@@ -5032,7 +5032,7 @@
       "type": "library",
       "name": "detect-libc",
       "version": "2.1.2",
-      "bom-ref": "netrewind-desktop@1.0.0|detect-libc@2.1.2",
+      "bom-ref": "netrewind-desktop@1.1.0|detect-libc@2.1.2",
       "author": "Lovell Fuller",
       "description": "Node.js module to detect the C standard library (libc) implementation family and version",
       "licenses": [
@@ -5091,7 +5091,7 @@
       "type": "library",
       "name": "lightningcss-win32-x64-msvc",
       "version": "1.33.0",
-      "bom-ref": "netrewind-desktop@1.0.0|lightningcss-win32-x64-msvc@1.33.0",
+      "bom-ref": "netrewind-desktop@1.1.0|lightningcss-win32-x64-msvc@1.33.0",
       "description": "A CSS parser, transformer, and minifier written in Rust",
       "scope": "optional",
       "licenses": [
@@ -5150,7 +5150,7 @@
       "type": "library",
       "name": "nanoid",
       "version": "3.3.19",
-      "bom-ref": "netrewind-desktop@1.0.0|nanoid@3.3.19",
+      "bom-ref": "netrewind-desktop@1.1.0|nanoid@3.3.19",
       "author": "Andrey Sitnik",
       "description": "A tiny (116 bytes), secure URL-friendly unique string ID generator",
       "licenses": [
@@ -5209,7 +5209,7 @@
       "type": "library",
       "name": "source-map-js",
       "version": "1.2.1",
-      "bom-ref": "netrewind-desktop@1.0.0|source-map-js@1.2.1",
+      "bom-ref": "netrewind-desktop@1.1.0|source-map-js@1.2.1",
       "author": "Valentin 7rulnik Semirulnik",
       "description": "Generates and consumes source maps",
       "licenses": [
@@ -5269,7 +5269,7 @@
       "name": "types",
       "group": "@oxc-project",
       "version": "0.149.0",
-      "bom-ref": "netrewind-desktop@1.0.0|@oxc-project/types@0.149.0",
+      "bom-ref": "netrewind-desktop@1.1.0|@oxc-project/types@0.149.0",
       "author": "Boshen and oxc contributors",
       "description": "Types for Oxc AST nodes",
       "licenses": [
@@ -5325,7 +5325,7 @@
       "name": "binding-win32-x64-msvc",
       "group": "@rolldown",
       "version": "1.2.8",
-      "bom-ref": "netrewind-desktop@1.0.0|@rolldown/binding-win32-x64-msvc@1.2.8",
+      "bom-ref": "netrewind-desktop@1.1.0|@rolldown/binding-win32-x64-msvc@1.2.8",
       "description": "Fast JavaScript/TypeScript bundler in Rust with Rollup-compatible API.",
       "scope": "optional",
       "licenses": [
@@ -5384,7 +5384,7 @@
       "type": "library",
       "name": "fdir",
       "version": "6.5.0",
-      "bom-ref": "netrewind-desktop@1.0.0|fdir@6.5.0",
+      "bom-ref": "netrewind-desktop@1.1.0|fdir@6.5.0",
       "author": "thecodrr",
       "description": "The fastest directory crawler & globbing alternative to glob, fast-glob, & tiny-glob. Crawls 1m files in < 1s",
       "licenses": [
@@ -5444,7 +5444,7 @@
       "name": "deep-eql",
       "group": "@types",
       "version": "4.0.2",
-      "bom-ref": "netrewind-desktop@1.0.0|@types/deep-eql@4.0.2",
+      "bom-ref": "netrewind-desktop@1.1.0|@types/deep-eql@4.0.2",
       "description": "TypeScript definitions for deep-eql",
       "licenses": [
         {
@@ -5498,7 +5498,7 @@
       "type": "library",
       "name": "assertion-error",
       "version": "2.0.1",
-      "bom-ref": "netrewind-desktop@1.0.0|assertion-error@2.0.1",
+      "bom-ref": "netrewind-desktop@1.1.0|assertion-error@2.0.1",
       "author": "Jake Luer",
       "description": "Error constructor for test and validation frameworks that implements standardized AssertionError specification.",
       "licenses": [
@@ -5558,7 +5558,7 @@
       "name": "trace-mapping",
       "group": "@jridgewell",
       "version": "0.3.31",
-      "bom-ref": "netrewind-desktop@1.0.0|@jridgewell/trace-mapping@0.3.31",
+      "bom-ref": "netrewind-desktop@1.1.0|@jridgewell/trace-mapping@0.3.31",
       "author": "Justin Ridgewell",
       "description": "Trace the original position through a source map",
       "licenses": [
@@ -5614,7 +5614,7 @@
       "name": "spy",
       "group": "@vitest",
       "version": "5.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|@vitest/spy@5.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|@vitest/spy@5.0.0",
       "description": "Lightweight Jest compatible spy implementation",
       "licenses": [
         {
@@ -5668,7 +5668,7 @@
       "type": "library",
       "name": "estree-walker",
       "version": "3.0.3",
-      "bom-ref": "netrewind-desktop@1.0.0|estree-walker@3.0.3",
+      "bom-ref": "netrewind-desktop@1.1.0|estree-walker@3.0.3",
       "author": "Rich Harris",
       "description": "Traverse an ESTree-compliant AST",
       "licenses": [
@@ -5724,7 +5724,7 @@
       "name": "sourcemap-codec",
       "group": "@jridgewell",
       "version": "1.6.0",
-      "bom-ref": "netrewind-desktop@1.0.0|@jridgewell/sourcemap-codec@1.6.0",
+      "bom-ref": "netrewind-desktop@1.1.0|@jridgewell/sourcemap-codec@1.6.0",
       "author": "Justin Ridgewell",
       "description": "Encode/decode sourcemap mappings",
       "licenses": [
@@ -5779,7 +5779,7 @@
       "type": "library",
       "name": "siginfo",
       "version": "2.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|siginfo@2.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|siginfo@2.0.0",
       "author": "Emil Bay",
       "description": "Utility module to print pretty messages on SIGINFO/SIGUSR1",
       "licenses": [
@@ -5834,7 +5834,7 @@
       "type": "library",
       "name": "stackback",
       "version": "0.0.2",
-      "bom-ref": "netrewind-desktop@1.0.0|stackback@0.0.2",
+      "bom-ref": "netrewind-desktop@1.1.0|stackback@0.0.2",
       "author": "Roman Shtylman",
       "description": "return list of CallSite objects from a captured stacktrace",
       "licenses": [
@@ -5889,7 +5889,7 @@
       "type": "library",
       "name": "min-indent",
       "version": "1.0.1",
-      "bom-ref": "netrewind-desktop@1.0.0|min-indent@1.0.1",
+      "bom-ref": "netrewind-desktop@1.1.0|min-indent@1.0.1",
       "author": "James Kyle",
       "description": "Get the shortest leading whitespace from lines in a string",
       "licenses": [
@@ -5949,7 +5949,7 @@
       "name": "helper-validator-identifier",
       "group": "@babel",
       "version": "7.29.7",
-      "bom-ref": "netrewind-desktop@1.0.0|@babel/helper-validator-identifier@7.29.7",
+      "bom-ref": "netrewind-desktop@1.1.0|@babel/helper-validator-identifier@7.29.7",
       "author": "The Babel Team",
       "description": "Validate identifier/keywords name",
       "licenses": [
@@ -6008,7 +6008,7 @@
       "type": "library",
       "name": "js-tokens",
       "version": "4.0.0",
-      "bom-ref": "netrewind-desktop@1.0.0|js-tokens@4.0.0",
+      "bom-ref": "netrewind-desktop@1.1.0|js-tokens@4.0.0",
       "author": "Simon Lydell",
       "description": "A regex that tokenizes JavaScript.",
       "licenses": [
@@ -6063,7 +6063,7 @@
       "type": "library",
       "name": "ansi-regex",
       "version": "5.0.1",
-      "bom-ref": "netrewind-desktop@1.0.0|ansi-regex@5.0.1",
+      "bom-ref": "netrewind-desktop@1.1.0|ansi-regex@5.0.1",
       "author": "Sindre Sorhus",
       "description": "Regular expression for matching ANSI escape codes",
       "licenses": [
@@ -6122,7 +6122,7 @@
       "type": "library",
       "name": "ansi-styles",
       "version": "5.2.0",
-      "bom-ref": "netrewind-desktop@1.0.0|ansi-styles@5.2.0",
+      "bom-ref": "netrewind-desktop@1.1.0|ansi-styles@5.2.0",
       "author": "Sindre Sorhus",
       "description": "ANSI escape codes for styling strings in the terminal",
       "licenses": [
@@ -6181,7 +6181,7 @@
       "type": "library",
       "name": "react-is",
       "version": "17.0.2",
-      "bom-ref": "netrewind-desktop@1.0.0|react-is@17.0.2",
+      "bom-ref": "netrewind-desktop@1.1.0|react-is@17.0.2",
       "description": "Brand checking of React Elements.",
       "licenses": [
         {
@@ -6236,7 +6236,7 @@
       "name": "css-calc",
       "group": "@csstools",
       "version": "2.1.4",
-      "bom-ref": "netrewind-desktop@1.0.0|@csstools/css-calc@2.1.4",
+      "bom-ref": "netrewind-desktop@1.1.0|@csstools/css-calc@2.1.4",
       "description": "Solve CSS math expressions",
       "licenses": [
         {
@@ -6295,7 +6295,7 @@
       "name": "css-color-parser",
       "group": "@csstools",
       "version": "3.1.0",
-      "bom-ref": "netrewind-desktop@1.0.0|@csstools/css-color-parser@3.1.0",
+      "bom-ref": "netrewind-desktop@1.1.0|@csstools/css-color-parser@3.1.0",
       "description": "Parse CSS color values",
       "licenses": [
         {
@@ -6354,7 +6354,7 @@
       "name": "css-parser-algorithms",
       "group": "@csstools",
       "version": "3.0.5",
-      "bom-ref": "netrewind-desktop@1.0.0|@csstools/css-parser-algorithms@3.0.5",
+      "bom-ref": "netrewind-desktop@1.1.0|@csstools/css-parser-algorithms@3.0.5",
       "description": "Algorithms to help you parse CSS from an array of tokens.",
       "licenses": [
         {
@@ -6413,7 +6413,7 @@
       "name": "css-tokenizer",
       "group": "@csstools",
       "version": "3.0.4",
-      "bom-ref": "netrewind-desktop@1.0.0|@csstools/css-tokenizer@3.0.4",
+      "bom-ref": "netrewind-desktop@1.1.0|@csstools/css-tokenizer@3.0.4",
       "description": "Tokenize CSS",
       "licenses": [
         {
@@ -6471,7 +6471,7 @@
       "type": "library",
       "name": "lru-cache",
       "version": "10.4.3",
-      "bom-ref": "netrewind-desktop@1.0.0|lru-cache@10.4.3",
+      "bom-ref": "netrewind-desktop@1.1.0|lru-cache@10.4.3",
       "author": "Isaac Z. Schlueter",
       "description": "A cache object that deletes the least-recently-used items.",
       "licenses": [
@@ -6526,7 +6526,7 @@
       "type": "library",
       "name": "ms",
       "version": "2.1.3",
-      "bom-ref": "netrewind-desktop@1.0.0|ms@2.1.3",
+      "bom-ref": "netrewind-desktop@1.1.0|ms@2.1.3",
       "description": "Tiny millisecond conversion utility",
       "licenses": [
         {
@@ -6580,7 +6580,7 @@
       "type": "library",
       "name": "tldts-core",
       "version": "6.1.86",
-      "bom-ref": "netrewind-desktop@1.0.0|tldts-core@6.1.86",
+      "bom-ref": "netrewind-desktop@1.1.0|tldts-core@6.1.86",
       "author": "Rémi Berson",
       "description": "tldts core primitives (internal module)",
       "licenses": [
@@ -6635,7 +6635,7 @@
       "type": "library",
       "name": "safer-buffer",
       "version": "2.1.2",
-      "bom-ref": "netrewind-desktop@1.0.0|safer-buffer@2.1.2",
+      "bom-ref": "netrewind-desktop@1.1.0|safer-buffer@2.1.2",
       "author": "Nikita Skovoroda",
       "description": "Modern Buffer API polyfill without footguns",
       "licenses": [
@@ -6690,7 +6690,7 @@
       "type": "library",
       "name": "punycode",
       "version": "2.3.1",
-      "bom-ref": "netrewind-desktop@1.0.0|punycode@2.3.1",
+      "bom-ref": "netrewind-desktop@1.1.0|punycode@2.3.1",
       "author": "Mathias Bynens",
       "description": "A robust Punycode converter that fully complies to RFC 3492 and RFC 5891, and works on nearly all JavaScript platforms.",
       "licenses": [
@@ -6750,7 +6750,7 @@
       "name": "resolve-uri",
       "group": "@jridgewell",
       "version": "3.1.2",
-      "bom-ref": "netrewind-desktop@1.0.0|@jridgewell/resolve-uri@3.1.2",
+      "bom-ref": "netrewind-desktop@1.1.0|@jridgewell/resolve-uri@3.1.2",
       "author": "Justin Ridgewell",
       "description": "Resolve a URI relative to an optional base URI",
       "licenses": [
@@ -6810,7 +6810,7 @@
       "name": "estree",
       "group": "@types",
       "version": "1.0.9",
-      "bom-ref": "netrewind-desktop@1.0.0|@types/estree@1.0.9",
+      "bom-ref": "netrewind-desktop@1.1.0|@types/estree@1.0.9",
       "description": "TypeScript definitions for estree",
       "licenses": [
         {
@@ -6865,7 +6865,7 @@
       "name": "color-helpers",
       "group": "@csstools",
       "version": "5.1.0",
-      "bom-ref": "netrewind-desktop@1.0.0|@csstools/color-helpers@5.1.0",
+      "bom-ref": "netrewind-desktop@1.1.0|@csstools/color-helpers@5.1.0",
       "description": "Color helpers to ease transformation between formats, gamut, etc",
       "licenses": [
         {
@@ -6922,630 +6922,630 @@
   ],
   "dependencies": [
     {
-      "ref": "netrewind-desktop@1.0.0",
+      "ref": "netrewind-desktop@1.1.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@axe-core/playwright@4.13.0",
-        "netrewind-desktop@1.0.0|@playwright/test@1.63.0",
-        "netrewind-desktop@1.0.0|@tauri-apps/api@2.11.1",
-        "netrewind-desktop@1.0.0|@tauri-apps/cli@2.11.4",
-        "netrewind-desktop@1.0.0|@tauri-apps/plugin-dialog@2.7.3",
-        "netrewind-desktop@1.0.0|@tauri-apps/plugin-opener@2.5.5",
-        "netrewind-desktop@1.0.0|@testing-library/jest-dom@6.9.1",
-        "netrewind-desktop@1.0.0|@testing-library/react@16.3.3",
-        "netrewind-desktop@1.0.0|@types/node@26.5.1",
-        "netrewind-desktop@1.0.0|@types/react-dom@19.3.0",
-        "netrewind-desktop@1.0.0|@types/react@19.3.0",
-        "netrewind-desktop@1.0.0|@vitejs/plugin-react@6.1.1",
-        "netrewind-desktop@1.0.0|jsdom@26.1.0",
-        "netrewind-desktop@1.0.0|react-dom@19.3.0",
-        "netrewind-desktop@1.0.0|react@19.3.0",
-        "netrewind-desktop@1.0.0|typescript@6.0.3",
-        "netrewind-desktop@1.0.0|vite@8.3.0",
-        "netrewind-desktop@1.0.0|vitest@5.0.0"
+        "netrewind-desktop@1.1.0|@axe-core/playwright@4.13.0",
+        "netrewind-desktop@1.1.0|@playwright/test@1.63.0",
+        "netrewind-desktop@1.1.0|@tauri-apps/api@2.11.1",
+        "netrewind-desktop@1.1.0|@tauri-apps/cli@2.11.4",
+        "netrewind-desktop@1.1.0|@tauri-apps/plugin-dialog@2.7.3",
+        "netrewind-desktop@1.1.0|@tauri-apps/plugin-opener@2.5.5",
+        "netrewind-desktop@1.1.0|@testing-library/jest-dom@6.9.1",
+        "netrewind-desktop@1.1.0|@testing-library/react@16.3.3",
+        "netrewind-desktop@1.1.0|@types/node@26.5.1",
+        "netrewind-desktop@1.1.0|@types/react-dom@19.3.0",
+        "netrewind-desktop@1.1.0|@types/react@19.3.0",
+        "netrewind-desktop@1.1.0|@vitejs/plugin-react@6.1.1",
+        "netrewind-desktop@1.1.0|jsdom@26.1.0",
+        "netrewind-desktop@1.1.0|react-dom@19.3.0",
+        "netrewind-desktop@1.1.0|react@19.3.0",
+        "netrewind-desktop@1.1.0|typescript@6.0.3",
+        "netrewind-desktop@1.1.0|vite@8.3.0",
+        "netrewind-desktop@1.1.0|vitest@5.0.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@axe-core/playwright@4.13.0",
+      "ref": "netrewind-desktop@1.1.0|@axe-core/playwright@4.13.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|axe-core@4.13.0",
-        "netrewind-desktop@1.0.0|playwright-core@1.63.0"
+        "netrewind-desktop@1.1.0|axe-core@4.13.0",
+        "netrewind-desktop@1.1.0|playwright-core@1.63.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@playwright/test@1.63.0",
+      "ref": "netrewind-desktop@1.1.0|@playwright/test@1.63.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|playwright@1.63.0"
+        "netrewind-desktop@1.1.0|playwright@1.63.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@tauri-apps/api@2.11.1"
+      "ref": "netrewind-desktop@1.1.0|@tauri-apps/api@2.11.1"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@tauri-apps/cli@2.11.4",
+      "ref": "netrewind-desktop@1.1.0|@tauri-apps/cli@2.11.4",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@tauri-apps/cli-win32-x64-msvc@2.11.4"
+        "netrewind-desktop@1.1.0|@tauri-apps/cli-win32-x64-msvc@2.11.4"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@tauri-apps/plugin-dialog@2.7.3",
+      "ref": "netrewind-desktop@1.1.0|@tauri-apps/plugin-dialog@2.7.3",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@tauri-apps/api@2.11.1"
+        "netrewind-desktop@1.1.0|@tauri-apps/api@2.11.1"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@tauri-apps/plugin-opener@2.5.5",
+      "ref": "netrewind-desktop@1.1.0|@tauri-apps/plugin-opener@2.5.5",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@tauri-apps/api@2.11.1"
+        "netrewind-desktop@1.1.0|@tauri-apps/api@2.11.1"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@testing-library/jest-dom@6.9.1",
+      "ref": "netrewind-desktop@1.1.0|@testing-library/jest-dom@6.9.1",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@adobe/css-tools@4.5.0",
-        "netrewind-desktop@1.0.0|aria-query@5.3.0",
-        "netrewind-desktop@1.0.0|css.escape@1.5.1",
-        "netrewind-desktop@1.0.0|@testing-library/jest-dom@6.9.1|dom-accessibility-api@0.6.3",
-        "netrewind-desktop@1.0.0|picocolors@1.1.1",
-        "netrewind-desktop@1.0.0|redent@3.0.0"
+        "netrewind-desktop@1.1.0|@adobe/css-tools@4.5.0",
+        "netrewind-desktop@1.1.0|aria-query@5.3.0",
+        "netrewind-desktop@1.1.0|css.escape@1.5.1",
+        "netrewind-desktop@1.1.0|@testing-library/jest-dom@6.9.1|dom-accessibility-api@0.6.3",
+        "netrewind-desktop@1.1.0|picocolors@1.1.1",
+        "netrewind-desktop@1.1.0|redent@3.0.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@testing-library/jest-dom@6.9.1|dom-accessibility-api@0.6.3"
+      "ref": "netrewind-desktop@1.1.0|@testing-library/jest-dom@6.9.1|dom-accessibility-api@0.6.3"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@testing-library/react@16.3.3",
+      "ref": "netrewind-desktop@1.1.0|@testing-library/react@16.3.3",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@babel/runtime@7.29.7",
-        "netrewind-desktop@1.0.0|@testing-library/dom@10.4.2",
-        "netrewind-desktop@1.0.0|@types/react-dom@19.3.0",
-        "netrewind-desktop@1.0.0|@types/react@19.3.0",
-        "netrewind-desktop@1.0.0|react-dom@19.3.0",
-        "netrewind-desktop@1.0.0|react@19.3.0"
+        "netrewind-desktop@1.1.0|@babel/runtime@7.29.7",
+        "netrewind-desktop@1.1.0|@testing-library/dom@10.4.2",
+        "netrewind-desktop@1.1.0|@types/react-dom@19.3.0",
+        "netrewind-desktop@1.1.0|@types/react@19.3.0",
+        "netrewind-desktop@1.1.0|react-dom@19.3.0",
+        "netrewind-desktop@1.1.0|react@19.3.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@types/node@26.5.1",
+      "ref": "netrewind-desktop@1.1.0|@types/node@26.5.1",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|undici-types@8.9.0"
+        "netrewind-desktop@1.1.0|undici-types@8.9.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@types/react-dom@19.3.0",
+      "ref": "netrewind-desktop@1.1.0|@types/react-dom@19.3.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@types/react@19.3.0"
+        "netrewind-desktop@1.1.0|@types/react@19.3.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@types/react@19.3.0",
+      "ref": "netrewind-desktop@1.1.0|@types/react@19.3.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|csstype@3.2.3"
+        "netrewind-desktop@1.1.0|csstype@3.2.3"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@vitejs/plugin-react@6.1.1",
+      "ref": "netrewind-desktop@1.1.0|@vitejs/plugin-react@6.1.1",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@rolldown/pluginutils@1.0.1",
-        "netrewind-desktop@1.0.0|vite@8.3.0"
+        "netrewind-desktop@1.1.0|@rolldown/pluginutils@1.0.1",
+        "netrewind-desktop@1.1.0|vite@8.3.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|jsdom@26.1.0",
+      "ref": "netrewind-desktop@1.1.0|jsdom@26.1.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|cssstyle@4.6.0",
-        "netrewind-desktop@1.0.0|data-urls@5.0.0",
-        "netrewind-desktop@1.0.0|decimal.js@10.6.0",
-        "netrewind-desktop@1.0.0|html-encoding-sniffer@4.0.0",
-        "netrewind-desktop@1.0.0|http-proxy-agent@7.0.2",
-        "netrewind-desktop@1.0.0|https-proxy-agent@7.0.6",
-        "netrewind-desktop@1.0.0|is-potential-custom-element-name@1.0.1",
-        "netrewind-desktop@1.0.0|nwsapi@2.2.27",
-        "netrewind-desktop@1.0.0|parse5@7.3.0",
-        "netrewind-desktop@1.0.0|rrweb-cssom@0.8.0",
-        "netrewind-desktop@1.0.0|saxes@6.0.0",
-        "netrewind-desktop@1.0.0|symbol-tree@3.2.4",
-        "netrewind-desktop@1.0.0|tough-cookie@5.1.2",
-        "netrewind-desktop@1.0.0|w3c-xmlserializer@5.0.0",
-        "netrewind-desktop@1.0.0|webidl-conversions@7.0.0",
-        "netrewind-desktop@1.0.0|whatwg-encoding@3.1.1",
-        "netrewind-desktop@1.0.0|whatwg-mimetype@4.0.0",
-        "netrewind-desktop@1.0.0|whatwg-url@14.2.0",
-        "netrewind-desktop@1.0.0|ws@8.21.3",
-        "netrewind-desktop@1.0.0|xml-name-validator@5.0.0"
+        "netrewind-desktop@1.1.0|cssstyle@4.6.0",
+        "netrewind-desktop@1.1.0|data-urls@5.0.0",
+        "netrewind-desktop@1.1.0|decimal.js@10.6.0",
+        "netrewind-desktop@1.1.0|html-encoding-sniffer@4.0.0",
+        "netrewind-desktop@1.1.0|http-proxy-agent@7.0.2",
+        "netrewind-desktop@1.1.0|https-proxy-agent@7.0.6",
+        "netrewind-desktop@1.1.0|is-potential-custom-element-name@1.0.1",
+        "netrewind-desktop@1.1.0|nwsapi@2.2.27",
+        "netrewind-desktop@1.1.0|parse5@7.3.0",
+        "netrewind-desktop@1.1.0|rrweb-cssom@0.8.0",
+        "netrewind-desktop@1.1.0|saxes@6.0.0",
+        "netrewind-desktop@1.1.0|symbol-tree@3.2.4",
+        "netrewind-desktop@1.1.0|tough-cookie@5.1.2",
+        "netrewind-desktop@1.1.0|w3c-xmlserializer@5.0.0",
+        "netrewind-desktop@1.1.0|webidl-conversions@7.0.0",
+        "netrewind-desktop@1.1.0|whatwg-encoding@3.1.1",
+        "netrewind-desktop@1.1.0|whatwg-mimetype@4.0.0",
+        "netrewind-desktop@1.1.0|whatwg-url@14.2.0",
+        "netrewind-desktop@1.1.0|ws@8.21.3",
+        "netrewind-desktop@1.1.0|xml-name-validator@5.0.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|react-dom@19.3.0",
+      "ref": "netrewind-desktop@1.1.0|react-dom@19.3.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|react@19.3.0",
-        "netrewind-desktop@1.0.0|scheduler@0.28.0"
+        "netrewind-desktop@1.1.0|react@19.3.0",
+        "netrewind-desktop@1.1.0|scheduler@0.28.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|react@19.3.0"
+      "ref": "netrewind-desktop@1.1.0|react@19.3.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|typescript@6.0.3"
+      "ref": "netrewind-desktop@1.1.0|typescript@6.0.3"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|vite@8.3.0",
+      "ref": "netrewind-desktop@1.1.0|vite@8.3.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@types/node@26.5.1",
-        "netrewind-desktop@1.0.0|lightningcss@1.33.0",
-        "netrewind-desktop@1.0.0|picomatch@4.0.7",
-        "netrewind-desktop@1.0.0|postcss@8.5.28",
-        "netrewind-desktop@1.0.0|rolldown@1.2.8",
-        "netrewind-desktop@1.0.0|tinyglobby@0.2.17"
+        "netrewind-desktop@1.1.0|@types/node@26.5.1",
+        "netrewind-desktop@1.1.0|lightningcss@1.33.0",
+        "netrewind-desktop@1.1.0|picomatch@4.0.7",
+        "netrewind-desktop@1.1.0|postcss@8.5.28",
+        "netrewind-desktop@1.1.0|rolldown@1.2.8",
+        "netrewind-desktop@1.1.0|tinyglobby@0.2.17"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|vitest@5.0.0",
+      "ref": "netrewind-desktop@1.1.0|vitest@5.0.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@types/chai@5.2.3",
-        "netrewind-desktop@1.0.0|@types/node@26.5.1",
-        "netrewind-desktop@1.0.0|@vitest/mocker@5.0.0",
-        "netrewind-desktop@1.0.0|chai@6.2.2",
-        "netrewind-desktop@1.0.0|es-module-lexer@2.3.2",
-        "netrewind-desktop@1.0.0|expect-type@1.4.0",
-        "netrewind-desktop@1.0.0|jsdom@26.1.0",
-        "netrewind-desktop@1.0.0|magic-string@1.3.1",
-        "netrewind-desktop@1.0.0|obug@2.2.1",
-        "netrewind-desktop@1.0.0|picomatch@4.0.7",
-        "netrewind-desktop@1.0.0|std-env@4.2.0",
-        "netrewind-desktop@1.0.0|tinybench@6.1.4",
-        "netrewind-desktop@1.0.0|tinyexec@1.3.0",
-        "netrewind-desktop@1.0.0|tinyglobby@0.2.17",
-        "netrewind-desktop@1.0.0|vite@8.3.0",
-        "netrewind-desktop@1.0.0|why-is-node-running@2.3.0"
+        "netrewind-desktop@1.1.0|@types/chai@5.2.3",
+        "netrewind-desktop@1.1.0|@types/node@26.5.1",
+        "netrewind-desktop@1.1.0|@vitest/mocker@5.0.0",
+        "netrewind-desktop@1.1.0|chai@6.2.2",
+        "netrewind-desktop@1.1.0|es-module-lexer@2.3.2",
+        "netrewind-desktop@1.1.0|expect-type@1.4.0",
+        "netrewind-desktop@1.1.0|jsdom@26.1.0",
+        "netrewind-desktop@1.1.0|magic-string@1.3.1",
+        "netrewind-desktop@1.1.0|obug@2.2.1",
+        "netrewind-desktop@1.1.0|picomatch@4.0.7",
+        "netrewind-desktop@1.1.0|std-env@4.2.0",
+        "netrewind-desktop@1.1.0|tinybench@6.1.4",
+        "netrewind-desktop@1.1.0|tinyexec@1.3.0",
+        "netrewind-desktop@1.1.0|tinyglobby@0.2.17",
+        "netrewind-desktop@1.1.0|vite@8.3.0",
+        "netrewind-desktop@1.1.0|why-is-node-running@2.3.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|axe-core@4.13.0"
+      "ref": "netrewind-desktop@1.1.0|axe-core@4.13.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|playwright-core@1.63.0"
+      "ref": "netrewind-desktop@1.1.0|playwright-core@1.63.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|playwright@1.63.0",
+      "ref": "netrewind-desktop@1.1.0|playwright@1.63.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|playwright-core@1.63.0"
+        "netrewind-desktop@1.1.0|playwright-core@1.63.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@tauri-apps/cli-win32-x64-msvc@2.11.4"
+      "ref": "netrewind-desktop@1.1.0|@tauri-apps/cli-win32-x64-msvc@2.11.4"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@adobe/css-tools@4.5.0"
+      "ref": "netrewind-desktop@1.1.0|@adobe/css-tools@4.5.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|aria-query@5.3.0",
+      "ref": "netrewind-desktop@1.1.0|aria-query@5.3.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|dequal@2.0.3"
+        "netrewind-desktop@1.1.0|dequal@2.0.3"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|css.escape@1.5.1"
+      "ref": "netrewind-desktop@1.1.0|css.escape@1.5.1"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|picocolors@1.1.1"
+      "ref": "netrewind-desktop@1.1.0|picocolors@1.1.1"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|redent@3.0.0",
+      "ref": "netrewind-desktop@1.1.0|redent@3.0.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|indent-string@4.0.0",
-        "netrewind-desktop@1.0.0|strip-indent@3.0.0"
+        "netrewind-desktop@1.1.0|indent-string@4.0.0",
+        "netrewind-desktop@1.1.0|strip-indent@3.0.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@babel/runtime@7.29.7"
+      "ref": "netrewind-desktop@1.1.0|@babel/runtime@7.29.7"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@testing-library/dom@10.4.2",
+      "ref": "netrewind-desktop@1.1.0|@testing-library/dom@10.4.2",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@babel/code-frame@7.29.7",
-        "netrewind-desktop@1.0.0|@babel/runtime@7.29.7",
-        "netrewind-desktop@1.0.0|@types/aria-query@5.0.4",
-        "netrewind-desktop@1.0.0|aria-query@5.3.0",
-        "netrewind-desktop@1.0.0|dom-accessibility-api@0.5.16",
-        "netrewind-desktop@1.0.0|lz-string@1.5.0",
-        "netrewind-desktop@1.0.0|picocolors@1.1.1",
-        "netrewind-desktop@1.0.0|pretty-format@27.5.1"
+        "netrewind-desktop@1.1.0|@babel/code-frame@7.29.7",
+        "netrewind-desktop@1.1.0|@babel/runtime@7.29.7",
+        "netrewind-desktop@1.1.0|@types/aria-query@5.0.4",
+        "netrewind-desktop@1.1.0|aria-query@5.3.0",
+        "netrewind-desktop@1.1.0|dom-accessibility-api@0.5.16",
+        "netrewind-desktop@1.1.0|lz-string@1.5.0",
+        "netrewind-desktop@1.1.0|picocolors@1.1.1",
+        "netrewind-desktop@1.1.0|pretty-format@27.5.1"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|undici-types@8.9.0"
+      "ref": "netrewind-desktop@1.1.0|undici-types@8.9.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|csstype@3.2.3"
+      "ref": "netrewind-desktop@1.1.0|csstype@3.2.3"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@rolldown/pluginutils@1.0.1"
+      "ref": "netrewind-desktop@1.1.0|@rolldown/pluginutils@1.0.1"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|cssstyle@4.6.0",
+      "ref": "netrewind-desktop@1.1.0|cssstyle@4.6.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@asamuzakjp/css-color@3.2.0",
-        "netrewind-desktop@1.0.0|rrweb-cssom@0.8.0"
+        "netrewind-desktop@1.1.0|@asamuzakjp/css-color@3.2.0",
+        "netrewind-desktop@1.1.0|rrweb-cssom@0.8.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|data-urls@5.0.0",
+      "ref": "netrewind-desktop@1.1.0|data-urls@5.0.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|whatwg-mimetype@4.0.0",
-        "netrewind-desktop@1.0.0|whatwg-url@14.2.0"
+        "netrewind-desktop@1.1.0|whatwg-mimetype@4.0.0",
+        "netrewind-desktop@1.1.0|whatwg-url@14.2.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|decimal.js@10.6.0"
+      "ref": "netrewind-desktop@1.1.0|decimal.js@10.6.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|html-encoding-sniffer@4.0.0",
+      "ref": "netrewind-desktop@1.1.0|html-encoding-sniffer@4.0.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|whatwg-encoding@3.1.1"
+        "netrewind-desktop@1.1.0|whatwg-encoding@3.1.1"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|http-proxy-agent@7.0.2",
+      "ref": "netrewind-desktop@1.1.0|http-proxy-agent@7.0.2",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|agent-base@7.1.4",
-        "netrewind-desktop@1.0.0|debug@4.4.3"
+        "netrewind-desktop@1.1.0|agent-base@7.1.4",
+        "netrewind-desktop@1.1.0|debug@4.4.3"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|https-proxy-agent@7.0.6",
+      "ref": "netrewind-desktop@1.1.0|https-proxy-agent@7.0.6",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|agent-base@7.1.4",
-        "netrewind-desktop@1.0.0|debug@4.4.3"
+        "netrewind-desktop@1.1.0|agent-base@7.1.4",
+        "netrewind-desktop@1.1.0|debug@4.4.3"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|is-potential-custom-element-name@1.0.1"
+      "ref": "netrewind-desktop@1.1.0|is-potential-custom-element-name@1.0.1"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|nwsapi@2.2.27"
+      "ref": "netrewind-desktop@1.1.0|nwsapi@2.2.27"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|parse5@7.3.0",
+      "ref": "netrewind-desktop@1.1.0|parse5@7.3.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|entities@6.0.1"
+        "netrewind-desktop@1.1.0|entities@6.0.1"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|rrweb-cssom@0.8.0"
+      "ref": "netrewind-desktop@1.1.0|rrweb-cssom@0.8.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|saxes@6.0.0",
+      "ref": "netrewind-desktop@1.1.0|saxes@6.0.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|xmlchars@2.2.0"
+        "netrewind-desktop@1.1.0|xmlchars@2.2.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|symbol-tree@3.2.4"
+      "ref": "netrewind-desktop@1.1.0|symbol-tree@3.2.4"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|tough-cookie@5.1.2",
+      "ref": "netrewind-desktop@1.1.0|tough-cookie@5.1.2",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|tldts@6.1.86"
+        "netrewind-desktop@1.1.0|tldts@6.1.86"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|w3c-xmlserializer@5.0.0",
+      "ref": "netrewind-desktop@1.1.0|w3c-xmlserializer@5.0.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|xml-name-validator@5.0.0"
+        "netrewind-desktop@1.1.0|xml-name-validator@5.0.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|webidl-conversions@7.0.0"
+      "ref": "netrewind-desktop@1.1.0|webidl-conversions@7.0.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|whatwg-encoding@3.1.1",
+      "ref": "netrewind-desktop@1.1.0|whatwg-encoding@3.1.1",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|iconv-lite@0.6.3"
+        "netrewind-desktop@1.1.0|iconv-lite@0.6.3"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|whatwg-mimetype@4.0.0"
+      "ref": "netrewind-desktop@1.1.0|whatwg-mimetype@4.0.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|whatwg-url@14.2.0",
+      "ref": "netrewind-desktop@1.1.0|whatwg-url@14.2.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|tr46@5.1.1",
-        "netrewind-desktop@1.0.0|webidl-conversions@7.0.0"
+        "netrewind-desktop@1.1.0|tr46@5.1.1",
+        "netrewind-desktop@1.1.0|webidl-conversions@7.0.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|ws@8.21.3"
+      "ref": "netrewind-desktop@1.1.0|ws@8.21.3"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|xml-name-validator@5.0.0"
+      "ref": "netrewind-desktop@1.1.0|xml-name-validator@5.0.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|scheduler@0.28.0"
+      "ref": "netrewind-desktop@1.1.0|scheduler@0.28.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|lightningcss@1.33.0",
+      "ref": "netrewind-desktop@1.1.0|lightningcss@1.33.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|detect-libc@2.1.2",
-        "netrewind-desktop@1.0.0|lightningcss-win32-x64-msvc@1.33.0"
+        "netrewind-desktop@1.1.0|detect-libc@2.1.2",
+        "netrewind-desktop@1.1.0|lightningcss-win32-x64-msvc@1.33.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|picomatch@4.0.7"
+      "ref": "netrewind-desktop@1.1.0|picomatch@4.0.7"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|postcss@8.5.28",
+      "ref": "netrewind-desktop@1.1.0|postcss@8.5.28",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|nanoid@3.3.19",
-        "netrewind-desktop@1.0.0|picocolors@1.1.1",
-        "netrewind-desktop@1.0.0|source-map-js@1.2.1"
+        "netrewind-desktop@1.1.0|nanoid@3.3.19",
+        "netrewind-desktop@1.1.0|picocolors@1.1.1",
+        "netrewind-desktop@1.1.0|source-map-js@1.2.1"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|rolldown@1.2.8",
+      "ref": "netrewind-desktop@1.1.0|rolldown@1.2.8",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@oxc-project/types@0.149.0",
-        "netrewind-desktop@1.0.0|@rolldown/binding-win32-x64-msvc@1.2.8",
-        "netrewind-desktop@1.0.0|@rolldown/pluginutils@1.0.1"
+        "netrewind-desktop@1.1.0|@oxc-project/types@0.149.0",
+        "netrewind-desktop@1.1.0|@rolldown/binding-win32-x64-msvc@1.2.8",
+        "netrewind-desktop@1.1.0|@rolldown/pluginutils@1.0.1"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|tinyglobby@0.2.17",
+      "ref": "netrewind-desktop@1.1.0|tinyglobby@0.2.17",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|fdir@6.5.0",
-        "netrewind-desktop@1.0.0|picomatch@4.0.7"
+        "netrewind-desktop@1.1.0|fdir@6.5.0",
+        "netrewind-desktop@1.1.0|picomatch@4.0.7"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@types/chai@5.2.3",
+      "ref": "netrewind-desktop@1.1.0|@types/chai@5.2.3",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@types/deep-eql@4.0.2",
-        "netrewind-desktop@1.0.0|assertion-error@2.0.1"
+        "netrewind-desktop@1.1.0|@types/deep-eql@4.0.2",
+        "netrewind-desktop@1.1.0|assertion-error@2.0.1"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@vitest/mocker@5.0.0",
+      "ref": "netrewind-desktop@1.1.0|@vitest/mocker@5.0.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@jridgewell/trace-mapping@0.3.31",
-        "netrewind-desktop@1.0.0|@vitest/spy@5.0.0",
-        "netrewind-desktop@1.0.0|estree-walker@3.0.3",
-        "netrewind-desktop@1.0.0|magic-string@1.3.1",
-        "netrewind-desktop@1.0.0|vite@8.3.0"
+        "netrewind-desktop@1.1.0|@jridgewell/trace-mapping@0.3.31",
+        "netrewind-desktop@1.1.0|@vitest/spy@5.0.0",
+        "netrewind-desktop@1.1.0|estree-walker@3.0.3",
+        "netrewind-desktop@1.1.0|magic-string@1.3.1",
+        "netrewind-desktop@1.1.0|vite@8.3.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|chai@6.2.2"
+      "ref": "netrewind-desktop@1.1.0|chai@6.2.2"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|es-module-lexer@2.3.2"
+      "ref": "netrewind-desktop@1.1.0|es-module-lexer@2.3.2"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|expect-type@1.4.0"
+      "ref": "netrewind-desktop@1.1.0|expect-type@1.4.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|magic-string@1.3.1",
+      "ref": "netrewind-desktop@1.1.0|magic-string@1.3.1",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@jridgewell/sourcemap-codec@1.6.0"
+        "netrewind-desktop@1.1.0|@jridgewell/sourcemap-codec@1.6.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|obug@2.2.1"
+      "ref": "netrewind-desktop@1.1.0|obug@2.2.1"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|std-env@4.2.0"
+      "ref": "netrewind-desktop@1.1.0|std-env@4.2.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|tinybench@6.1.4"
+      "ref": "netrewind-desktop@1.1.0|tinybench@6.1.4"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|tinyexec@1.3.0"
+      "ref": "netrewind-desktop@1.1.0|tinyexec@1.3.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|why-is-node-running@2.3.0",
+      "ref": "netrewind-desktop@1.1.0|why-is-node-running@2.3.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|siginfo@2.0.0",
-        "netrewind-desktop@1.0.0|stackback@0.0.2"
+        "netrewind-desktop@1.1.0|siginfo@2.0.0",
+        "netrewind-desktop@1.1.0|stackback@0.0.2"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|dequal@2.0.3"
+      "ref": "netrewind-desktop@1.1.0|dequal@2.0.3"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|indent-string@4.0.0"
+      "ref": "netrewind-desktop@1.1.0|indent-string@4.0.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|strip-indent@3.0.0",
+      "ref": "netrewind-desktop@1.1.0|strip-indent@3.0.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|min-indent@1.0.1"
+        "netrewind-desktop@1.1.0|min-indent@1.0.1"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@babel/code-frame@7.29.7",
+      "ref": "netrewind-desktop@1.1.0|@babel/code-frame@7.29.7",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@babel/helper-validator-identifier@7.29.7",
-        "netrewind-desktop@1.0.0|js-tokens@4.0.0",
-        "netrewind-desktop@1.0.0|picocolors@1.1.1"
+        "netrewind-desktop@1.1.0|@babel/helper-validator-identifier@7.29.7",
+        "netrewind-desktop@1.1.0|js-tokens@4.0.0",
+        "netrewind-desktop@1.1.0|picocolors@1.1.1"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@types/aria-query@5.0.4"
+      "ref": "netrewind-desktop@1.1.0|@types/aria-query@5.0.4"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|dom-accessibility-api@0.5.16"
+      "ref": "netrewind-desktop@1.1.0|dom-accessibility-api@0.5.16"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|lz-string@1.5.0"
+      "ref": "netrewind-desktop@1.1.0|lz-string@1.5.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|pretty-format@27.5.1",
+      "ref": "netrewind-desktop@1.1.0|pretty-format@27.5.1",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|ansi-regex@5.0.1",
-        "netrewind-desktop@1.0.0|ansi-styles@5.2.0",
-        "netrewind-desktop@1.0.0|react-is@17.0.2"
+        "netrewind-desktop@1.1.0|ansi-regex@5.0.1",
+        "netrewind-desktop@1.1.0|ansi-styles@5.2.0",
+        "netrewind-desktop@1.1.0|react-is@17.0.2"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@asamuzakjp/css-color@3.2.0",
+      "ref": "netrewind-desktop@1.1.0|@asamuzakjp/css-color@3.2.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@csstools/css-calc@2.1.4",
-        "netrewind-desktop@1.0.0|@csstools/css-color-parser@3.1.0",
-        "netrewind-desktop@1.0.0|@csstools/css-parser-algorithms@3.0.5",
-        "netrewind-desktop@1.0.0|@csstools/css-tokenizer@3.0.4",
-        "netrewind-desktop@1.0.0|lru-cache@10.4.3"
+        "netrewind-desktop@1.1.0|@csstools/css-calc@2.1.4",
+        "netrewind-desktop@1.1.0|@csstools/css-color-parser@3.1.0",
+        "netrewind-desktop@1.1.0|@csstools/css-parser-algorithms@3.0.5",
+        "netrewind-desktop@1.1.0|@csstools/css-tokenizer@3.0.4",
+        "netrewind-desktop@1.1.0|lru-cache@10.4.3"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|agent-base@7.1.4"
+      "ref": "netrewind-desktop@1.1.0|agent-base@7.1.4"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|debug@4.4.3",
+      "ref": "netrewind-desktop@1.1.0|debug@4.4.3",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|ms@2.1.3"
+        "netrewind-desktop@1.1.0|ms@2.1.3"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|entities@6.0.1"
+      "ref": "netrewind-desktop@1.1.0|entities@6.0.1"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|xmlchars@2.2.0"
+      "ref": "netrewind-desktop@1.1.0|xmlchars@2.2.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|tldts@6.1.86",
+      "ref": "netrewind-desktop@1.1.0|tldts@6.1.86",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|tldts-core@6.1.86"
+        "netrewind-desktop@1.1.0|tldts-core@6.1.86"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|iconv-lite@0.6.3",
+      "ref": "netrewind-desktop@1.1.0|iconv-lite@0.6.3",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|safer-buffer@2.1.2"
+        "netrewind-desktop@1.1.0|safer-buffer@2.1.2"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|tr46@5.1.1",
+      "ref": "netrewind-desktop@1.1.0|tr46@5.1.1",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|punycode@2.3.1"
+        "netrewind-desktop@1.1.0|punycode@2.3.1"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|detect-libc@2.1.2"
+      "ref": "netrewind-desktop@1.1.0|detect-libc@2.1.2"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|lightningcss-win32-x64-msvc@1.33.0"
+      "ref": "netrewind-desktop@1.1.0|lightningcss-win32-x64-msvc@1.33.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|nanoid@3.3.19"
+      "ref": "netrewind-desktop@1.1.0|nanoid@3.3.19"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|source-map-js@1.2.1"
+      "ref": "netrewind-desktop@1.1.0|source-map-js@1.2.1"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@oxc-project/types@0.149.0"
+      "ref": "netrewind-desktop@1.1.0|@oxc-project/types@0.149.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@rolldown/binding-win32-x64-msvc@1.2.8"
+      "ref": "netrewind-desktop@1.1.0|@rolldown/binding-win32-x64-msvc@1.2.8"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|fdir@6.5.0",
+      "ref": "netrewind-desktop@1.1.0|fdir@6.5.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|picomatch@4.0.7"
+        "netrewind-desktop@1.1.0|picomatch@4.0.7"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@types/deep-eql@4.0.2"
+      "ref": "netrewind-desktop@1.1.0|@types/deep-eql@4.0.2"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|assertion-error@2.0.1"
+      "ref": "netrewind-desktop@1.1.0|assertion-error@2.0.1"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@jridgewell/trace-mapping@0.3.31",
+      "ref": "netrewind-desktop@1.1.0|@jridgewell/trace-mapping@0.3.31",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@jridgewell/resolve-uri@3.1.2",
-        "netrewind-desktop@1.0.0|@jridgewell/sourcemap-codec@1.6.0"
+        "netrewind-desktop@1.1.0|@jridgewell/resolve-uri@3.1.2",
+        "netrewind-desktop@1.1.0|@jridgewell/sourcemap-codec@1.6.0"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@vitest/spy@5.0.0"
+      "ref": "netrewind-desktop@1.1.0|@vitest/spy@5.0.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|estree-walker@3.0.3",
+      "ref": "netrewind-desktop@1.1.0|estree-walker@3.0.3",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@types/estree@1.0.9"
+        "netrewind-desktop@1.1.0|@types/estree@1.0.9"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@jridgewell/sourcemap-codec@1.6.0"
+      "ref": "netrewind-desktop@1.1.0|@jridgewell/sourcemap-codec@1.6.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|siginfo@2.0.0"
+      "ref": "netrewind-desktop@1.1.0|siginfo@2.0.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|stackback@0.0.2"
+      "ref": "netrewind-desktop@1.1.0|stackback@0.0.2"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|min-indent@1.0.1"
+      "ref": "netrewind-desktop@1.1.0|min-indent@1.0.1"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@babel/helper-validator-identifier@7.29.7"
+      "ref": "netrewind-desktop@1.1.0|@babel/helper-validator-identifier@7.29.7"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|js-tokens@4.0.0"
+      "ref": "netrewind-desktop@1.1.0|js-tokens@4.0.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|ansi-regex@5.0.1"
+      "ref": "netrewind-desktop@1.1.0|ansi-regex@5.0.1"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|ansi-styles@5.2.0"
+      "ref": "netrewind-desktop@1.1.0|ansi-styles@5.2.0"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|react-is@17.0.2"
+      "ref": "netrewind-desktop@1.1.0|react-is@17.0.2"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@csstools/css-calc@2.1.4",
+      "ref": "netrewind-desktop@1.1.0|@csstools/css-calc@2.1.4",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@csstools/css-parser-algorithms@3.0.5",
-        "netrewind-desktop@1.0.0|@csstools/css-tokenizer@3.0.4"
+        "netrewind-desktop@1.1.0|@csstools/css-parser-algorithms@3.0.5",
+        "netrewind-desktop@1.1.0|@csstools/css-tokenizer@3.0.4"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@csstools/css-color-parser@3.1.0",
+      "ref": "netrewind-desktop@1.1.0|@csstools/css-color-parser@3.1.0",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@csstools/color-helpers@5.1.0",
-        "netrewind-desktop@1.0.0|@csstools/css-calc@2.1.4",
-        "netrewind-desktop@1.0.0|@csstools/css-parser-algorithms@3.0.5",
-        "netrewind-desktop@1.0.0|@csstools/css-tokenizer@3.0.4"
+        "netrewind-desktop@1.1.0|@csstools/color-helpers@5.1.0",
+        "netrewind-desktop@1.1.0|@csstools/css-calc@2.1.4",
+        "netrewind-desktop@1.1.0|@csstools/css-parser-algorithms@3.0.5",
+        "netrewind-desktop@1.1.0|@csstools/css-tokenizer@3.0.4"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@csstools/css-parser-algorithms@3.0.5",
+      "ref": "netrewind-desktop@1.1.0|@csstools/css-parser-algorithms@3.0.5",
       "dependsOn": [
-        "netrewind-desktop@1.0.0|@csstools/css-tokenizer@3.0.4"
+        "netrewind-desktop@1.1.0|@csstools/css-tokenizer@3.0.4"
       ]
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@csstools/css-tokenizer@3.0.4"
+      "ref": "netrewind-desktop@1.1.0|@csstools/css-tokenizer@3.0.4"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|lru-cache@10.4.3"
+      "ref": "netrewind-desktop@1.1.0|lru-cache@10.4.3"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|ms@2.1.3"
+      "ref": "netrewind-desktop@1.1.0|ms@2.1.3"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|tldts-core@6.1.86"
+      "ref": "netrewind-desktop@1.1.0|tldts-core@6.1.86"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|safer-buffer@2.1.2"
+      "ref": "netrewind-desktop@1.1.0|safer-buffer@2.1.2"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|punycode@2.3.1"
+      "ref": "netrewind-desktop@1.1.0|punycode@2.3.1"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@jridgewell/resolve-uri@3.1.2"
+      "ref": "netrewind-desktop@1.1.0|@jridgewell/resolve-uri@3.1.2"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@types/estree@1.0.9"
+      "ref": "netrewind-desktop@1.1.0|@types/estree@1.0.9"
     },
     {
-      "ref": "netrewind-desktop@1.0.0|@csstools/color-helpers@5.1.0"
+      "ref": "netrewind-desktop@1.1.0|@csstools/color-helpers@5.1.0"
     }
   ]
 }

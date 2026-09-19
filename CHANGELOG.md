@@ -1,5 +1,129 @@
 # Changelog
 
+## 1.1.0 — 2026-09-19
+
+A modernization pass on the desktop application: the shell no longer scrolls
+itself away, Arabic covers the actual content an investigation reads rather
+than only the surrounding chrome, the client talks to a live recorder
+efficiently instead of re-fetching everything on a timer, and every page the
+1.0.0 PRD named gets the workflow it was missing. No API contract broke; every
+addition is additive.
+
+### The shell stays where you put it
+
+`.app-shell` bounded itself with `min-height: 100vh` and no independent scroll
+regions, so once a page's content grew past the viewport (any incident list or
+timeline longer than a screenful), the whole grid — sidebar included — scrolled
+away as one unit, taking the language toggle and the lower navigation items
+with it. `.app-frame` now sets an actual `block-size: 100dvh; overflow: hidden`
+ceiling; the sidebar and the workspace body each get their own scroll region,
+so the sidebar's footer and language toggle stay reachable regardless of how
+long the current page is. The onboarding wizard had the identical defect at a
+smaller scale (its longest step overflowed the minimum supported window by
+15px) and is fixed the same way. Sidebar navigation is native `<button>`s in a
+labelled `<nav>` now, not `<div role="button">` with hand-rolled key handling.
+Proven across 5 widths (720–1920px) × 2 languages × 2 color schemes, plus the
+WCAG 1.4.10 320px reflow check, with a real browser-driven Playwright suite
+that did not exist before this release.
+
+### Real Arabic, not just Arabic chrome
+
+Every rule's title, advice, and per-clause explanation — the actual sentences
+an investigation reads — were English-only in the engine, with no
+localization mechanism at all; only the UI chrome around them was bilingual.
+Rules now carry an optional `i18n` block (title, advice, and a translation
+per matched clause, keyed by the clause's own name so a translation for a
+clause that doesn't exist is rejected at load time, not silently ignored),
+and all 19 shipped rules are translated. `incident.Link` gained `clause`, so
+a chain link's explanation can be looked up by rule and clause even when it
+fell back to a generic description. The 49-kind event vocabulary and every
+rule's content are generated into the desktop bundle (`internal/event/gen`,
+`internal/correlate/gen`) with a test that fails on drift from the Go source
+of truth, so demo mode, bundle mode, and a live recorder all render the same
+translations. A new formatting service gives times, dates, durations, and
+counts a single, correct Arabic rendering (Latin numerals, proper grouping —
+ten call sites had each grown their own inconsistent formatting before this).
+The full §5 content-contract sweep (terminology corrections, the wizard's
+privacy step, and a blanket-avoid glossary) landed as well. An automated
+scanner (`desktop/tests/visual/latin-text-scan.spec.ts`) now flags any
+untranslated English sentence rendered in the Arabic app that isn't a
+short technical term or acronym — not "any Latin text," which Arabic
+technical writing legitimately mixes in — and found real gaps this release
+closes, not just the ones anticipated in advance.
+
+### The client stops re-fetching everything on a timer
+
+`/v1/events` and `/v1/incidents` gained keyset cursor pagination
+(`cursor`/`next_cursor`/`has_more`, plus `order=asc|desc`), correctly aware
+that a folded repeat updates its existing row rather than appending a new
+one. `/v1/rules` and `/v1/capabilities` support conditional GET (ETag/304),
+and the Tauri bridge gained real per-request cancellation, so a superseded
+poll actually stops instead of merely being ignored when it finishes. The
+desktop client now polls by delta instead of re-fetching a full 24h/5000-event
+window every few seconds. A new `GET /v1/what-happened` endpoint gives the
+GUI the same identity-aware "what happened to this host" reconstruction the
+CLI has always had, expanding a host to every address it's held rather than
+only the one in front of you. The desktop app also gained real URL-based
+routing (`#/page?...`) in place of in-memory page state — every page is now
+a deep link, and browser back/forward works.
+
+### The investigation workflows the PRD named
+
+- Chain links can disclose their raw evidence (matched-count, the events
+  behind a clause) without leaving the incident view.
+- Evidence can be exported scoped to one incident's own window, with
+  adjustable padding, instead of only a fixed recent-time range.
+- Diagnostics gained a one-click, secret-free support-summary copy button.
+- Incidents gained search, severity/family filters, and sort — all
+  reflected in the URL, so a filtered investigation can be bookmarked or
+  shared — plus an optional master/detail layout.
+- Settings gained a sticky save/discard bar and a guard against losing
+  unsaved changes, on both in-app navigation and tab close.
+- Rules gained a match-count date range.
+- Connection failures and capability reasons are now structured
+  `{code, params, technical_detail}` values with a translated message and
+  the raw detail available on demand, replacing twelve hard-coded English
+  strings on the Rust side alone.
+
+### Type is no longer a fallback font
+
+IBM Plex Sans Arabic, Alexandria, Inter, and JetBrains Mono are vendored
+(15 WOFF2 files, SIL OFL 1.1) instead of being named in CSS and left to
+whatever the OS happened to have installed. Two real WCAG contrast failures
+in the design tokens were found and fixed (a warning color at 4.39:1, and
+white-on-accent button fills as low as 2.66:1 in dark mode — a genuinely
+different constraint than the same colors used as text, which is what they
+were originally tuned for). Every scroll region added by this release is
+keyboard-focusable, closing an axe-detected gap that a mouse-only pass would
+never have found.
+
+### Local AI evaluation continues; still nothing ships
+
+The evaluation harness that measures a candidate model's answers gained the
+fixes needed for a real benchmark to mean something: evidence is now cited
+by short closed handles instead of requiring a model to reproduce a
+26-character event ID verbatim (the actual reason both previously-measured
+candidates failed), the confidence ceiling is enforced structurally rather
+than only checked after the fact, address redaction was generalized beyond
+one lab's fixed subnet, and the request shape sent to the local model server
+was corrected twice — once for a structural mismatch, once for a
+documented-but-non-functional field value — each found only by running the
+real, downloaded model against the real, pinned server rather than by
+reading its documentation more carefully. The corpus grew from 33 to 37
+cases. No model ships and no AI feature is enabled in this release; the
+actual benchmark run stays on hardware set aside for it.
+
+### Also
+
+- `desktop/src/demo/demo-incidents.json` is regenerated to carry the new
+  `clause` field, via a new tool (`internal/correlate/replaydemo`) that
+  replays the demo recording's raw events through the real engine rather
+  than its already-folded export — fixing a real gap where a folded event's
+  true occurrence count was silently understated on replay.
+- A genuine, previously-unnoticed non-determinism in the correlation engine
+  is fixed: an incident's `victims` list is now sorted, where it previously
+  depended on Go's randomized map iteration order.
+
 ## 1.0.0 — 2026-09-14
 
 The first release of NetRewind as a product rather than a Linux daemon with a
