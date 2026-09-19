@@ -63,7 +63,13 @@ func (s *brokenStore) PruneIncidents(context.Context, time.Time) (int64, error) 
 func (s *brokenStore) PruneIdentity(context.Context, int64) (int64, error)      { return 0, nil }
 func (s *brokenStore) GetMeta(context.Context, string) (string, error)          { return "", nil }
 func (s *brokenStore) SetMeta(context.Context, string, string) error            { return nil }
-func (s *brokenStore) Close() error                                             { return nil }
+func (s *brokenStore) ResolveAt(context.Context, string, string, int64) (string, bool, error) {
+	return "", false, nil
+}
+func (s *brokenStore) LabelsFor(context.Context, string, int64, int64) ([]string, error) {
+	return nil, nil
+}
+func (s *brokenStore) Close() error { return nil }
 func (s *brokenStore) AppendIncidents(context.Context, ...*incident.Incident) error {
 	return nil
 }
