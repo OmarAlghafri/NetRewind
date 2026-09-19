@@ -1,0 +1,102 @@
+GUI modernization, Phase 3 (backend slice): keyset cursor pagination for
+/v1/events and /v1/incidents (ADR 0005), and GET /v1/what-happened for
+investigation parity with the CLI (ADR 0007). Frontend consumption of
+either is separate, not-yet-started work - this covers the Go side only.
+
+## 1. Cursor pagination
+
+`store.Filter` gains `Cursor *Cursor{TSWall, EventID, After}`;
+`store.IncidentFilter` gains `Cursor *IncidentCursor{OpenedAt, ID}`. Both
+are additive - nil by default, every existing caller of
+`Store.Query`/`QueryIncidents` (the CLI, `internal/bundle`, `internal/web`)
+is unaffected, confirmed by the full existing test suite passing
+unmodified.
+
+The fold hazard, tested directly:
+
+    $ go test ./internal/store/... -run Cursor -v
+    === RUN   TestQueryCursorExcludesAlreadySeenRows
+    --- PASS: TestQueryCursorExcludesAlreadySeenRows (0.03s)
+    === RUN   TestQueryCursorCatchesAFoldedRowsCountChange
+    --- PASS: TestQueryCursorCatchesAFoldedRowsCountChange (0.01s)
+    === RUN   TestQueryIncidentsCursorExcludesAlreadySeenRows
+    --- PASS: TestQueryIncidentsCursorExcludesAlreadySeenRows (0.01s)
+
+`TestQueryCursorCatchesAFoldedRowsCountChange` is the test the execution
+order specifically demanded: append an event, poll (count=1, take a
+cursor), append a repeat of the same fact inside the fold window (folds in
+place - ts_wall unchanged, ts_last and count move), delta-poll with the
+pre-fold cursor and assert the folded row comes back with count=2. A
+companion test confirms a cursor taken *after* the fold correctly sees
+nothing further (the mechanism doesn't re-report the same fold forever).
+Repeated at the HTTP layer (`internal/api/v1/cursor_test.go`,
+`TestEventsCursorCatchesAFoldedRowsCountChange`) through the real handler,
+cursor encoding, and JSON round-trip - not only the Go-internal path.
+
+`/v1/events` and `/v1/incidents` both now return `next_cursor`/`has_more`
+on every response, including the first (`since`-based) call. `order=asc|
+desc` added to events (the store's `Descending` field existed and was used
+by the CLI/web UI; the API never exposed it). `limit` is clamped to
+`store.MaxLimit` (20000) server-side.
+
+## 2. `/v1/what-happened`
+
+`ResolveAt`/`LabelsFor` promoted from `*store.SQLite`-only methods onto
+the `store.Store` interface, so the API layer (which only holds the
+interface) can do the same identity expansion the CLI's
+`what-happened` already does. One test double
+(`cmd/netrewindd/writer_test.go`'s `brokenStore`) needed two stub methods
+added to keep satisfying the interface - never called, confirmed by the
+existing writer tests still passing unmodified.
+
+Verified against a real identity binding, not a mocked resolver:
+
+    TestWhatHappenedExpandsAHostToEveryLabelItAnsweredTo
+    - host-1 held 10.0.0.5 until 1 minute ago, then 10.0.0.9
+    - an event recorded under the OLD address (10.0.0.5), inside the window
+    - an unrelated event on an unrelated host (10.0.0.200)
+    - asked about 10.0.0.9: got the 10.0.0.5 event back (identity expansion
+      actually crossed the address change), did NOT get the unrelated
+      host's event, and observed_labels correctly listed 10.0.0.5.
+
+Also verified: no-host searches the whole window (matching the CLI with no
+--host); system.gap is included regardless of the host filter (a blind
+spot is never silently absent); malformed at/window/negative window
+rejected as bad_param.
+
+    $ go test ./internal/api/... -run WhatHappened -v
+    --- PASS: TestWhatHappenedWithNoHostSearchesTheWholeWindow (0.02s)
+    --- PASS: TestWhatHappenedExpandsAHostToEveryLabelItAnsweredTo (0.02s)
+    --- PASS: TestWhatHappenedAlwaysIncludesSystemEvents (0.01s)
+    --- PASS: TestWhatHappenedRejectsBadParams (0.01s)
+
+## 3. Full regression
+
+    $ gofmt -l cmd internal                     (empty - all formatted)
+    $ go build ./...                             clean
+    $ CGO_ENABLED=0 go test ./...                 all packages ok, including
+                                                   internal/web (untouched,
+                                                   confirmed still passing)
+    $ GOOS=linux/windows/darwin go vet ./...      clean, all three
+    $ govulncheck ./...                           No vulnerabilities found.
+
+Race detector (`go test -race`) could not be run on this machine: `-race`
+needs cgo, and no C compiler is installed here (this project's own
+docs/testing.md already scopes the race suite to Linux, matching CI). The
+second physical test machine's WSL2 Ubuntu has neither Go nor gcc
+installed yet either (checked directly) - setting up a full toolchain
+there just for this one run was judged lower value than the existing
+non-race coverage of this exact request-handling code path (no goroutines
+or shared mutable state were added; the changes are additional SQL
+predicates and pure functions), so it is deferred to Phase 7's real
+Linux-toolchain setup rather than done as a one-off now.
+
+## 4. Not yet done (this is a backend-only slice)
+
+- `/v1/rules`/`/v1/capabilities` content-hash (ADR 0005's remaining
+  Decision item).
+- Frontend: `useRecord.ts` cursor/delta consumption, `AbortController`,
+  backoff, and the Investigation page that calls `/v1/what-happened`.
+- The actual CLI-vs-API E2E parity check (running `netrewind
+  what-happened` and diffing against this endpoint) - meaningful once the
+  Investigation page exists to be the thing under test.
