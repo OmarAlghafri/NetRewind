@@ -7,3 +7,20 @@ Version 3.0. See the LICENSE file for the full license text.
 The correlation core is named "Isnad" after the classical Arabic method of
 establishing a chain of transmission in which every link is named and every
 link is verifiable.
+
+## Fonts (desktop/src/assets/fonts/)
+
+Vendored, self-hosted, no runtime fetch. Each is licensed under the SIL
+Open Font License, Version 1.1 (full text in the corresponding OFL.txt);
+none has been modified from upstream. See
+desktop/src/assets/fonts/README.md for exact files, versions and SHA-256
+checksums.
+
+- IBM Plex Sans Arabic - Copyright 2017 IBM Corp. with Reserved Font Name
+  "Plex" (desktop/src/assets/fonts/ibm-plex-sans-arabic/OFL.txt)
+- Alexandria - Copyright 2022 The Alexandria Project Authors
+  (desktop/src/assets/fonts/alexandria/OFL.txt)
+- Inter - Copyright 2020 The Inter Project Authors
+  (desktop/src/assets/fonts/inter/OFL.txt)
+- JetBrains Mono - Copyright 2020 The JetBrains Mono Project Authors
+  (desktop/src/assets/fonts/jetbrains-mono/OFL.txt)
