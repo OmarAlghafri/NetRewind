@@ -6,6 +6,28 @@ mod agent;
 mod bundle;
 
 use serde::Serialize;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use tauri::State;
+use tokio::sync::Notify;
+
+/// A request `agent_cancel` was asked to stop returns this exact string as
+/// its error - a sentinel the frontend checks for specifically, so an
+/// intentional cancellation (the investigation moved on before the poll
+/// finished) never shows the user a scary "the recorder is unreachable"
+/// message the way a real transport failure should.
+const CANCELLED: &str = "__cancelled__";
+
+/// One `Notify` per in-flight request that was given a `request_id`,
+/// keyed by that id so `agent_cancel` can find and wake the specific
+/// request being superseded - not every in-flight request at once, which
+/// would cancel a poll for a different page's data along with the stale
+/// one. Cleaned up (removed) the moment its request finishes, cancelled or
+/// not, so a long session does not accumulate finished entries.
+#[derive(Default)]
+struct AgentState {
+    inflight: Mutex<HashMap<String, Arc<Notify>>>,
+}
 
 /// Command-line options the viewer was started with, applied by the
 /// frontend on top of its saved settings for this run only (nothing here
@@ -56,6 +78,10 @@ struct AgentResponse {
     status: u16,
     /// The response body as text (the API is JSON).
     body: String,
+    /// Lower-cased header names ("etag", not "ETag") - what
+    /// /v1/rules and /v1/capabilities' conditional-GET support (ADR 0005)
+    /// needs read back on the frontend.
+    headers: HashMap<String, String>,
 }
 
 /// The endpoint the recorder listens on by default on this platform.
@@ -64,16 +90,85 @@ fn agent_default_endpoint() -> String {
     agent::default_endpoint()
 }
 
+/// Races `future` against `notify` (when given) being triggered, favouring
+/// whichever finishes first the way `tokio::select!` always does. `None`
+/// runs `future` to completion with no cancellation path at all - the
+/// no-`request_id` case, kept as a real code path rather than always
+/// registering a `Notify` nothing will ever fire.
+///
+/// A free function taking `Option<&Notify>` instead of `agent_get`'s own
+/// `Option<Arc<Notify>>`/`State` so it can be unit tested directly against
+/// a fake slow future, without spinning up a Tauri app just to exercise
+/// the one part of this command that has real logic worth getting wrong.
+async fn race_cancellable<F, T>(future: F, notify: Option<&Notify>) -> Result<T, String>
+where
+    F: std::future::Future<Output = Result<T, String>>,
+{
+    match notify {
+        Some(n) => {
+            tokio::select! {
+                r = future => r,
+                _ = n.notified() => Err(CANCELLED.to_string()),
+            }
+        }
+        None => future.await,
+    }
+}
+
 /// GET `path` (for example `/v1/events?limit=200`) from the recorder at
-/// `endpoint` (empty means the platform default).
+/// `endpoint` (empty means the platform default). `headers` lets the
+/// frontend send `If-None-Match` for a conditional GET.
+///
+/// `request_id`, when given, registers this call so a later `agent_cancel`
+/// with the same id can interrupt it - real cancellation of the
+/// in-flight named-pipe/socket read, not merely the frontend choosing to
+/// ignore whatever answer eventually arrives (which `useRecord.ts`'s
+/// `generation` counter already handled; this is the piece that also
+/// stops the wasted work itself, addressing the wasted work a superseded
+/// poll leaves running otherwise).
 #[tauri::command]
-async fn agent_get(endpoint: String, path: String) -> Result<AgentResponse, String> {
+async fn agent_get(
+    endpoint: String,
+    path: String,
+    headers: Option<HashMap<String, String>>,
+    request_id: Option<String>,
+    state: State<'_, AgentState>,
+) -> Result<AgentResponse, String> {
     if !path.starts_with("/v1/") {
         return Err("only /v1/ paths are served".to_string());
     }
     let endpoint = if endpoint.trim().is_empty() { agent::default_endpoint() } else { endpoint };
-    let resp = agent::get(&endpoint, &path).await?;
-    Ok(AgentResponse { status: resp.status, body: String::from_utf8_lossy(&resp.body).into_owned() })
+    let extra_headers: Vec<(String, String)> = headers.unwrap_or_default().into_iter().collect();
+
+    let notify = request_id.as_ref().map(|id| {
+        let n = Arc::new(Notify::new());
+        state.inflight.lock().unwrap().insert(id.clone(), n.clone());
+        n
+    });
+
+    let result = race_cancellable(agent::get(&endpoint, &path, &extra_headers), notify.as_deref()).await;
+
+    if let Some(id) = &request_id {
+        state.inflight.lock().unwrap().remove(id);
+    }
+
+    let resp = result?;
+    Ok(AgentResponse {
+        status: resp.status,
+        body: String::from_utf8_lossy(&resp.body).into_owned(),
+        headers: resp.headers.into_iter().collect(),
+    })
+}
+
+/// Interrupts the in-flight `agent_get` call registered under
+/// `request_id`, if it is still running. A no-op (not an error) if the
+/// request already finished - cancellation racing completion is normal,
+/// not a bug to report.
+#[tauri::command]
+fn agent_cancel(request_id: String, state: State<'_, AgentState>) {
+    if let Some(n) = state.inflight.lock().unwrap().get(&request_id) {
+        n.notify_one();
+    }
 }
 
 #[derive(Serialize)]
@@ -88,7 +183,7 @@ struct ExportResult {
 async fn agent_export_bundle(endpoint: String, query: String, dest: String) -> Result<ExportResult, String> {
     let endpoint = if endpoint.trim().is_empty() { agent::default_endpoint() } else { endpoint };
     let path = if query.is_empty() { "/v1/bundle".to_string() } else { format!("/v1/bundle?{query}") };
-    let resp = agent::get(&endpoint, &path).await?;
+    let resp = agent::get(&endpoint, &path, &[]).await?;
     if resp.status != 200 {
         return Err(format!(
             "the recorder refused the export ({}): {}",
@@ -116,10 +211,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(AgentState::default())
         .invoke_handler(tauri::generate_handler![
             launch_options,
             agent_default_endpoint,
             agent_get,
+            agent_cancel,
             agent_export_bundle,
             bundle_open
         ])
@@ -129,7 +226,8 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_launch_options;
+    use super::{parse_launch_options, race_cancellable, CANCELLED};
+    use tokio::sync::Notify;
 
     #[test]
     fn parses_the_documented_options_and_ignores_the_rest() {
@@ -150,5 +248,30 @@ mod tests {
         let o = parse_launch_options(["--bundle", "C:/x/b.tar.gz"].into_iter().map(String::from));
         assert_eq!(o.source.as_deref(), Some("bundle"));
         assert_eq!(o.bundle.as_deref(), Some("C:/x/b.tar.gz"));
+    }
+
+    #[tokio::test]
+    async fn race_cancellable_returns_the_futures_own_result_when_never_cancelled() {
+        let notify = Notify::new();
+        // Never notified - the future must be allowed to run to completion,
+        // Some(&notify) or not.
+        let got = race_cancellable(async { Ok::<_, String>(42) }, Some(&notify)).await;
+        assert_eq!(got, Ok(42));
+
+        let got_no_notify = race_cancellable(async { Ok::<_, String>(7) }, None).await;
+        assert_eq!(got_no_notify, Ok(7));
+    }
+
+    #[tokio::test]
+    async fn race_cancellable_returns_the_cancelled_sentinel_when_notified_first() {
+        let notify = Notify::new();
+        notify.notify_one();
+        // std::future::pending() never resolves on its own - if this test
+        // returns anything at all, it can only be because the
+        // cancellation path actually won the race, not because the
+        // "real" work happened to finish first (which is impossible here
+        // by construction, ruling out a false pass).
+        let got = race_cancellable(std::future::pending::<Result<(), String>>(), Some(&notify)).await;
+        assert_eq!(got, Err(CANCELLED.to_string()));
     }
 }

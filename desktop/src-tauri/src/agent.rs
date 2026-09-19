@@ -32,19 +32,26 @@ pub fn default_endpoint() -> String {
 pub struct Response {
     pub status: u16,
     pub body: Vec<u8>,
+    /// Header names are lower-cased (HTTP header names are case-insensitive;
+    /// a caller looking for "etag" should not have to also check "ETag").
+    /// Only ever populated from what the recorder itself sent, never
+    /// invented here.
+    pub headers: Vec<(String, String)>,
 }
 
 /// Performs `GET path` (path includes any query string) against the API at
-/// `endpoint`. A transport failure (no such pipe or socket, access denied)
-/// is an `Err`; an HTTP error status is an `Ok` with that status, since the
-/// body then carries the API's own error shape.
-pub async fn get(endpoint: &str, path: &str) -> Result<Response, String> {
-    tokio::time::timeout(REQUEST_TIMEOUT, get_inner(endpoint, path))
+/// `endpoint`, with `extra_headers` added to the request (empty is fine -
+/// this is how a client sends `If-None-Match` for a conditional GET). A
+/// transport failure (no such pipe or socket, access denied) is an `Err`;
+/// an HTTP error status is an `Ok` with that status, since the body then
+/// carries the API's own error shape.
+pub async fn get(endpoint: &str, path: &str, extra_headers: &[(String, String)]) -> Result<Response, String> {
+    tokio::time::timeout(REQUEST_TIMEOUT, get_inner(endpoint, path, extra_headers))
         .await
         .map_err(|_| format!("the recorder at {endpoint} did not answer within {}s", REQUEST_TIMEOUT.as_secs()))?
 }
 
-async fn get_inner(endpoint: &str, path: &str) -> Result<Response, String> {
+async fn get_inner(endpoint: &str, path: &str, extra_headers: &[(String, String)]) -> Result<Response, String> {
     let stream = connect(endpoint).await?;
     let (mut sender, conn) = hyper::client::conn::http1::handshake(TokioIo::new(stream))
         .await
@@ -54,11 +61,15 @@ async fn get_inner(endpoint: &str, path: &str) -> Result<Response, String> {
         // outcome is reflected in the response future below.
         let _ = conn.await;
     });
-    let req = Request::builder()
+    let mut builder = Request::builder()
         .method("GET")
         .uri(path)
         .header("Host", "netrewind")
-        .header("Accept", "application/json, application/gzip")
+        .header("Accept", "application/json, application/gzip");
+    for (name, value) in extra_headers {
+        builder = builder.header(name.as_str(), value.as_str());
+    }
+    let req = builder
         .body(Empty::<Bytes>::new())
         .map_err(|e| format!("could not build the request: {e}"))?;
     let resp = sender
@@ -66,6 +77,11 @@ async fn get_inner(endpoint: &str, path: &str) -> Result<Response, String> {
         .await
         .map_err(|e| format!("request to the recorder failed: {e}"))?;
     let status = resp.status().as_u16();
+    let headers = resp
+        .headers()
+        .iter()
+        .filter_map(|(name, value)| value.to_str().ok().map(|v| (name.as_str().to_ascii_lowercase(), v.to_string())))
+        .collect();
     let body = resp
         .into_body()
         .collect()
@@ -73,7 +89,7 @@ async fn get_inner(endpoint: &str, path: &str) -> Result<Response, String> {
         .map_err(|e| format!("reading the recorder's answer failed: {e}"))?
         .to_bytes()
         .to_vec();
-    Ok(Response { status, body })
+    Ok(Response { status, body, headers })
 }
 
 #[cfg(windows)]
