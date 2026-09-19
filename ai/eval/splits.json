@@ -11,9 +11,11 @@
     "default_route_lost-positive-en",
     "default_route_lost-positive-en-deidentified",
     "link_flap-negative-en",
+    "malicious_dns_name-adversarial-injected-en",
     "path_broke-0-positive-en",
     "path_broke-1-positive-en",
     "path_broke-0-positive-en-deidentified",
+    "path_broke-1-positive-en-deidentified",
     "route_change-negative-en"
   ],
   "train": [
@@ -26,7 +28,9 @@
     "duplicate_ip-0-positive-en",
     "duplicate_ip-1-positive-en",
     "duplicate_ip-0-positive-en-deidentified",
-    "malicious_dns_name-adversarial-en",
+    "duplicate_ip-1-positive-en-deidentified",
+    "malicious_dns_name-positive-en",
+    "malicious_dns_name-positive-en-deidentified",
     "measured_loss-positive-en",
     "measured_loss-positive-en-deidentified",
     "policy_broke_a_path-positive-en",

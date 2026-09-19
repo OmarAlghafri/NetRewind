@@ -161,7 +161,7 @@ func main() {
 		var c schema.Case
 		readJSON(filepath.Join(root, "ai", "eval", "cases", id+".json"), &c)
 
-		events := loadScenarioEvents(root, c.Scenario)
+		events := loadScenarioEvents(root, c.Scenario, c.EventsOverride)
 		hm := harness.BuildHandles(events)
 		redacted := make([]map[string]any, len(events))
 		for i, e := range events {
@@ -439,9 +439,21 @@ func extractModelOutput(raw string) (harness.ModelOutput, error) {
 	return out, nil
 }
 
-func loadScenarioEvents(root, scenario string) []map[string]any {
+// loadScenarioEvents loads from corpus/v1/<scenario>/ by default, or from
+// eventsOverride (a repo-root-relative path) when the case sets one -
+// currently only the synthetic held-out adversarial case; see
+// schema.Case.EventsOverride and ai/eval/synthetic/README.md.
+func loadScenarioEvents(root, scenario, eventsOverride string) []map[string]any {
+	path := filepath.Join(root, "corpus", "v1", scenario, "events.json")
+	if eventsOverride != "" {
+		// eventsOverride is stored with forward slashes in the case JSON
+		// (portable across the Windows/Linux machines this benchmark
+		// actually runs on) - filepath.FromSlash converts to this OS's
+		// separator before joining.
+		path = filepath.Join(root, filepath.FromSlash(eventsOverride))
+	}
 	var events []map[string]any
-	readJSON(filepath.Join(root, "corpus", "v1", scenario, "events.json"), &events)
+	readJSON(path, &events)
 	return events
 }
 

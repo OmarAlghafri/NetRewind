@@ -2,8 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/OmarAlghafri/netrewind/ai/eval/schema"
 )
 
 // TestExtractModelOutputIgnoresNestedBraces is a regression test for a real
@@ -108,6 +112,64 @@ func TestRequestDisablesThePromptCache(t *testing.T) {
 	}
 	if !strings.Contains(string(body), `"cache_prompt":false`) {
 		t.Errorf("request body = %s, want cache_prompt:false present", body)
+	}
+}
+
+// TestLoadScenarioEventsRespectsEventsOverride is a real, on-disk check
+// against the actual checked-in files (not synthetic strings): with no
+// override, arp_change loads its own real corpus/v1 events, carrying real
+// event IDs from that scenario. With an override set (exactly the value
+// gen/main.go writes for the synthetic adversarial case), it loads from
+// ai/eval/synthetic/ instead, carrying that file's own distinct event IDs
+// - proving the two paths do not silently collapse to the same data.
+func TestLoadScenarioEventsRespectsEventsOverride(t *testing.T) {
+	root := repoRoot()
+
+	real := loadScenarioEvents(root, "arp_change", "")
+	if len(real) == 0 {
+		t.Fatal("expected real arp_change events, got none")
+	}
+
+	override := loadScenarioEvents(root, "malicious_dns_name", "ai/eval/synthetic/malicious_dns_name_injected/events.json")
+	if len(override) != 3 {
+		t.Fatalf("expected 3 events from the synthetic override file, got %d", len(override))
+	}
+	found := false
+	for _, e := range override {
+		attrs, ok := e["attrs"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if name, ok := attrs["name"].(string); ok && strings.Contains(name, "ignore-all-previous-instructions") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("loaded override events do not contain the expected synthetic injected payload")
+	}
+}
+
+// TestLoadScenarioEventsOverridePathIsPortable proves the exact literal
+// value gen/main.go writes to a checked-in case file resolves on this OS -
+// a real bug this test would have caught directly: an earlier version
+// built this path with filepath.Join on Windows, baking in backslashes
+// that do not resolve as directory separators on Linux, where the actual
+// benchmark run happens.
+func TestLoadScenarioEventsOverridePathIsPortable(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(repoRoot(), "ai", "eval", "cases", "malicious_dns_name-adversarial-injected-en.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var c schema.Case
+	if err := json.Unmarshal(data, &c); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(c.EventsOverride, `\`) {
+		t.Fatalf("events_override = %q contains a backslash - not portable to a Linux benchmark run", c.EventsOverride)
+	}
+	events := loadScenarioEvents(repoRoot(), c.Scenario, c.EventsOverride)
+	if len(events) == 0 {
+		t.Fatal("the case's own events_override value did not resolve to any events")
 	}
 }
 

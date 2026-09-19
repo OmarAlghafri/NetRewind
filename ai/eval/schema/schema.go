@@ -15,6 +15,15 @@ type Case struct {
 	EventIDs   []string `json:"input_event_ids"`
 	Expected   Expected `json:"expected"`
 	Note       string   `json:"note,omitempty"`
+	// EventsOverride, when set, is a repo-root-relative path to an events
+	// JSON file to load INSTEAD of corpus/v1/<Scenario>/events.json - used
+	// only by a synthetic adversarial case that needs one field of a real
+	// event modified to test something the real, unmodified lab run never
+	// actually captured (ai/eval/synthetic/, never corpus/v1/, which stays
+	// "every number here is real" per its own README). Scenario is kept
+	// even then, naming which real scenario the synthetic variant is based
+	// on, for lineage - it is documentation in that case, not a load path.
+	EventsOverride string `json:"events_override,omitempty"`
 }
 
 // Expected is what a passing answer must satisfy.
