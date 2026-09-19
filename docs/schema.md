@@ -241,6 +241,12 @@ declared but not yet produced, and are marked *reserved*: a schema that
 promises what the code does not do is the failure this project is built
 against, so the gap is written down rather than glossed over.
 
+The desktop GUI shows a human name for each kind, in English and Arabic,
+next to this same technical code - generated from `kinds.go` into
+`desktop/src/i18n/generated/kinds.json` (`go run ./internal/event/gen`)
+and kept in step with it by `internal/event/kind_catalogue_test.go`, the
+same guard that keeps this table honest applied to the GUI's own copy.
+
 | Kind | Source | What it means |
 |---|---|---|
 | `link.up` | netlink | An interface started carrying |

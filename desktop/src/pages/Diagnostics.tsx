@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { useLanguage } from "../i18n/LanguageContext";
 import type { NetRewindEvent, Incident } from "../types";
 import { SeverityBadge } from "../components/SeverityBadge";
+import { TechnicalValue } from "../components/TechnicalValue";
+import { labelForFamily } from "../i18n/kindCatalogue";
 import type { SourceSettings } from "../data/source";
 import type { Record } from "../data/useRecord";
 
@@ -101,14 +103,20 @@ export function Diagnostics({
         {byFamily.length === 0 ? (
           <div className="empty-state">{t("diagnostics_empty")}</div>
         ) : (
-          byFamily.map(([family, count]) => (
-            <div className="capability-row" key={family}>
-              <span className="ltr-field">{family}</span>
-              <span>
-                <span className="ltr-field">{count}</span> {t("diagnostics_event_count_label")}
-              </span>
-            </div>
-          ))
+          byFamily.map(([family, count]) => {
+            const { name, known } = labelForFamily(family, lang);
+            return (
+              <div className="capability-row" key={family}>
+                <span>
+                  {known && <>{name} </>}
+                  <TechnicalValue>{family}</TechnicalValue>
+                </span>
+                <span>
+                  <span className="ltr-field">{count}</span> {t("diagnostics_event_count_label")}
+                </span>
+              </div>
+            );
+          })
         )}
       </div>
 

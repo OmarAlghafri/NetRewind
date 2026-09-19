@@ -1,0 +1,157 @@
+GUI modernization, Phase 4 (second slice): the 49-kind event catalogue
+(ADR 0004) - generated source of truth, hand-written bilingual labels, a
+completeness test on each side of the generation boundary, and real
+frontend consumption in IncidentCard.tsx and Diagnostics.tsx (the two
+call sites that rendered a bare kind or family code with no human name).
+
+## 1. Why a generator, not a hand-maintained list
+
+internal/event/kinds.go declares exactly 49 `Kind` constants across 10
+families (confirmed by reading the file in full, not assumed from an
+earlier count): link=5, l2=7, l3=8, flow=6, dhcp=5, dns=3, policy=2,
+metric=1, change=3, system=9. ADR 0004 requires "a new Go kind cannot
+silently ship without a matching GUI entry" - a hand-maintained TS list
+would drift the same way docs/schema.md's table once did (the reserved
+comment in internal/event/coverage_test.go: "Twenty-five kinds were once
+declared and produced by nothing at all"). This project already has the
+fix for that failure mode - internal/event/coverage_test.go's
+`declaredKinds`/`repoRoot`, which parse kinds.go's AST rather than
+trusting a second list - so the catalogue reuses the same technique
+instead of inventing a different one.
+
+## 2. What was built
+
+- `internal/event/gen/main.go` (new): a standalone generator, run with
+  `go run ./internal/event/gen`, matching the existing `ai/eval/gen`
+  convention (manually run, documented, not wired into the Makefile).
+  Parses kinds.go's AST for every `Kind`-typed string constant and the
+  `Families` var's literal, writes sorted JSON to
+  `desktop/src/i18n/generated/kinds.json`.
+- `internal/event/kind_catalogue_test.go` (new):
+  `TestTheGeneratedKindCatalogueIsUpToDate` re-parses kinds.go directly
+  (reusing `declaredKinds`/`repoRoot` from coverage_test.go, adding
+  `declaredFamilies` alongside them) and fails if the checked-in
+  kinds.json does not match byte-for-byte in content - the same
+  "re-derive from source, do not trust the second copy" shape as
+  `TestTheSchemaDocumentListsEveryKind`.
+- `desktop/src/i18n/kindCatalogue.ts` (new): hand-written `{en, ar}`
+  labels for all 49 kinds and all 10 families, plus `labelForKind`/
+  `labelForFamily` returning `{name, known}` - `known: false` is the
+  ADR's "unknown or newer localization key falls back to the original,
+  never a crash, never blank text" path for a kind this build predates.
+- `desktop/src/i18n/kindCatalogue.test.ts` (new): checks kindCatalogue's
+  key set against the generated JSON (missing/extra both fail), checks
+  every label is non-empty in both languages and is not just the raw
+  code again, and checks `labelForKind`/`labelForFamily`'s known/unknown
+  behaviour directly.
+- `desktop/src/components/IncidentCard.tsx`: the two call sites that
+  rendered a bare `Kind` string (`link.kind` in the chain, and
+  `incident.root_cause.kind`) now render the human name (bold) followed
+  by the technical code in `TechnicalValue` - the component Phase 2
+  built for exactly this "technical value stays visible, isolated LTR"
+  purpose. A `KindName` helper covers both call sites so the "don't
+  print the fallback code twice" logic exists once.
+- `desktop/src/pages/Diagnostics.tsx`: the "events by family" breakdown
+  (`byFamily.map`) had the same gap - raw `link`/`l2`/`l3`/... codes with
+  no name in either language. Same treatment via `labelForFamily`.
+
+## 3. Proving the generator and both completeness tests actually catch drift
+
+Not just "it compiled and passed once" - each guard was deliberately
+broken and confirmed to fail, then restored:
+
+    $ go run ./internal/event/gen
+    wrote 49 kinds and 10 families to .../desktop/src/i18n/generated/kinds.json
+
+    $ <removed the last kind and last family from the generated JSON by script>
+    $ go test ./internal/event/... -run TestTheGeneratedKindCatalogueIsUpToDate -v
+    --- FAIL: TestTheGeneratedKindCatalogueIsUpToDate
+        kind_catalogue_test.go:57: .../kinds.json's kinds are stale against
+        kinds.go - run `go run ./internal/event/gen`
+        kind_catalogue_test.go:61: .../kinds.json's families are stale ...
+
+    $ go run ./internal/event/gen   # restored
+    $ go test ./internal/event/... -run TestTheGeneratedKindCatalogueIsUpToDate -v
+    --- PASS: TestTheGeneratedKindCatalogueIsUpToDate
+
+    $ <deleted the system.update_failed entry from kindCatalogue.ts>
+    $ npx vitest run src/i18n/kindCatalogue.test.ts
+    FAIL  ... gives every generated kind a non-empty label in both languages
+    AssertionError: system.update_failed has no entry: expected undefined to be defined
+    2 failed | 5 passed (7)
+
+    $ <restored kindCatalogue.ts, confirmed via grep -c the entry is back exactly once>
+    $ npx vitest run src/i18n/kindCatalogue.test.ts
+    Test Files  1 passed (1)
+         Tests  7 passed (7)
+
+## 4. Arabic content - reused established vocabulary, did not invent a second one
+
+Before writing any label, grepped rules/*.yaml's already-reviewed `i18n.ar`
+blocks (Phase 4's first slice) for the same concepts, so the same fact
+reads the same way in a rule's `why` and in a raw event kind:
+المسار (route), العنوان (address), عنوان العتاد (MAC), البوابة (gateway),
+الواجهة (interface), المُحلِّل (DNS resolver), توقف ... عن الإجابة
+("stopped answering" - the established idiom, used instead of a literal
+calque of "unreachable" for `l3.icmp_unreachable`).
+
+Cross-checked the execution order's own glossary table before writing
+"collector": it names «جامعة/جامعات» as the wrong word already live at
+`wizard_permissions_collectors` and prescribes «وحدة جمع البيانات» - used
+that, not the wrong word, for `system.collector_down`. Checked
+`translations.ts` before reusing "حزمة" (already claimed for "evidence
+bundle" throughout the app, `evidence_title` etc.) - used the distinct
+established networking term «رزمة» for a packet in `policy.drop_burst`
+instead of overloading a word this app already uses for something else.
+
+## 5. Full regression
+
+    $ gofmt -l cmd internal                       (empty)
+    $ go vet ./...                                 clean
+    $ go build ./...                               clean
+    $ CGO_ENABLED=0 go test ./...                  all packages ok
+    $ npx tsc --noEmit                             clean
+    $ npm test                                     6 files, 33 tests passed
+    $ npm run build                                clean, 55 modules
+    $ npx playwright test                          32 passed (0 failed)
+
+## 6. Actually looked at it - not just the test suite
+
+Launched the Vite dev server, opened the demo recording in the browser,
+and read every incident the demo produces in both languages via the
+rendered DOM text (`get_page_text`), not a screenshot alone. Every kind
+that appears in this real dataset - `link.down`, `link.up`,
+`l2.neighbor_failed`, `l2.arp_binding_changed`, `l2.duplicate_ip`,
+`dhcp.server_seen`, `dns.resolver_changed`, `flow.first_failure_for_pair`,
+`flow.handshake_fail`, `l3.route_removed`, `l3.default_route_changed`,
+`metric.anomaly` - rendered its Arabic human name correctly next to the
+unchanged technical code, read naturally, no leftover English word order.
+The Diagnostics "events by family" card showed all 9 families present in
+this recording (`change` produced nothing, consistent with it being
+listed as a reserved/not-yet-produced family) each with a correct Arabic
+name beside the code.
+
+Also caught something that was not a real bug: a long-lived browser tab
+left open across this whole multi-hour session threw
+`ReferenceError: backoffMs is not defined` and a "Rendered more hooks
+than during the previous render" error on reload - `backoffMs` does not
+exist anywhere in current source (`grep -rn backoffMs src/` - no
+matches), and it was a variable name from before Phase 3's useRecord.ts
+rewrite. Restarting the dev server process did not clear it; closing the
+tab and opening a fresh one against the same server did, confirming it
+was that tab's own stale module state, not a regression - recorded here
+rather than silently ignored, per this execution order's rule against
+dismissing an observed error without checking it against the actual
+source first.
+
+## 7. What this slice does not touch (still open in ADR 0004)
+
+Rust/Go structured error codes for capability `reason` and shell
+connection failures; `desktop/src/i18n/generated/rules.json` (so demo/
+bundle mode get the rule-level Arabic already built in the first Phase 4
+slice); `Rules.tsx` and the rest of `IncidentCard.tsx`
+(`incident.title`/`link.why`/`incident.advice`) still render the raw
+English rule text directly - visible in this same session's screenshots,
+where the kind labels are Arabic but the incident title and advice
+sentences are still English; the automated "no untagged Latin sentence"
+scanner. All tracked in ADR 0004, not folded into "done" by this slice.

@@ -3,10 +3,14 @@
 **Status:** Rule i18n contract accepted and implemented, all 19 shipped
 rules translated (`internal/correlate/rule.go`, `internal/incident/incident.go`,
 `internal/correlate/engine.go`, `internal/api/v1/server.go`, `rules/*.yaml`).
-Event-kind catalogue, Rust/Go error codes, the generated
-`desktop/src/i18n/generated/rules.json` build step, and the frontend
-rendering/scanner are separate, not-yet-started pieces of this same ADR -
-tracked below, not silently folded into "done".
+The 49-kind event catalogue is also implemented and rendering in the GUI
+(`internal/event/gen`, `desktop/src/i18n/kindCatalogue.ts`,
+`IncidentCard.tsx`, `Diagnostics.tsx`). Rust/Go error codes, the generated
+`desktop/src/i18n/generated/rules.json` build step, and
+`IncidentCard.tsx`'s/`Rules.tsx`'s remaining raw-English fields
+(`title`/`why`/`advice`) plus the untagged-Latin scanner are separate,
+not-yet-started pieces of this same ADR - tracked below, not silently
+folded into "done".
 **Date:** 2026-09-19.
 
 ## Context
@@ -96,10 +100,40 @@ the Go struct, or every one of the 19 shipped rules fails to load.
 - `go build ./...`, `CGO_ENABLED=0 go test ./...` (all packages), `gofmt -l`
   all clean.
 
-**Not started:** the event-kind catalogue (49 kinds); Rust/Go error codes
-for capability `reason` and shell connection failures; the
-`desktop/src/i18n/generated/rules.json` build step; any frontend rendering
-of `i18n.ar` at all (`IncidentCard.tsx`/`Rules.tsx` still render the raw
-English fields - the Go/API side is ready for them to switch, they have
-not yet); the automated scan for untagged Latin sentences, which needs
-that frontend work to exist before it has anything meaningful to scan.
+**Event-kind catalogue (done):**
+- `internal/event/gen/main.go`: parses `kinds.go`'s AST for every `Kind`
+  constant and the `Families` var, writes sorted JSON to
+  `desktop/src/i18n/generated/kinds.json` - the same technique
+  `internal/event/coverage_test.go`'s `declaredKinds`/`repoRoot` already
+  use to keep `docs/schema.md` honest, applied to the GUI catalogue.
+- `internal/event/kind_catalogue_test.go`'s
+  `TestTheGeneratedKindCatalogueIsUpToDate` re-parses `kinds.go` directly
+  and fails if the checked-in JSON drifts - proven by deliberately
+  breaking it and watching it fail before restoring (see
+  `docs/evidence/36-...log`).
+- `desktop/src/i18n/kindCatalogue.ts`: hand-written `{en, ar}` labels for
+  all 49 kinds and 10 families, reusing the rule translations' own
+  vocabulary (المسار, العنوان, عنوان العتاد, البوابة, المُحلِّل, "توقف ...
+  عن الإجابة") rather than inventing a second one, and the execution
+  order's glossary correction (وحدة جمع البيانات, not «جامعة»).
+  `labelForKind`/`labelForFamily` return `{name, known}`; `known: false`
+  is the "unknown key falls back to the original, never blank, never a
+  crash" path this ADR requires, for a kind an older GUI build predates.
+- `desktop/src/i18n/kindCatalogue.test.ts`: checks the catalogue's key set
+  against the generated JSON exactly (missing or extra both fail), and
+  that every label is non-empty and distinct from the raw code. Also
+  deliberately broken and watched to fail before restoring.
+- `IncidentCard.tsx` (chain links and root cause) and `Diagnostics.tsx`
+  ("events by family") switched from a bare technical code to the human
+  name plus the code in `TechnicalValue` - verified by actually running
+  the app against the demo recording in both languages and reading the
+  rendered text, not merely by the test suite passing.
+
+**Not started:** Rust/Go error codes for capability `reason` and shell
+connection failures; the `desktop/src/i18n/generated/rules.json` build
+step; `IncidentCard.tsx`'s `title`/`link.why`/`incident.advice` and all of
+`Rules.tsx` still render the raw English rule fields - confirmed still
+true by this session's own screenshots, where kind labels are Arabic but
+incident titles and advice are still English; the automated scan for
+untagged Latin sentences, which needs that remaining frontend work to
+exist before it has anything meaningful to scan.

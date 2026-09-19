@@ -1,7 +1,10 @@
 import type { Incident, Relation } from "../types";
 import { nsToDate } from "../types";
 import { useLanguage } from "../i18n/LanguageContext";
+import type { Lang } from "../i18n/translations";
+import { labelForKind } from "../i18n/kindCatalogue";
 import { SeverityBadge } from "./SeverityBadge";
+import { TechnicalValue } from "./TechnicalValue";
 
 // PRODUCT_RELEASE_PLAN_AR.md §3: "causes خط متصل بلون تحذير، correlates خط
 // متقطع محايد، precedes منقط. لا يعتمد التمييز على اللون وحده." The line
@@ -24,6 +27,19 @@ function formatTime(ns: number, lang: string) {
   return nsToDate(ns).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour12: false });
 }
 
+// A kind this build's catalogue does not know (an older bundle from a newer
+// recorder release) shows only the raw code - showing it twice, once as a
+// "name" that is just the code again, would be noise, not a fallback.
+function KindName({ kind, lang }: { kind: string; lang: Lang }) {
+  const { name, known } = labelForKind(kind, lang);
+  if (!known) return <TechnicalValue>{kind}</TechnicalValue>;
+  return (
+    <>
+      <strong>{name}</strong> <TechnicalValue>{kind}</TechnicalValue>
+    </>
+  );
+}
+
 export function IncidentCard({ incident }: { incident: Incident }) {
   const { t, lang } = useLanguage();
   return (
@@ -44,7 +60,7 @@ export function IncidentCard({ incident }: { incident: Incident }) {
           <div className="chain-link" key={link.event_id + i}>
             <div>
               <span className="ltr-field">{formatTime(link.at, lang)}</span>{"  "}
-              <strong className="ltr-field">{link.kind}</strong>{"  "}
+              <KindName kind={link.kind} lang={lang} />{"  "}
               <span className="ltr-field">{link.subject}</span>
             </div>
             <div style={{ fontSize: "0.88rem", color: "var(--text-muted)" }}>{link.why}</div>
@@ -60,7 +76,7 @@ export function IncidentCard({ incident }: { incident: Incident }) {
 
       <div className="root-cause-box">
         <strong>{t("root_cause")}:</strong>{" "}
-        <span className="ltr-field">{incident.root_cause.kind}</span>
+        <KindName kind={incident.root_cause.kind} lang={lang} />
         {" "}
         (<span className="ltr-field">{incident.root_cause.entity}</span>,{" "}
         <span className="ltr-field">{incident.root_cause.confidence}%</span>)
