@@ -48,7 +48,9 @@ sudo usermod -aG netrewind "$USER"
 - **Investigation** — the events touching one host, by address or name.
 - **Rules** — with a live recorder, the full catalogue it loaded and how often
   each rule concluded an incident in the loaded window; otherwise, only the
-  rules that fired in the recording, and the page says so.
+  rules that fired in the recording, and the page says so. An optional
+  from/to range narrows the fired-count to incidents opened in that window;
+  left unset, every incident counts, as before.
 - **Evidence bundles** — export from the live recorder, open a bundle, and
   see what an open bundle is: who produced it, its window, whether its
   checksums and signature verified.

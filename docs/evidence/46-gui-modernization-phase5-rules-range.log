@@ -1,0 +1,145 @@
+GUI modernization, Phase 5 (seventh slice): Rules "match-count in range" -
+execution order §9 Phase 5, the last item on the Rules page. Closes the
+Rules half of that line; the six-group Settings regrouping question
+remains separately open (see the progress log).
+
+## 1. Design decision this slice actually depended on
+
+Absolute `from`/`to` inputs, reusing `InvestigationContext`'s existing
+fields - deliberately not a port of Evidence.tsx's relative "last
+1h/24h/7d" window selector. That pattern computes its bounds against
+`new Date()` (now), which is correct for a live recorder's rolling
+export but would silently show zero matches against demo or bundle
+incidents, whose timestamps are fixed history, not recent - exactly the
+kind of regression this project's own discipline exists to catch before
+it ships, not after. Absolute bounds behave identically regardless of
+source mode; leaving both unset is defined as "no filter", so existing
+behaviour (today's unfiltered fired-count list) is unchanged unless a
+user actually sets a bound.
+
+## 2. What was built
+
+`incidentsInRange(incidents, context)` (new, exported from `Rules.tsx`):
+parses `context.from`/`context.to` with `Date.parse`, compares against
+each incident's `opened_at` (converted from nanoseconds), inclusive at
+both boundaries. An unparseable or absent bound is treated as unset, not
+as "exclude everything" - a bad deep link degrades to the full list
+rather than an empty one.
+
+`toDatetimeLocal`/`fromDatetimeLocal` (new, private): `<input
+type="datetime-local">` speaks "YYYY-MM-DDTHH:mm" in the browser's local
+time, with no timezone in the string at all - converted at the two edges
+so `InvestigationContext` keeps carrying real, unambiguous ISO instants
+internally, the same contract every other consumer of that context
+already relies on.
+
+`Rules` gained `context`/`navigate` props, matching the exact pattern
+already established for `Incidents`/`Evidence`. Two datetime-local
+inputs plus a "Clear range" button (shown only once a bound is actually
+set - the same "nothing to decide, nothing shown" discipline as the
+Settings save bar) sit above both the full-catalogue and fired-only
+list views; the `fired` count `Map` is now built from the range-filtered
+incident list rather than the raw prop in both branches. `App.tsx`'s
+`<Rules>` call site now passes `context={route.context}` and
+`navigate={navigate}`.
+
+## 3. Full regression
+
+    $ npx tsc --noEmit                             clean
+    $ npm test -- --run                            14 files, 119 tests passed (was 106; +13)
+    $ npm run build                                clean
+    $ npx playwright test                          37 passed (0 failed, unchanged)
+
+## 4. Proven, not just passing once
+
+13 new tests in `Rules.test.tsx`. The boundary comparison - the one
+piece of logic an off-by-one or a flipped operator could silently break
+without any test noticing - was deliberately inverted (`openedMs <
+fromMs` flipped to `openedMs > fromMs`, the mistake a fat-fingered edit
+would actually make) inside the test file itself, confirmed to produce a
+result that does NOT match what the real function returns for the same
+input, then left only as the recorded proof (the shipped `Rules.tsx` was
+never touched by this - the inversion lives in a throwaway function
+inside the test, not a checked-out-and-reverted edit to the component).
+
+A second regression property was tested explicitly rather than assumed:
+"neither from nor to set" must return every incident completely
+unchanged (`toEqual(all)`, not just the same length) - the exact
+guarantee the whole design leans on for zero-regression-risk rollout.
+
+One test-authoring mistake surfaced and fixed before it could hide a
+real bug: an early version of the "navigates with a patched from" test
+hardcoded the expected UTC instant for a `09:00` local input, which
+failed the moment it ran against this machine's actual local timezone
+offset (09:00 local is not 09:00 UTC here). Root-caused correctly as a
+bad assumption in the test, not a bug in `fromDatetimeLocal` - fixed by
+computing the expectation the same way the component does
+(`new Date("...").toISOString()`) instead of a hardcoded literal, so the
+test is honest about what it actually verifies (round-trip correctness)
+and stays correct on a CI runner in any timezone.
+
+## 5. Actually looked at it - against real demo data, not just fixtures
+
+Live in the browser (fresh dev server - a stale long-lived preview tab
+threw "useLanguage() called outside LanguageProvider" on the first load
+after this slice's edits, the same known Vite-HMR module-identity
+staleness already documented in this project's evidence log for an
+unrelated earlier slice; a plain server restart cleared it and a fresh
+load showed zero console errors, confirming it was never a real bug in
+this feature):
+
+- Arabic, demo mode: "من:"/"إلى:" labels render correctly; the native
+  datetime-local widgets stay LTR (`dir="ltr"`, matching every other
+  technical value in this app) inside the RTL page; the filter bar's
+  flex row places "من:" on the reading-first (right) side and "إلى:" on
+  the left, the correct RTL order, with no explicit direction-flipping
+  code needed - the browser's default RTL flex behaviour already gets
+  this right.
+- Setting "from" to 2030-01-01 (after every demo incident) correctly
+  emptied the list down to the existing "no incidents, so no fired
+  rules" empty state, and the "Clear range" button appeared - confirmed
+  via `getBoundingClientRect`/computed-style JS rather than trusting an
+  ambiguous screenshot crop, matching this session's standing practice
+  for verifying layout when a screenshot alone is inconclusive (the
+  filter bar's own `flex-wrap: wrap` moved the two inputs onto two
+  visual rows at the narrower emulated width, which is expected,
+  pre-existing behaviour shared with Incidents' own filter bar, not a
+  defect this slice introduced).
+- The resulting hash was `#/rules?from=2029-12-31T20:00:00.000Z` -
+  correct local-to-UTC conversion for this machine's offset, and proof
+  the range round-trips through the same hash-route serialization every
+  other `InvestigationContext` field already uses (deep-linkable, same
+  as Incidents' filters and Evidence's export scope).
+- Clicking "Clear range" reverted the hash to bare `#/rules`, emptied
+  both inputs, removed the button, and restored the full 16-incident
+  fired list - read back from the live DOM, not assumed.
+- Deep-linking directly to `#/rules?to=2026-09-13T18%3A20%3A29.000Z`
+  (bypassing the input entirely, exercising the URL-to-context-to-props
+  path App.tsx actually uses) against the real `demo-incidents.json`
+  fixture (read directly, sorted by `opened_at`) produced exactly the 8
+  incidents at or before that instant and none of the other 8 - counts
+  summed from the rendered per-rule numbers (2+1+1+1+1+1+1=8) match the
+  fixture exactly.
+- Switching to English via the sidebar's live language toggle (no
+  reload - this is an in-memory React state change, unlike Settings'
+  localStorage-on-mount source setting) kept the same filtered state and
+  correctly rendered "From:"/"To:"/"Clear range"/"time(s) in this
+  recording"; `document.documentElement.dir` read back as `"ltr"` and
+  the label DOM order was `["From:", "To:"]`, confirming no leftover
+  RTL-only styling assumption broke the English layout.
+
+The `rules.length > 0` (live-catalogue) branch's own range wiring is
+covered by a dedicated component test (§4) but was not separately
+screenshotted live, since exercising it needs a live recorder or a
+bundle with a full rule catalogue loaded - neither is available in this
+environment; recorded here as tested, not visually re-confirmed, rather
+than silently conflating the two.
+
+## 6. What remains in Phase 5
+
+The six-group Settings regrouping question - still open, still a real
+product decision (most named groups reference features that do not
+exist yet: no manual theme system, DNS-recording lives in the recorder
+process rather than the GUI, no AI or update-checking UI to group). No
+new ADR for this slice - a pure frontend addition reusing an existing
+routing field and existing rule/incident types, no contract change.
