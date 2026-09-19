@@ -76,14 +76,32 @@ not reported yet).
 ### `GET /v1/events`
 
 Query parameters: `since`, `until` (RFC 3339; default window is the last
-hour ending now), `limit` (positive integer), `kind` (exact event kind, e.g.
-`link.down`), `family` (kind prefix, e.g. `l3`), `subject` (subject label,
-e.g. an address). Returns `{ "events": [...] }`, newest first, never `null`.
+hour ending now), `limit` (positive integer, capped server-side regardless
+of what is asked for), `order` (`asc` or `desc`, default `asc` - oldest
+first), `kind` (exact event kind, e.g. `link.down`), `family` (kind prefix,
+e.g. `l3`), `subject` (subject label, e.g. an address), `cursor` (opaque,
+from a previous response's `next_cursor` - see below). Returns
+`{ "events": [...], "next_cursor": "...", "has_more": bool }`, `events`
+never `null`.
+
+`cursor`, when present, replaces `since` as the lower bound: the response
+contains only events after the cursor's position. Every response - even
+the first, `since`-based call - carries a `next_cursor` to present on the
+next poll, so a client can switch from a full window fetch to a delta poll
+(only what's new) without a separate mode. A cursor also catches a
+*folded* event (a repeat of the same fact within the fold window updates
+its existing row's count in place, without moving its timestamp) - the
+delta correctly reports the updated count on the next poll rather than
+missing the update the way a plain "since the last timestamp I saw" filter
+would. `has_more` is true when the response was cut off by `limit`, a hint
+to page further rather than a guarantee of exactly how much more there is.
 
 ### `GET /v1/incidents`
 
-Same window parameters plus `rule` (rule id) and `min_severity`
-(`info|notice|warn|error`). Returns `{ "incidents": [...] }`.
+Same window, `limit`, and `cursor` parameters (see `/v1/events` above)
+plus `rule` (rule id) and `min_severity` (`info|notice|warn|error`).
+Returns `{ "incidents": [...], "next_cursor": "...", "has_more": bool }`.
+Always ordered oldest first; there is no `order` parameter here.
 
 ### `GET /v1/rules`
 
@@ -99,6 +117,42 @@ are redacted unless `include_secrets=true`. Still a read: nothing is written
 anywhere by serving it. The `limit` parameter caps events and incidents;
 without it the bundle's own, much larger default applies and the manifest's
 `truncated` flag says whether it was hit.
+
+### `GET /v1/what-happened`
+
+Answers exactly what `netrewind what-happened --host <addr> --at <time>
+--window <dur>` answers from a terminal - reconstructing what happened
+around one moment, for one machine or for all of them - over the API
+instead of reading the store file directly.
+
+Query parameters: `host` (an address, MAC, or hostname; omitted searches
+every subject in the window, matching the CLI's own behaviour with no
+`--host`), `at` (RFC 3339, default now), `window` (a duration, e.g. `5m`,
+default `5m` - how far either side of `at` to look). Unlike `/v1/events`
+this is a single bounded reconstruction, not a paginated feed: there is no
+`limit` or `cursor` parameter here.
+
+A `host` is expanded to every identity label it answered to during the
+window - asking about an address a machine picked up five minutes ago
+still finds what was recorded while it held its previous one. `system.*`
+events inside the window are always included regardless of the host
+filter, so a recording gap is never silently indistinguishable from
+nothing happening.
+
+Returns:
+
+```json
+{
+  "from": "2026-09-19T10:15:00Z",
+  "to": "2026-09-19T10:25:00Z",
+  "observed_labels": ["10.0.0.5"],
+  "events": [ ... ],
+  "incidents": [ ... ]
+}
+```
+
+`observed_labels` lists the host's *other* addresses (what the CLI prints
+as "also answered to: ..."), not the one given in the query.
 
 ## Using it from a shell
 
