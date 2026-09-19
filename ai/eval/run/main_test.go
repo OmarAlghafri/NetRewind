@@ -254,7 +254,7 @@ func TestChatCompletionRequestSendsThePerCaseSchema(t *testing.T) {
 	body, err := json.Marshal(chatCompletionRequest{
 		Temperature:    0,
 		MaxTokens:      1,
-		ResponseFormat: &responseFormat{Type: "json_schema", Schema: jsonSchemaFor([]string{"E1"}, 0)},
+		ResponseFormat: &responseFormat{Type: "json_object", Schema: jsonSchemaFor([]string{"E1"}, 0)},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -268,13 +268,19 @@ func TestChatCompletionRequestSendsThePerCaseSchema(t *testing.T) {
 }
 
 // TestResponseFormatMatchesLlamaServersOwnShapeNotOpenAIs is the direct
-// regression test for the real bug this session found by reading
-// llama.cpp's own server README instead of assuming OpenAI's API shape:
-// the schema must sit directly at response_format.schema, with no
-// intermediate "json_schema" wrapper object - the wrapped shape would not
-// error, it would just silently constrain nothing.
+// regression test for a real bug this session found in two stages:
+// first by reading llama.cpp's own server README instead of assuming
+// OpenAI's API shape (the schema must sit directly at
+// response_format.schema, with no intermediate "json_schema" wrapper
+// object - the wrapped shape would not error, it would just silently
+// constrain nothing); then by a live smoke test against the real
+// downloaded build finding that the README's own "json_schema" Type
+// value ALSO silently constrains nothing in practice, while
+// "json_object" with the identical flat schema field works exactly as
+// intended (evidence 52) - so this test pins the empirically-verified
+// value, not the one the documentation states.
 func TestResponseFormatMatchesLlamaServersOwnShapeNotOpenAIs(t *testing.T) {
-	body, err := json.Marshal(responseFormat{Type: "json_schema", Schema: map[string]any{"marker": "present"}})
+	body, err := json.Marshal(responseFormat{Type: "json_object", Schema: map[string]any{"marker": "present"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,5 +297,22 @@ func TestResponseFormatMatchesLlamaServersOwnShapeNotOpenAIs(t *testing.T) {
 	}
 	if _, wrapped := decoded["json_schema"]; wrapped {
 		t.Error(`response_format has a "json_schema" wrapper key - that is OpenAI's shape, not llama-server's; llama-server would silently ignore this`)
+	}
+}
+
+// TestChatCompleteSendsTheEmpiricallyVerifiedTypeValue pins the exact
+// wire value chatComplete actually sends: "json_object", not the
+// README-documented-but-non-functional "json_schema" - see
+// TestResponseFormatMatchesLlamaServersOwnShapeNotOpenAIs's own comment
+// for why the documentation and the real build's behavior disagree here.
+func TestChatCompleteSendsTheEmpiricallyVerifiedTypeValue(t *testing.T) {
+	body, err := json.Marshal(chatCompletionRequest{
+		ResponseFormat: &responseFormat{Type: "json_object", Schema: map[string]any{"type": "object"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), `"type":"json_object"`) {
+		t.Errorf(`request body = %s, want response_format.type == "json_object" (the type value verified to actually work against the real build)`, body)
 	}
 }

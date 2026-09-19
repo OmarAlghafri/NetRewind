@@ -301,17 +301,20 @@ type chatCompletionRequest struct {
 // actually vary case to case, which a server-wide `-jf <file>` startup flag
 // could not do.
 //
-// llama-server's own shape here is NOT OpenAI's: OpenAI nests the schema
-// under `response_format.json_schema.schema`, but llama.cpp's server
-// (tools/server/README.md, "response_format parameter") puts it directly
-// at `response_format.schema` - `{"type": "json_schema", "schema": {...}}`,
-// no intermediate wrapper object. Sending OpenAI's nested shape here would
-// not error (llama-server simply would not find a "schema" key at the
-// top level of an object it does not recognise) - it would silently
-// constrain nothing at all, defeating every guardrail this schema carries
-// without any visible failure. Confirmed against the server's own README
-// for the exact pinned commit this build (b10948) was built from, not
-// assumed from OpenAI's API alone.
+// The shape is flat, not OpenAI's nested `response_format.json_schema.
+// schema` - `{"type": ..., "schema": {...}}` directly. That much matches
+// tools/server/README.md at the exact pinned commit (b10948) this build
+// is from. The `Type` value does NOT match the README as closely: the
+// README documents both `"json_object"` and `"json_schema"` as valid
+// alongside a `schema` key, but a live smoke test against this exact
+// downloaded build (F:\netrewind-ai-eval-bench\smoke-test*.json,
+// evidence 52) found `"json_schema"` silently applies no constraint at
+// all - the model answered with a completely different, unconstrained
+// shape and no error of any kind - while `"json_object"` with the
+// identical flat `schema` field produced exactly the required shape,
+// including the enum-constrained handles. Empirically verified behavior
+// of the real binary wins over what its own documentation states; this
+// program sends `"json_object"`.
 type responseFormat struct {
 	Type   string         `json:"type"`
 	Schema map[string]any `json:"schema"`
@@ -342,7 +345,7 @@ func chatComplete(client *http.Client, serverURL, sysPrompt, userPrompt string, 
 		Temperature:    0,
 		MaxTokens:      maxTokens,
 		CachePrompt:    false,
-		ResponseFormat: &responseFormat{Type: "json_schema", Schema: schema},
+		ResponseFormat: &responseFormat{Type: "json_object", Schema: schema},
 		Messages: []chatMessage{
 			{Role: "system", Content: sysPrompt},
 			{Role: "user", Content: userPrompt},

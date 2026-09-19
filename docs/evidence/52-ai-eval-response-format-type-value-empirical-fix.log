@@ -1,0 +1,84 @@
+Phase 6, fifth slice: a second, deeper layer of the same bug evidence 51
+fixed - found only by actually running the real, downloaded model against
+the real, pinned server, not by reading documentation more carefully.
+
+## 1. What evidence 51 got right, and what it still got wrong
+
+Evidence 51 fixed the shape (flat `response_format.schema`, not OpenAI's
+nested `response_format.json_schema.schema`) by reading llama.cpp's
+`tools/server/README.md` at the exact pinned commit (`5f436dddb...`,
+build b10948). That fix was necessary and correct. It was not sufficient:
+the same README documents two valid `Type` values for schema-constrained
+output, `"json_object"` and `"json_schema"`, and evidence 51 picked
+`"json_schema"` as the more semantically apt-sounding name.
+
+## 2. What a live smoke test found
+
+Before running the real corpus against the real downloaded model
+(unsloth/Qwen3-4B-Instruct-2507-GGUF, Q4_K_M, SHA-256 verified against
+Hugging Face's own LFS `oid` before use; llama.cpp b10948 Windows CPU
+build, SHA-256 verified against the GitHub release's own recorded digest)
+on the second test machine, a direct request was sent to the running
+server with `"type": "json_schema"` and a required three-field schema
+(`summary`, `evidence_handles` as a closed two-value enum, `confidence`).
+The model answered with `{"event": "eth0 link status changed from down
+to up"}` - a completely different, unconstrained shape, no error of any
+kind from the server. The exact same request with `"type": "json_object"`
+and the identical flat `schema` field produced `{"summary": "eth0 started
+down, then came up.", "evidence_handles": ["E1","E2"], "confidence": 0}` -
+every required field present, the enum constraint honored exactly.
+
+This is the same class of finding as evidence 51 (a request shape that
+does not error but silently constrains nothing), one layer deeper: not a
+structural mismatch this time, but a `Type` value the README lists as
+valid that this specific build does not actually honor in practice for
+constraint purposes, while its sibling value does. Whether this is a
+version-specific gap between documentation and implementation, or some
+other build-specific quirk, was not investigated further - the empirical
+result against the real, pinned binary is what this project ships
+against, not a theory about why the documentation and the binary
+disagree.
+
+## 3. The fix
+
+`responseFormat.Type` value sent by `chatComplete` changed from
+`"json_schema"` to `"json_object"` (the schema itself is unchanged - still
+the flat, un-nested shape evidence 51 fixed). The doc comment on
+`responseFormat` is rewritten to state plainly that empirically-verified
+behavior of the real binary was preferred over what its own documentation
+states, and to point at this evidence log and the raw smoke-test request/
+response pairs.
+
+## 4. Full regression
+
+    $ go build ./...                               clean
+    $ go vet ./...                                  clean
+    $ CGO_ENABLED=0 go test ./...                   every package passes
+
+## 5. Proven, not just asserted
+
+`TestChatCompleteSendsTheEmpiricallyVerifiedTypeValue` (new): marshals a
+real `chatCompletionRequest` built the same way `chatComplete` builds one
+and asserts the wire value is exactly `"type":"json_object"` - pinning
+the specific, non-obvious, documentation-contradicting value a future
+edit could otherwise "correct" back to the more official-sounding
+`"json_schema"` without realizing that value silently does nothing
+against the real server. The two pre-existing response-format tests
+(`TestChatCompletionRequestSendsThePerCaseSchema`,
+`TestResponseFormatMatchesLlamaServersOwnShapeNotOpenAIs`) were updated
+to construct their fixtures with `"json_object"` too, so nothing in the
+test suite continues to exercise the value now known not to work.
+
+## 6. Why this matters beyond one flag value
+
+This is the second time in two slices that a request-shape assumption
+built and unit-tested entirely against Go's own type system turned out
+to not do what was intended against the real target - first a structural
+mismatch (evidence 51), now a documented-but-non-functional value
+(this log). Both were caught before a single real benchmark case ran
+against them, specifically because this session insisted on a live smoke
+test against the actual downloaded model before trusting either fix, not
+because either bug was visible from reading the Go code alone. The
+benchmark run against the `test` split proceeds only now, using the
+build proven correct by this smoke test, not the one that merely
+compiled and passed its own unit tests.
