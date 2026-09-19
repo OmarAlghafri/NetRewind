@@ -406,6 +406,17 @@ body {
   cursor: not-allowed;
 }
 
+/* The support-summary preview (Diagnostics) is read-only text meant to be
+   copied verbatim, not a form field to type into - wider than the usual
+   520px setting inputs, and monospace: .field-input's own font-family
+   would otherwise win the cascade over .ltr-field's (declared earlier in
+   this file), leaving it in the UI font instead. */
+.support-summary-preview {
+  max-width: 100%;
+  font-family: var(--font-mono);
+  resize: vertical;
+}
+
 .inline-ok {
   color: var(--accent);
   font-size: 0.88rem;

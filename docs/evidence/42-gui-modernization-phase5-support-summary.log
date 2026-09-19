@@ -1,0 +1,105 @@
+GUI modernization, Phase 5 (third slice): Diagnostics' secret-free
+support-summary copy button, with a live preview - already-documented
+product spec (`docs/desktop.md`: "what to copy into a support request")
+that had never actually been built.
+
+## 1. The gap
+
+`docs/desktop.md`'s own Diagnostics description already promised this;
+`Diagnostics.tsx` only ever displayed the information (source, endpoint,
+totals, by-family/by-severity breakdowns) with no way to get it into a
+support request except retyping it by hand.
+
+## 2. What was built
+
+`buildSupportSummary` (new, exported for direct testing): a pure
+function assembling a plain-text summary from exactly the fields already
+on screen - app version, source kind, endpoint or bundle file name, last
+refresh, event/incident totals, the two breakdowns - using the same
+`dict[lang]` labels the page itself renders with, so the copied text
+reads in whichever language was on screen when it was copied. Explicitly
+secret-free: a bundle path is reduced to its file name only
+(`bundlePath.split(/[/\\]/).pop()`), since the full path can contain a
+local username or folder structure the way an endpoint (a local pipe/
+socket name) does not.
+
+UI: a new card with a read-only, monospace `<textarea>` showing the
+live-computed preview (always current, no separate "generate" step -
+the "preview before copying" requirement is met by showing it plainly,
+not hiding it behind a click) and a "Copy summary" button using
+`navigator.clipboard.writeText`, with success/failure feedback that
+clears after 2.5s (matching the existing `settings_saved`/
+`exportMessage` feedback pattern already used elsewhere in this app).
+
+## 3. Full regression
+
+    $ npx tsc --noEmit                             clean
+    $ npm test                                     13 files, 79 tests passed
+    $ npm run build                                clean
+    $ npx playwright test                          35 passed (0 failed) -
+        Diagnostics is one of the 8 pages the untagged-Latin-sentence
+        scanner already covers; zero new violations
+
+One real slip caught mid-work, not left in: adding the second batch of
+component tests (clipboard mocking) introduced a TypeScript error
+(`vi.fn(async () => {})`'s inferred zero-argument mock call tuple made
+`.mock.calls[0][0]` an out-of-bounds tuple index) that `npm test`
+(vitest, which does not type-check) did not catch but `npm run build`
+(which runs `tsc` first) did - a reminder that `tsc --noEmit` needs
+re-running after every edit, not just once per slice, since vitest alone
+will happily run code with a real type error in it. Fixed by giving the
+mock an explicit parameter type.
+
+## 4. Proven secret-free, not just asserted
+
+Six `buildSupportSummary` unit tests, including two specifically for the
+redaction claim: a Windows path
+(`C:\Users\jsmith\Desktop\incident-42.tar.gz`) and a POSIX path
+(`/home/jsmith/incident-42.tar.gz`) each assert the username and folder
+segments are absent from the output and only the file name
+(`incident-42.tar.gz`) survives - not merely that *some* reduction
+happened. A live-endpoint test confirms that value is included as-is
+(a local pipe/socket name is not a secret), and a demo-mode test
+confirms the endpoint line is omitted entirely rather than shown empty.
+
+Two component tests mock `navigator.clipboard.writeText` to prove both
+outcomes: a successful copy shows "Copied" and receives exactly the
+preview textarea's own current value (not a stale or reconstructed
+copy), and a rejected write shows "Could not copy" rather than an
+unhandled promise rejection or a crash.
+
+## 5. Actually looked at it - including an unplanned real-environment proof of the failure path
+
+Fresh browser tab, demo recording. Arabic: the new "ملخص للدعم الفني"
+card renders with the correct translated body text and a monospace
+preview showing labelled lines ("إصدار التطبيق: 1.0.0", "النوع: demo",
+"الأحداث حسب الفئة:" followed by each family/count) - a deliberately
+LTR-forced block despite the Arabic labels inside it, which is correct
+for text meant to be pasted verbatim into a support ticket rather than
+read as a bidi-optimized UI element.
+
+Clicking "نسخ الملخص" (Copy summary) surfaced "تعذّر النسخ" (Could not
+copy) - not a bug: `navigator.clipboard.writeText` in this sandboxed
+browser-automation context genuinely rejects with "Write permission
+denied" (confirmed directly via a debugging script:
+`navigator.clipboard.writeText("test")` throws the same error outside
+the app entirely). This is the exact failure path the component tests
+already proved handled correctly, now also confirmed against a real
+browser's actual security policy rather than only a mock - the error is
+caught, shown plainly, and nothing crashes or logs to the console.
+English mode re-checked separately: same card, same body text, correctly
+translated. Console clean throughout both languages.
+
+## 6. What remains in Phase 5
+
+Incidents master/detail with search/sort/filter; Rules bilingual
+catalogue improvements; Settings regrouped into six sections with a
+sticky save/discard bar and unsaved-changes guard - two of that
+spec's six groups ("local AI & model management", "updates & release
+channel") reference features that do not exist yet (Phase 6 has not
+started; there is no update-checking UI today), so building hollow
+settings for them now would be exactly the kind of half-finished
+implementation this project's own discipline rules against. Deferred
+until the features they configure actually exist, rather than stubbed.
+No new ADR needed for this slice - a pure frontend addition using
+information already computed for display.
