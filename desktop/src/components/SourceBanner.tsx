@@ -1,5 +1,6 @@
 import { useLanguage } from "../i18n/LanguageContext";
 import { messageFor, type AgentErrorPayload } from "../i18n/agentErrorCatalogue";
+import { formatTime } from "../i18n/format";
 import { Button } from "./Button";
 import { TechnicalValue } from "./TechnicalValue";
 import type { Record } from "../data/useRecord";
@@ -81,8 +82,8 @@ export function SourceBanner({
         {record.status === "ready" && record.refreshedAt && settings.kind === "live" && (
           <span>
             {t("status_refreshed")}{" "}
-            <TechnicalValue>
-              {record.refreshedAt.toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour12: false })}
+            <TechnicalValue dateTime={record.refreshedAt.toISOString()}>
+              {formatTime(record.refreshedAt, lang)}
             </TechnicalValue>
           </span>
         )}

@@ -7,6 +7,7 @@ import type { SourceSettings } from "../data/source";
 import { agentExportBundle, isTauri, pickBundleToOpen, pickBundleToSave } from "../data/tauri";
 import type { InvestigationContext } from "../routing/useRoute";
 import { findRule, titleFor } from "../i18n/rulesCatalogue";
+import { formatDateTime } from "../i18n/format";
 
 type Window = "1h" | "24h" | "7d";
 const WINDOW_HOURS: { [w in Window]: number } = { "1h": 1, "24h": 24, "7d": 168 };
@@ -99,7 +100,7 @@ export function Evidence({
 
   const fmt = (iso: string) => {
     const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(lang === "ar" ? "ar-EG" : "en-US", { hour12: false });
+    return Number.isNaN(d.getTime()) ? iso : formatDateTime(d, lang);
   };
 
   return (
@@ -162,9 +163,12 @@ export function Evidence({
               </p>
             )}
             <div style={{ marginTop: 8 }}>
-              <TechnicalValue>
-                {new Date(incidentScope.from).toLocaleString(lang === "ar" ? "ar-EG" : "en-US", { hour12: false })} →{" "}
-                {new Date(incidentScope.to).toLocaleString(lang === "ar" ? "ar-EG" : "en-US", { hour12: false })}
+              <TechnicalValue dateTime={incidentScope.from}>
+                {formatDateTime(new Date(incidentScope.from), lang)}
+              </TechnicalValue>{" "}
+              →{" "}
+              <TechnicalValue dateTime={incidentScope.to}>
+                {formatDateTime(new Date(incidentScope.to), lang)}
               </TechnicalValue>
             </div>
           </>

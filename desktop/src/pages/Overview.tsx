@@ -3,13 +3,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import type { Record } from "../data/useRecord";
 import type { SourceSettings } from "../data/source";
 import { CapabilityTable } from "../components/CapabilityTable";
-
-function formatUptime(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
+import { formatCount, formatDuration } from "../i18n/format";
 
 // Health is what a live recorder says about itself, and the capability
 // matrix is its registry. With a bundle, the same matrix is what the
@@ -17,7 +11,7 @@ function formatUptime(seconds: number): string {
 // registry at all, so the page reports only what the recording contains -
 // never an implied "up".
 export function Overview({ record, settings }: { record: Record; settings: SourceSettings }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { events, health, capabilities } = record;
 
   const sources = useMemo(() => {
@@ -47,11 +41,13 @@ export function Overview({ record, settings }: { record: Record; settings: Sourc
           </div>
           <div className="capability-row">
             <span>{t("health_uptime")}</span>
-            <span className="ltr-field">{formatUptime(health.uptime_seconds)}</span>
+            <span className="ltr-field">{formatDuration(health.uptime_seconds, lang, "compact")}</span>
           </div>
           <div className="capability-row">
             <span>{t("health_store_events")}</span>
-            <span className="ltr-field">{health.store.error ? health.store.error : health.store.events}</span>
+            <span className="ltr-field">
+              {health.store.error ? health.store.error : formatCount(health.store.events, lang)}
+            </span>
           </div>
           <div className="capability-row" style={{ borderBottom: "none" }}>
             <span>{t("health_store_path")}</span>

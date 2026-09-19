@@ -6,7 +6,9 @@ import type { RuleSummary } from "../data/types";
 import { IncidentCard } from "../components/IncidentCard";
 import { InspectorPanel } from "../components/InspectorPanel";
 import { SeverityBadge } from "../components/SeverityBadge";
+import { TechnicalValue } from "../components/TechnicalValue";
 import { findRule, titleFor } from "../i18n/rulesCatalogue";
+import { formatTime } from "../i18n/format";
 import { labelForFamily } from "../i18n/kindCatalogue";
 import type { Page } from "../components/Sidebar";
 import type { InvestigationContext } from "../routing/useRoute";
@@ -90,10 +92,6 @@ export function filterAndSortIncidents(
 
 const SEVERITY_OPTIONS = ["error", "warn", "notice", "info"] as const;
 
-function formatTime(ns: number, lang: Lang): string {
-  return nsToDate(ns).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour12: false });
-}
-
 /**
  * The "master" half of master/detail (execution order §9 Phase 5): a
  * compact, single-line summary - time, severity, translated title,
@@ -123,7 +121,9 @@ function IncidentRow({
       onClick={onSelect}
       aria-pressed={selected}
     >
-      <span className="ltr-field">{formatTime(incident.opened_at, lang)}</span>
+      <TechnicalValue dateTime={nsToDate(incident.opened_at).toISOString()}>
+        {formatTime(nsToDate(incident.opened_at), lang)}
+      </TechnicalValue>
       <SeverityBadge severity={incident.severity} />
       <span className="incident-row-title">{title}</span>
       <span className="incident-row-confidence">

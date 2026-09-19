@@ -15,15 +15,6 @@ export function PermissionsStep({ settings, record }: { settings: SourceSettings
       <h1 className="page-title">{t("wizard_permissions_title")}</h1>
       <p className="page-subtitle">{t("wizard_permissions_subtitle")}</p>
 
-      <div className="card">
-        <strong>{t("wizard_permissions_would_check_title")}</strong>
-        <ul style={{ marginBottom: 0, paddingInlineStart: "1.3em" }}>
-          <li>{t("wizard_permissions_check_disk")}</li>
-          <li>{t("wizard_permissions_check_folder")}</li>
-          <li>{t("wizard_permissions_check_privilege")}</li>
-        </ul>
-      </div>
-
       {live && record.health ? (
         <div className="card">
           <strong>{t("wizard_permissions_live_title")}</strong>

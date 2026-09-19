@@ -4,6 +4,7 @@ import { nsToDate } from "../types";
 import { useLanguage } from "../i18n/LanguageContext";
 import type { Lang } from "../i18n/translations";
 import { labelForKind } from "../i18n/kindCatalogue";
+import { formatTime } from "../i18n/format";
 import { adviceFor, findRule, titleFor, whyFor } from "../i18n/rulesCatalogue";
 import type { RuleSummary } from "../data/types";
 import { Button } from "./Button";
@@ -25,10 +26,6 @@ function relationLabelKey(relation: Relation) {
   if (relation === "causes") return "relation_causes" as const;
   if (relation === "precedes") return "relation_precedes" as const;
   return "relation_correlates" as const;
-}
-
-function formatTime(ns: number, lang: string) {
-  return nsToDate(ns).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour12: false });
 }
 
 // A kind this build's catalogue does not know (an older bundle from a newer
@@ -111,7 +108,9 @@ export function IncidentCard({
     <div className="card">
       <div className="incident-title">{title}</div>
       <div className="incident-meta">
-        <span className="ltr-field">{formatTime(incident.opened_at, lang)}</span>
+        <TechnicalValue dateTime={nsToDate(incident.opened_at).toISOString()}>
+          {formatTime(nsToDate(incident.opened_at), lang)}
+        </TechnicalValue>
         {"  ·  "}
         <SeverityBadge severity={incident.severity} />
         {"  ·  "}
@@ -124,7 +123,9 @@ export function IncidentCard({
         {incident.chain.map((link, i) => (
           <div className="chain-link" key={link.event_id + i}>
             <div>
-              <span className="ltr-field">{formatTime(link.at, lang)}</span>{"  "}
+              <TechnicalValue dateTime={nsToDate(link.at).toISOString()}>
+                {formatTime(nsToDate(link.at), lang)}
+              </TechnicalValue>{"  "}
               <KindName kind={link.kind} lang={lang} />{"  "}
               <span className="ltr-field">{link.subject}</span>
             </div>

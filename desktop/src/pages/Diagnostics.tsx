@@ -6,6 +6,7 @@ import { SeverityBadge } from "../components/SeverityBadge";
 import { Button } from "../components/Button";
 import { TechnicalValue } from "../components/TechnicalValue";
 import { labelForFamily } from "../i18n/kindCatalogue";
+import { formatCount, formatTime } from "../i18n/format";
 import { dict } from "../i18n/translations";
 import type { SourceSettings } from "../data/source";
 import type { Record } from "../data/useRecord";
@@ -117,9 +118,7 @@ export function Diagnostics({
         sourceKind: settings.kind,
         endpoint: settings.kind === "live" ? settings.endpoint : undefined,
         bundlePath: settings.kind === "bundle" ? settings.bundlePath : undefined,
-        lastRefresh: record.refreshedAt
-          ? record.refreshedAt.toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour12: false })
-          : "-",
+        lastRefresh: record.refreshedAt ? formatTime(record.refreshedAt, lang) : "-",
         eventsTotal: events.length,
         incidentsTotal: incidents.length,
         byFamily,
@@ -170,9 +169,13 @@ export function Diagnostics({
         <div className="capability-row" style={{ borderBottom: "none" }}>
           <span>{t("diagnostics_last_refresh")}</span>
           <span className="ltr-field">
-            {record.refreshedAt
-              ? record.refreshedAt.toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour12: false })
-              : "-"}
+            {record.refreshedAt ? (
+              <TechnicalValue dateTime={record.refreshedAt.toISOString()}>
+                {formatTime(record.refreshedAt, lang)}
+              </TechnicalValue>
+            ) : (
+              "-"
+            )}
           </span>
         </div>
       </div>
@@ -181,11 +184,11 @@ export function Diagnostics({
         <strong>{t("diagnostics_totals_title")}</strong>
         <div className="capability-row">
           <span>{t("diagnostics_events_label")}</span>
-          <span className="ltr-field">{events.length}</span>
+          <span className="ltr-field">{formatCount(events.length, lang)}</span>
         </div>
         <div className="capability-row">
           <span>{t("diagnostics_incidents_label")}</span>
-          <span className="ltr-field">{incidents.length}</span>
+          <span className="ltr-field">{formatCount(incidents.length, lang)}</span>
         </div>
       </div>
 

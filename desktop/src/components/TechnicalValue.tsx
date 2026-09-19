@@ -22,7 +22,29 @@ import type { ReactNode } from "react";
  * Diagnostics page explicitly wants a copy button with feedback) - not
  * added here yet, so as not to half-build a feature this phase doesn't
  * need.
+ *
+ * `dateTime` (execution order §4.6): renders a real `<time>` element
+ * instead of `<bdi>` for an actual point in time, so it carries a
+ * machine-readable ISO value alongside the formatted display text - the
+ * one variant of "technical value" that has its own semantic HTML
+ * element rather than being purely visual isolation.
  */
-export function TechnicalValue({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <bdi className={`technical-value${className ? ` ${className}` : ""}`}>{children}</bdi>;
+export function TechnicalValue({
+  children,
+  className = "",
+  dateTime,
+}: {
+  children: ReactNode;
+  className?: string;
+  dateTime?: string;
+}) {
+  const cls = `technical-value${className ? ` ${className}` : ""}`;
+  if (dateTime !== undefined) {
+    return (
+      <time dateTime={dateTime} className={cls}>
+        {children}
+      </time>
+    );
+  }
+  return <bdi className={cls}>{children}</bdi>;
 }

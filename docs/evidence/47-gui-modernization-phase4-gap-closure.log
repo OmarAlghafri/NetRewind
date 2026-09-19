@@ -1,0 +1,165 @@
+GUI modernization: closing a real gap in Phase 4, found by checking the
+phase's own gate against the live app rather than trusting the earlier
+"Phase 4 is now fully closed" progress-log entry at face value.
+
+## 1. What was actually wrong
+
+Phase 4's gate (execution order §9) reads: "Implement §4.5 (localization
+contract, kind catalogue, structured errors) and §4.6 (formatting
+service). Apply the full §5 content contract." ADR 0004 covers §4.5 only
+- its Decision section never mentions §5 or §4.6 - and its own "Phase 4
+is closed" status line is accurate about ITS OWN scope. The progress
+log's separate claim, "Phase 4 is now fully closed" (its own words,
+dated during the structured-error-codes slice), was not: it substantiated
+that sentence with only ADR 0004's item list, silently treating "every
+item this ADR named" as equivalent to "the whole phase gate," which it
+was not.
+
+Checked directly against the live dictionary rather than assumed:
+- `nav_overview` still read "الصحة", `rules_title` still read "قواعد
+  الارتباط", `severity_error` still read "خطأ", and 48 other keys named
+  in the execution order's §5.2 direct-replacement table were still their
+  pre-review text - the table had never been applied.
+- "الراصد" (the glossary's own "avoid in every instance" term) appeared
+  in 18 places; "جامعات" (also blanket-avoid) in 1. Neither swept.
+- The three §5.3 wizard corrections (language-step title, privacy-step
+  title, permissions-step title) were unapplied, and the "a live version
+  would have checked..." conditional card - explicitly named for removal
+  - was still rendering unconditionally in the Permissions step, above
+  the already-honest "skipped, no live recorder" card beneath it.
+- No shared formatting module existed anywhere in `desktop/src`. Ten
+  call sites across eight files independently repeated
+  `date.toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", {hour12:
+  false})`. A live screenshot taken earlier this session (Rules-page
+  work, unrelated task) had already shown the actual consequence without
+  it being connected to Phase 4 at the time: incident/event timestamps
+  rendered as Arabic-Indic digits ("٢٢:٢٠:٢٢") while every other number
+  on the same screen (confidence, counts, IDs) used Latin digits via
+  `TechnicalValue`/`ltr-field` - a real, visible inconsistency, not a
+  theoretical one.
+
+## 2. What was built
+
+**§5 content contract** - applied via a small Node script (76 exact,
+asserted-unique string replacements; two more caught by a follow-up grep
+sweep after the first pass) rather than manual editing, so every
+substitution is a recorded, auditable line rather than an unlogged hand
+edit:
+- The full §5.2 direct-replacement table, verbatim, with one deliberate
+  adaptation recorded rather than silently applied as-is:
+  `settings_refresh_label`'s table text ("تحديث البيانات كل") drops the
+  "(seconds)" unit that the original label supplied right before a bare
+  `<input type="number">` with nothing after it - kept as "تحديث البيانات
+  كل (بالثواني)" so the field does not lose its only unit indicator.
+- The three §5.3 wizard title corrections, the "جامعات" -> "وحدات جمع
+  البيانات" correction (extended to the three-state string the code
+  actually has, not just the two-state example given), and the sample-step
+  retitle.
+- The "would check" card removed from `PermissionsStep.tsx` entirely
+  (component change, not just a string edit) - demo mode now shows only
+  the pre-existing, already-honest "Skipped - no live recording service
+  to check" card, with nothing above it describing a hypothetical check
+  that never runs.
+- The privacy paragraph split from one long `<p>` into five `<li>` points
+  (`wizard_privacy_point_recorded/_not_recorded/_storage/_device/_bundle`,
+  both languages) - same facts as before (cross-checked against
+  `docs/product/data-policy.md`, which the component's own comment cites
+  as its source), restructured for a reader who skims, not walled by one
+  paragraph.
+- A full sweep for the glossary's blanket-avoid terms ("الراصد", "حي" as
+  a live/direct descriptor, "متوقف" for a down status, "نقطة الاتصال"
+  unqualified) beyond the §5.2 table's named keys, since §5.1 states
+  these as avoid-everywhere rules, not table-scoped ones. Every fix
+  re-checked for Arabic gender agreement where "الراصد" (masculine) became
+  "خدمة التسجيل" (feminine) - e.g. `evidence_export_note`'s "واجهته" ->
+  "واجهتها", `capabilities_in_bundle`'s "الذي أنتج" -> "التي أنتجت".
+
+**§4.6 formatting service** - `desktop/src/i18n/format.ts` (new):
+`formatTime`/`formatDateTime` (both locales now `ar-EG-u-nu-latn`
+in Arabic, forcing Latin numerals instead of the default Arabic-Indic
+ones - the actual fix for the screenshot-confirmed defect),
+`formatCount` (thousands grouping), `formatDuration` (compact «4 س 49 د»
+/ detailed «4 ساعات و49 دقيقة», both styles matching the execution
+order's own literal examples exactly, checked with an equality
+assertion, not a substring match). `TechnicalValue` gained an optional
+`dateTime` prop that renders a real `<time dateTime="...">` element
+instead of `<bdi>` for an actual point in time - one component remains
+the single place holding "isolated LTR technical content," instead of a
+second, competing wrapping convention. All ten call sites (`IncidentCard`,
+`SourceBanner`, `Diagnostics` x2, `Evidence` x3, `Host`, `Incidents`,
+`Timeline`) migrated; `Overview.tsx`'s bespoke, English-only
+`formatUptime` (never localized to Arabic at all, despite living inside
+an "ltr-field" span that made it look intentionally technical) replaced
+by the shared `formatDuration`.
+
+`formatBytes` (also named in §4.6) was deliberately not built: no field
+in the data model carries a byte size anywhere in the app today (checked
+`data/types.ts` directly) - it would be a function with no real value to
+format, the same reasoning this session already applied elsewhere to
+avoid unused, speculative code.
+
+## 3. Full regression
+
+    $ npx tsc --noEmit                             clean
+    $ npm test -- --run                            15 files, 130 tests passed (was 119; +11 format.test.ts)
+    $ npm run build                                clean
+    $ npx playwright test                          37 passed once isolated (see §4 for one flake)
+
+## 4. A real flake hit and correctly diagnosed, not ignored
+
+The first full Playwright run showed one failure: "wizard has no
+serious/critical axe violations on every step - ar" timing out at
+60000ms. This test's own code comment already documents this exact
+failure mode from an earlier slice ("under this suite's normal 4-worker
+parallelism this test alone occasionally exceeded 30s... not flaky in
+the sense of a real bug; the budget was just wrong"). Rather than assume
+that explanation applied again, it was checked: re-run alone with
+`--workers=1`, it passed in 14.8s, comfortably inside budget; a second
+full-parallelism run immediately after passed all 37/37 with no retry.
+Two consistent, contradictory-with-a-regression-theory results (fails
+only under contention, passes reliably alone and on a clean re-run)
+against zero reproductions of an actual axe violation - the conclusion
+recorded here is CPU contention on this machine during that one run, the
+same known class of flake, not a defect introduced by this slice's
+changes.
+
+## 5. Actually looked at it
+
+Live in the browser, Arabic, fresh dev-server load (clean console
+throughout): walked all six wizard steps start to finish - "اختر لغة
+التطبيق" -> five-point privacy list, rendered as a real bulleted `<ul>`
+at 720px width with actions still reachable -> "الاتصال بخدمة التسجيل
+المحلية" -> "التحقق من الجاهزية" showing only the honest skipped-check
+card, no more hypothetical "would check" list -> capability numbers ->
+"استكشف حادثة تجريبية" showing a full incident with every §5-corrected
+term in one coherent render (حرج severity badge, أدى إلى/تزامن معه
+relation labels, السبب المرجّح, ما الذي تتحقق منه الآن). Then Overview,
+Settings, Diagnostics, and Rules pages individually, confirming
+`nav_overview`/`nav_rules`/`overview_title`/`overview_subtitle`/
+`unknown_gaps_title`/`no_gaps`/`settings_source_title`/
+`settings_source_live`/`settings_shell_note`/`settings_wizard_body`/
+`diagnostics_subtitle` all read their corrected text together on a real
+page, not just individually in the dictionary. Confirmed via direct DOM
+inspection (not just visual reading) that a Timeline row's time now is a
+genuine `<time dateTime="2026-09-13T18:20:17.069Z">` element reading
+"22:20:17" in Latin digits with `direction: ltr` computed - the exact
+defect this gap-closure set out to fix, closed and verified at the DOM
+level, not just asserted.
+
+## 6. Correcting the record
+
+The progress log's prior "Phase 4 is now fully closed" entry is not
+edited or removed (append-only, newest-on-top logging) - a new entry
+above it states plainly that the claim covered only ADR 0004's own scope
+and the phase's actual gate (§5 content contract + §4.6 formatting
+service) was not yet met at the time it was written. ADR 0004 itself is
+unchanged: its Decision section never claimed §5 or §4.6, so its own
+status line was accurate about what it covers - the overclaim was in how
+the progress log summarized it, not in the ADR.
+
+Phase 4's gate, as literally written in the execution order, is now
+genuinely met: the Latin-scanner passes against the corrected Arabic
+render (unchanged, still green - every new/changed string went through
+`t()`), and a human re-read (this log's §5.2/§5.1 walkthrough, done
+string-by-string during implementation, not after) was performed against
+§5, not skipped.

@@ -2,6 +2,8 @@ import { useLanguage } from "../i18n/LanguageContext";
 import type { NetRewindEvent } from "../types";
 import { nsToDate } from "../types";
 import { SeverityBadge } from "../components/SeverityBadge";
+import { TechnicalValue } from "../components/TechnicalValue";
+import { formatTime } from "../i18n/format";
 
 export function Timeline({ events }: { events: NetRewindEvent[] }) {
   const { t, lang } = useLanguage();
@@ -17,9 +19,9 @@ export function Timeline({ events }: { events: NetRewindEvent[] }) {
         ) : (
           sorted.map((e) => (
             <div className="timeline-row" key={e.event_id}>
-              <span className="timeline-time ltr-field">
-                {nsToDate(e.ts_wall).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour12: false })}
-              </span>
+              <TechnicalValue className="timeline-time" dateTime={nsToDate(e.ts_wall).toISOString()}>
+                {formatTime(nsToDate(e.ts_wall), lang)}
+              </TechnicalValue>
               <SeverityBadge severity={e.severity} />
               <span className="ltr-field" style={{ fontWeight: 600 }}>
                 {e.kind}
