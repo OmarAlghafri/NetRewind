@@ -1,0 +1,108 @@
+Phase 6, second slice: two of the three "before/after inference" guardrails
+from execution order §4.10 - the confidence ceiling made structural, and a
+general-purpose address-redaction function. (The third, forced
+insufficient_evidence on a gap/collector-down, is still open - see §4.)
+
+## 1. Confidence ceiling: from graded to structural
+
+`harness.Grade` already checked a hypothesis's confidence against
+`expected.MaxConfidence` after the fact - correct as a grading rule, but
+not what §4.10 actually asks for: "the model does not get to set its own
+ceiling," which reads as a constraint the model cannot violate, not one
+that is merely detected once it has.
+
+`ai/eval/run/main.go`'s `jsonSchemaFor` now takes a `maxConfidence int`
+and applies it as a JSON-schema `"maximum"` on both `ranked_hypotheses[].
+confidence` and the top-level `confidence_ceiling` - sent per-request
+alongside the `evidence_handles` enum, so a model literally cannot sample
+a confidence value above what the deterministic engine itself reached for
+this case. `harness.Grade`'s own check is kept, not removed: it now only
+ever fires if a server is not actually applying the schema it was sent
+(a real, worth-catching misconfiguration), not against a model that is
+behaving as instructed. With no case-specific ceiling (`MaxConfidence ==
+0`), the field still bounds to [0, 100] rather than staying an
+open-ended integer - a nonsense value like 250 is unrepresentable
+either way.
+
+4 new tests, including one confirming the [0,100] default bound holds
+even absent a case-specific ceiling.
+
+## 2. Address redaction: generalized, not yet wired to the default path
+
+`ai/eval/harness/redact.go` (new): `RedactAddresses(s string) string`
+replaces every RFC 1918 private IPv4 address with a sequential
+"<HOST_N>" placeholder and every MAC address with a sequential "<MAC_N>"
+placeholder, same real value always getting the same placeholder within
+one call. Generalizes `ai/eval/run/main.go`'s existing
+`buildDeidentifyTable`/`deidentify` (a real, working mechanism, but
+hardcoded to a literal "10.99." prefix - correct for this one lab's fixed
+subnet, not a general private-address pattern) and adds MAC-address
+handling, which nothing in this codebase redacted before at all
+(`attrs.mac_old`/`attrs.mac_new` carry these verbatim in every arp_change-
+family event).
+
+Deliberately NOT wired into the eval runner's default prompt path this
+slice, and said so in the code rather than silently deferring it:
+`schema.Case`'s non-"-deidentified" variants (roughly two-thirds of the
+33 cases) have `Expected.RootCauseEntity` set to the real address: making
+redaction the default would show the model a placeholder it could never
+correctly answer against that real-address expectation, breaking
+Top1/Top3 scoring for every one of those cases in a way that would look
+like a model regression but would actually be a harness bug. Correcting
+that needs the corpus's Expected values reworked to match, which is the
+same shape of change already tracked separately ("expand ai/eval/cases/
+meaningfully beyond 33 cases," §3 below) - bundling it into this slice as
+a silent side effect would have been exactly the kind of half-finished
+change this project's own discipline exists to catch. `gen/main.go`'s
+own existing deidentify-table logic (used to author the "-deidentified"
+fixture variants at generation time) is untouched - a separate,
+already-correct mechanism serving a different purpose (build-time fixture
+authoring vs. runtime guardrail), not something this slice needed to
+touch.
+
+7 new tests: every RFC 1918 range redacted, the 172.16-31 boundary exact
+in both directions, public addresses (8.8.8.8, 1.1.1.1) left alone, the
+same real value always getting the same placeholder, MAC addresses
+handled as their own category, and a run against one real, unmodified
+scenario from `corpus/v1/arp_change/events.json` (not a synthetic
+string) confirming neither its real IP nor its real MAC survives.
+
+## 3. Full regression
+
+    $ go build ./...                               clean
+    $ go vet ./...                                  clean
+    $ CGO_ENABLED=0 go test ./...                   every package passes (22 packages with tests, 0 failures)
+    $ gofmt -l ai/eval/                             clean
+
+## 4. Proven, not just passing once
+
+Two deliberate-break proofs, both restored immediately after and
+confirmed via a clean `git diff --stat`:
+- Widened the confidence-ceiling and evidence-handle checks are already
+  covered by the prior slice's proofs; this slice's own highest-stakes
+  new logic is the 172.16-31 boundary regex. Widened it to `1[0-9]` (i.e.
+  172.16-19 became 172.10-19, silently also matching 172.15.x.x, a real
+  address just outside RFC 1918) - both
+  `TestRedactAddressesLeavesAdjacentRangesAlone` and
+  `TestPrivateIPPatternBoundsAreExact` failed with the exact expected
+  wrong values (172.15.255.255 and 172.32.0.0 both incorrectly matched),
+  proving the boundary tests actually depend on the exact bound, not on
+  the general shape of the pattern.
+
+## 5. What remains before a real benchmark run is possible
+
+Forced `insufficient_evidence` on a required-collector-down/in-window gap
+is not built yet: today, a refusal case (blind_gap, collector_down) is
+still sent to the model and graded on whether it chooses to refuse
+correctly, which is valuable data about candidate quality but is not the
+same as the backend deciding not to call the model at all when the
+deterministic engine can already tell evidence is insufficient. Building
+that requires deciding where this check reads from - the real
+`internal/registry`/`internal/correlate` gap detection the shipping
+product will use, versus a corpus-only stand-in for benchmarking purposes
+- a design question worth its own slice rather than a rushed addition
+here.
+
+The Tauri sidecar and model manager (ADR 0006) remain unbuilt. The actual
+model download and CPU benchmark run stays deferred to the second test
+machine (evidence 48 §1: 85-200GB free there vs. 5.3GB on this machine).

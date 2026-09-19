@@ -53,10 +53,23 @@ import (
 // llama-server's server-wide `-jf <file>` startup flag, because `-jf` fixes
 // one schema for the whole server session and cannot vary per case the way
 // this enum must.
-func jsonSchemaFor(handles []string) map[string]any {
+//
+// maxConfidence (0 means "no ceiling for this case") makes the confidence
+// ceiling structural rather than merely graded after the fact: "the model
+// does not get to set its own ceiling" (§4.10) becomes a `"maximum"` bound
+// on the confidence fields themselves, so a value above the deterministic
+// engine's own confidence for this conclusion cannot be sampled at all -
+// harness.Grade's own confidence check (kept, not removed) then only ever
+// fires against a server that is not actually applying this schema, which
+// is itself worth catching rather than silently trusting.
+func jsonSchemaFor(handles []string, maxConfidence int) map[string]any {
 	handleEnum := []any{}
 	for _, h := range handles {
 		handleEnum = append(handleEnum, h)
+	}
+	confidenceField := map[string]any{"type": "integer", "minimum": 0, "maximum": 100}
+	if maxConfidence > 0 {
+		confidenceField["maximum"] = maxConfidence
 	}
 	return map[string]any{
 		"type": "object",
@@ -69,7 +82,7 @@ func jsonSchemaFor(handles []string) map[string]any {
 					"properties": map[string]any{
 						"cause":      map[string]any{"type": "string"},
 						"entity":     map[string]any{"type": "string"},
-						"confidence": map[string]any{"type": "integer"},
+						"confidence": confidenceField,
 					},
 					"required": []any{"cause", "entity", "confidence"},
 				},
@@ -80,7 +93,7 @@ func jsonSchemaFor(handles []string) map[string]any {
 			},
 			"counter_evidence":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 			"unknowns":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
-			"confidence_ceiling": map[string]any{"type": "integer"},
+			"confidence_ceiling": confidenceField,
 			"next_checks":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 		},
 		"required": []any{
@@ -183,7 +196,7 @@ func main() {
 		userPrompt := buildUserPromptFromText(eventsText, question)
 
 		start := time.Now()
-		raw, err := chatComplete(client, *serverURL, systemPrompt, userPrompt, *nPredict, jsonSchemaFor(hm.Handles))
+		raw, err := chatComplete(client, *serverURL, systemPrompt, userPrompt, *nPredict, jsonSchemaFor(hm.Handles, c.Expected.MaxConfidence))
 		elapsed := time.Since(start)
 
 		rr := runResult{CaseID: id, Scenario: c.Scenario, Kind: c.Kind, Elapsed: elapsed.Round(time.Second).String()}

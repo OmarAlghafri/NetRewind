@@ -127,7 +127,7 @@ func TestSystemPromptNamesTheAnswerLanguage(t *testing.T) {
 // applies this schema, regardless of what the system prompt merely asks
 // for.
 func TestJSONSchemaForConstrainsEvidenceHandlesToExactlyWhatWasOffered(t *testing.T) {
-	s := jsonSchemaFor([]string{"E1", "E2", "E3"})
+	s := jsonSchemaFor([]string{"E1", "E2", "E3"}, 0)
 	props := s["properties"].(map[string]any)
 	handles := props["evidence_handles"].(map[string]any)
 	items := handles["items"].(map[string]any)
@@ -142,13 +142,45 @@ func TestJSONSchemaForConstrainsEvidenceHandlesToExactlyWhatWasOffered(t *testin
 // allowed values, not an unconstrained array - a schema.Case that offers no
 // evidence must make it impossible to cite any, not merely unlikely.
 func TestJSONSchemaForWithNoEvidenceForcesAnEmptyCitationList(t *testing.T) {
-	s := jsonSchemaFor(nil)
+	s := jsonSchemaFor(nil, 0)
 	props := s["properties"].(map[string]any)
 	handles := props["evidence_handles"].(map[string]any)
 	items := handles["items"].(map[string]any)
 	enum := items["enum"].([]any)
 	if len(enum) != 0 {
 		t.Errorf("evidence_handles enum = %v, want empty", enum)
+	}
+}
+
+// TestJSONSchemaForAppliesTheConfidenceCeilingStructurally pins execution
+// order §4.10's "the model does not get to set its own ceiling" as a
+// schema-level maximum, not merely a post-hoc grading check (harness.Grade
+// already checked this after the fact; this makes violating it
+// unrepresentable in the first place, the same structural approach as the
+// evidence_handles enum).
+func TestJSONSchemaForAppliesTheConfidenceCeilingStructurally(t *testing.T) {
+	s := jsonSchemaFor([]string{"E1"}, 62)
+	props := s["properties"].(map[string]any)
+
+	hypProps := props["ranked_hypotheses"].(map[string]any)["items"].(map[string]any)["properties"].(map[string]any)
+	if hypProps["confidence"].(map[string]any)["maximum"] != 62 {
+		t.Errorf("ranked_hypotheses[].confidence maximum = %v, want 62", hypProps["confidence"].(map[string]any)["maximum"])
+	}
+	if props["confidence_ceiling"].(map[string]any)["maximum"] != 62 {
+		t.Errorf("confidence_ceiling maximum = %v, want 62", props["confidence_ceiling"].(map[string]any)["maximum"])
+	}
+}
+
+// TestJSONSchemaForWithNoCeilingStillBoundsConfidenceTo100 proves a case
+// with no case-specific ceiling (MaxConfidence == 0, meaning "not set" in
+// schema.Expected) still rejects a nonsensical confidence like 250 - the
+// unconditional [0,100] bound, not an open-ended integer.
+func TestJSONSchemaForWithNoCeilingStillBoundsConfidenceTo100(t *testing.T) {
+	s := jsonSchemaFor([]string{"E1"}, 0)
+	props := s["properties"].(map[string]any)
+	ceiling := props["confidence_ceiling"].(map[string]any)
+	if ceiling["maximum"] != 100 || ceiling["minimum"] != 0 {
+		t.Errorf("confidence_ceiling bounds = [%v,%v], want [0,100] even with no case-specific ceiling", ceiling["minimum"], ceiling["maximum"])
 	}
 }
 
@@ -160,7 +192,7 @@ func TestChatCompletionRequestSendsThePerCaseSchema(t *testing.T) {
 	body, err := json.Marshal(chatCompletionRequest{
 		Temperature:    0,
 		MaxTokens:      1,
-		ResponseFormat: &responseFormat{Type: "json_schema", JSONSchema: jsonSchemaBody{Name: "x", Schema: jsonSchemaFor([]string{"E1"})}},
+		ResponseFormat: &responseFormat{Type: "json_schema", JSONSchema: jsonSchemaBody{Name: "x", Schema: jsonSchemaFor([]string{"E1"}, 0)}},
 	})
 	if err != nil {
 		t.Fatal(err)
