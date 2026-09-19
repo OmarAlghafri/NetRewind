@@ -15,7 +15,8 @@ function english<T>(ui: React.ReactElement<T>) {
 
 const record = (over: Partial<Record>): Record => ({
   status: "ready", error: "", events: [], incidents: [], health: null, capabilities: [], rules: [],
-  manifest: null, bundleSigned: false, bundleHasSignature: false, refreshedAt: null, refresh: () => {}, ...over,
+  manifest: null, bundleSigned: false, bundleHasSignature: false, refreshedAt: null, stale: false,
+  refresh: () => {}, ...over,
 });
 
 describe("CapabilityTable", () => {
