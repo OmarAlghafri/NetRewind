@@ -10,6 +10,21 @@ import (
 	"github.com/OmarAlghafri/netrewind/ai/eval/schema"
 )
 
+// testHandleMap builds a HandleMap the same way BuildHandles would, from a
+// plain list of "real IDs" in order - a small helper so each test below can
+// say what handle maps to what real ID without constructing full event
+// maps just to get an event_id field read out of them. Delegates to the
+// real BuildHandles (via a minimal synthetic event per ID) rather than
+// reimplementing the "E%d" numbering separately, so this helper cannot
+// silently drift from the actual assignment rule under test.
+func testHandleMap(ids ...string) HandleMap {
+	events := make([]map[string]any, len(ids))
+	for i, id := range ids {
+		events[i] = map[string]any{"event_id": id}
+	}
+	return BuildHandles(events)
+}
+
 func TestAGoodAnswerPassesAPositiveCase(t *testing.T) {
 	expected := Expected{
 		MustCiteEventIDs: []string{"ev1", "ev2"},
@@ -17,17 +32,17 @@ func TestAGoodAnswerPassesAPositiveCase(t *testing.T) {
 		RootCauseEntity:  "10.99.1.11",
 		MaxConfidence:    88,
 	}
-	known := map[string]bool{"ev1": true, "ev2": true, "ev3": true}
+	hm := testHandleMap("ev1", "ev2", "ev3")
 
 	out := ModelOutput{
 		Summary: "the ARP binding changed, breaking a working path",
 		RankedHypotheses: []Hypothesis{
 			{Cause: "l2.arp_binding_changed", Entity: "10.99.1.11", Confidence: 88},
 		},
-		EvidenceEventIDs: []string{"ev1", "ev2"},
+		EvidenceHandles: []string{"E1", "E2"},
 	}
 
-	r := Grade("t1", expected, known, out)
+	r := Grade("t1", expected, hm, out)
 	if !r.Pass() {
 		t.Fatalf("expected a pass, got violations: %v", r.Violations)
 	}
@@ -39,40 +54,46 @@ func TestAGoodAnswerPassesAPositiveCase(t *testing.T) {
 	}
 }
 
-func TestAFabricatedCitationIsAlwaysAViolation(t *testing.T) {
+// TestAHandleOutsideTheOfferedSetIsAlwaysAViolation is the direct proof of
+// execution order §4.10's actual fix: a model can no longer fabricate a
+// plausible-looking ULID, but it could still (if the server-side schema
+// enforcement were ever misconfigured or bypassed) emit a handle it was
+// never offered - e.g. "E99" when only E1 was given. That must still fail
+// exactly as fabricating a raw event ID always did.
+func TestAHandleOutsideTheOfferedSetIsAlwaysAViolation(t *testing.T) {
 	expected := Expected{RootCauseKind: "link.down", RootCauseEntity: "eth0", MaxConfidence: 80}
-	known := map[string]bool{"ev1": true}
+	hm := testHandleMap("ev1")
 
 	out := ModelOutput{
 		RankedHypotheses: []Hypothesis{{Cause: "link.down", Entity: "eth0", Confidence: 50}},
-		EvidenceEventIDs: []string{"ev1", "ev-does-not-exist"},
+		EvidenceHandles:  []string{"E1", "E99"},
 	}
 
-	r := Grade("t2", expected, known, out)
+	r := Grade("t2", expected, hm, out)
 	if r.Pass() {
-		t.Fatal("a citation of an event ID absent from the input must never pass")
+		t.Fatal("a handle never offered for this case must never pass")
 	}
 	found := false
 	for _, v := range r.Violations {
-		if strings.Contains(v, "ev-does-not-exist") {
+		if strings.Contains(v, "E99") {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("violations do not name the fabricated ID: %v", r.Violations)
+		t.Errorf("violations do not name the out-of-set handle: %v", r.Violations)
 	}
 }
 
 func TestConfidenceAboveTheCeilingIsAViolation(t *testing.T) {
 	expected := Expected{RootCauseKind: "link.down", RootCauseEntity: "eth0", MaxConfidence: 80}
-	known := map[string]bool{"ev1": true}
+	hm := testHandleMap("ev1")
 
 	out := ModelOutput{
 		RankedHypotheses: []Hypothesis{{Cause: "link.down", Entity: "eth0", Confidence: 99}},
-		EvidenceEventIDs: []string{"ev1"},
+		EvidenceHandles:  []string{"E1"},
 	}
 
-	r := Grade("t3", expected, known, out)
+	r := Grade("t3", expected, hm, out)
 	if r.Pass() {
 		t.Fatal("a hypothesis more confident than the evidence itself must never pass")
 	}
@@ -80,7 +101,7 @@ func TestConfidenceAboveTheCeilingIsAViolation(t *testing.T) {
 
 func TestNoHypothesisOfferedFailsAPositiveCase(t *testing.T) {
 	expected := Expected{RootCauseKind: "link.down", RootCauseEntity: "eth0"}
-	r := Grade("t4", expected, map[string]bool{}, ModelOutput{})
+	r := Grade("t4", expected, HandleMap{}, ModelOutput{})
 	if r.Pass() {
 		t.Fatal("offering nothing for a case with a real, findable cause must fail")
 	}
@@ -88,13 +109,13 @@ func TestNoHypothesisOfferedFailsAPositiveCase(t *testing.T) {
 
 func TestAConfidentAnswerOnARefusalCaseIsFalseCausality(t *testing.T) {
 	expected := Expected{RefusalExpected: true}
-	known := map[string]bool{"ev1": true}
+	hm := testHandleMap("ev1")
 
 	out := ModelOutput{
 		RankedHypotheses: []Hypothesis{{Cause: "link.down", Entity: "eth0", Confidence: 40}},
-		EvidenceEventIDs: []string{"ev1"},
+		EvidenceHandles:  []string{"E1"},
 	}
-	r := Grade("t5", expected, known, out)
+	r := Grade("t5", expected, hm, out)
 	if r.Pass() {
 		t.Fatal("a confident hypothesis where refusal was correct is exactly the false-causality this harness must catch")
 	}
@@ -106,7 +127,7 @@ func TestACorrectRefusalPasses(t *testing.T) {
 		Summary:  "the record has a gap here",
 		Unknowns: []string{"whether anything happened during the blind period"},
 	}
-	r := Grade("t6", expected, map[string]bool{}, out)
+	r := Grade("t6", expected, HandleMap{}, out)
 	if !r.Pass() {
 		t.Fatalf("a correct, honest refusal must pass: %v", r.Violations)
 	}
@@ -118,7 +139,7 @@ func TestACorrectRefusalPasses(t *testing.T) {
 func TestABareRefusalWithNoUnknownsNamedFails(t *testing.T) {
 	expected := Expected{RefusalExpected: true}
 	out := ModelOutput{Summary: "not sure"}
-	r := Grade("t7", expected, map[string]bool{}, out)
+	r := Grade("t7", expected, HandleMap{}, out)
 	if r.Pass() {
 		t.Fatal("a refusal that names no unknowns is not more useful than a wrong answer, and must not pass")
 	}
@@ -132,7 +153,7 @@ func TestTop3HitWithoutTop1(t *testing.T) {
 			{Cause: "link.down", Entity: "eth0", Confidence: 40},
 		},
 	}
-	r := Grade("t8", expected, map[string]bool{}, out)
+	r := Grade("t8", expected, HandleMap{}, out)
 	if r.Top1CauseHit {
 		t.Error("Top1CauseHit should be false - the right cause was ranked second")
 	}
@@ -143,14 +164,67 @@ func TestTop3HitWithoutTop1(t *testing.T) {
 
 func TestCitationPrecisionPartialOverlap(t *testing.T) {
 	expected := Expected{RootCauseKind: "x", RootCauseEntity: "y", MustCiteEventIDs: []string{"ev1", "ev2"}}
-	known := map[string]bool{"ev1": true, "ev2": true, "ev3": true}
+	hm := testHandleMap("ev1", "ev2", "ev3")
 	out := ModelOutput{
 		RankedHypotheses: []Hypothesis{{Cause: "x", Entity: "y", Confidence: 10}},
-		EvidenceEventIDs: []string{"ev1", "ev3"}, // one expected, one not
+		EvidenceHandles:  []string{"E1", "E3"}, // one expected (ev1), one not (ev3)
 	}
-	r := Grade("t9", expected, known, out)
+	r := Grade("t9", expected, hm, out)
 	if r.CitationPrecision != 0.5 {
 		t.Errorf("CitationPrecision = %v, want 0.5", r.CitationPrecision)
+	}
+}
+
+// TestBuildHandlesAssignsInEventOrderAndSkipsMalformedEntries proves the
+// handle-assignment contract directly: sequential E1..En in input order,
+// and an event with no usable event_id is skipped rather than silently
+// consuming a handle number it could never legitimately be cited by.
+func TestBuildHandlesAssignsInEventOrderAndSkipsMalformedEntries(t *testing.T) {
+	events := []map[string]any{
+		{"event_id": "id-a", "kind": "link.down"},
+		{"kind": "malformed, no event_id"},
+		{"event_id": "id-b", "kind": "link.up"},
+	}
+	hm := BuildHandles(events)
+	if len(hm.Handles) != 2 {
+		t.Fatalf("Handles = %v, want exactly 2 (the malformed entry must be skipped)", hm.Handles)
+	}
+	if hm.ToHandle["id-a"] != "E1" || hm.ToHandle["id-b"] != "E2" {
+		t.Errorf("ToHandle = %v, want id-a->E1, id-b->E2 (event order preserved)", hm.ToHandle)
+	}
+	if hm.ToID["E1"] != "id-a" || hm.ToID["E2"] != "id-b" {
+		t.Errorf("ToID = %v, want the reverse mapping", hm.ToID)
+	}
+}
+
+// TestRedactEventNeverLeavesTheRealEventIDReachable is the actual anti-
+// fabrication guarantee at the source: proves the field the model would
+// need to copy to fabricate a citation is not merely renamed but genuinely
+// absent from what RedactEvent returns - there is nothing shaped like a
+// real ULID anywhere in the model's input to begin with.
+func TestRedactEventNeverLeavesTheRealEventIDReachable(t *testing.T) {
+	events := []map[string]any{{"event_id": "01M2REALULIDVALUE", "kind": "link.down", "schema_v": 1, "ts_mono": 12345, "severity": "warn"}}
+	hm := BuildHandles(events)
+	redacted := hm.RedactEvent(events[0])
+
+	data, err := json.Marshal(redacted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "01M2REALULIDVALUE") {
+		t.Errorf("redacted event still contains the real event_id: %s", data)
+	}
+	if redacted["handle"] != "E1" {
+		t.Errorf(`redacted["handle"] = %v, want "E1"`, redacted["handle"])
+	}
+	if _, present := redacted["schema_v"]; present {
+		t.Error("schema_v should be stripped, not just event_id")
+	}
+	if _, present := redacted["ts_mono"]; present {
+		t.Error("ts_mono should be stripped, not just event_id")
+	}
+	if redacted["severity"] != "warn" {
+		t.Error("an unrelated, analytically useful field (severity) must survive redaction unchanged")
 	}
 }
 
@@ -184,25 +258,26 @@ func TestHarnessRunsAgainstEveryGeneratedCase(t *testing.T) {
 		}
 
 		t.Run(c.ID, func(t *testing.T) {
-			known := make(map[string]bool, len(c.EventIDs))
-			for _, id := range c.EventIDs {
-				known[id] = true
-			}
+			hm := testHandleMap(c.EventIDs...)
 
 			var out ModelOutput
 			if c.Expected.RefusalExpected {
 				out = ModelOutput{Summary: "refusing", Unknowns: []string{"the cause cannot be determined from this record"}}
 			} else {
+				citeHandles := make([]string, 0, len(c.Expected.MustCiteEventIDs))
+				for _, id := range c.Expected.MustCiteEventIDs {
+					citeHandles = append(citeHandles, hm.ToHandle[id])
+				}
 				out = ModelOutput{
 					Summary: "synthetic perfect answer built from the case's own expected block",
 					RankedHypotheses: []Hypothesis{
 						{Cause: c.Expected.RootCauseKind, Entity: c.Expected.RootCauseEntity, Confidence: c.Expected.MaxConfidence},
 					},
-					EvidenceEventIDs: c.Expected.MustCiteEventIDs,
+					EvidenceHandles: citeHandles,
 				}
 			}
 
-			r := Grade(c.ID, c.Expected, known, out)
+			r := Grade(c.ID, c.Expected, hm, out)
 			if !r.Pass() {
 				t.Errorf("a by-construction-correct answer failed: %v", r.Violations)
 			}

@@ -25,8 +25,10 @@ type Expected struct {
 	// gap/collector-down."
 	RefusalExpected bool `json:"refusal_expected"`
 	// MustCiteEventIDs are real event IDs from the actual incident chain,
-	// never invented - what a passing answer's evidence_event_ids should
-	// draw from.
+	// never invented - what a passing answer's evidence_handles should
+	// resolve to (execution order §4.10's handle contract: the model cites
+	// handles like "E3", never a raw event ID; harness.Grade resolves them
+	// back to real IDs via the case's HandleMap before comparing here).
 	MustCiteEventIDs []string `json:"must_cite_event_ids,omitempty"`
 	RootCauseKind    string   `json:"root_cause_kind,omitempty"`
 	RootCauseEntity  string   `json:"root_cause_entity,omitempty"`

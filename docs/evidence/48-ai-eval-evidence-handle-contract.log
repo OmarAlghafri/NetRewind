@@ -1,0 +1,112 @@
+Phase 6 (Local AI), first slice: the evidence-handle contract - execution
+order §4.10's actual fix for why both previously-measured models failed
+(docs/evidence/27-ai-eval-corrected-sweep.log: best result 2/6 graded
+cases, with Phi-4-mini fabricating an event ID in two others - "dominated
+by malformed/fabricated event-ID references, not reasoning quality").
+
+## 1. Environment check before writing any code
+
+Before building runtime/model-manager infrastructure, checked whether this
+machine can safely run the actual multi-gigabyte model download and
+benchmark ADR 0006 requires: `df -h` showed 5.3GB free on this machine's
+only drive. A Qwen3-4B-Instruct Q4_K_M GGUF alone is several GB; the
+low-resource and comparator candidates ADR 0006 names would not fit
+alongside it, and even attempting one risks filling a shared primary work
+machine's disk to zero - a hard-to-reverse, high-blast-radius action this
+project's own safety rules single out for care, not something to attempt
+speculatively. Checked the second physical test machine instead (already
+authorized for "freely within its safety rules" per the standing
+decisions this mission runs under): `C:` 85.9GB free, `D:` 204.3GB, `F:`
+172.7GB - ample room for the full three-candidate evaluation. The actual
+download/benchmark run moves there; this machine builds and tests the
+code that run depends on, with zero download risk.
+
+## 2. What was actually wrong with the prior design
+
+`ai/eval/harness.ModelOutput.EvidenceEventIDs` and the system prompt both
+worked directly with real event IDs (ULIDs) - the harness graded a cited
+ID as fabricated only if it did not appear in `case.EventIDs`, which
+requires the model to correctly reproduce a ~26-character ULID verbatim to
+pass at all. `ai/eval/run/main.go`'s JSON schema was also a build-time
+constant meant for `llama-server -jf <file>` at server startup - which
+fixes one schema for the whole server session and cannot vary per case.
+
+## 3. What was built
+
+`ai/eval/harness/evidence.go` (new): `HandleMap` (`BuildHandles`,
+`RedactEvent`, `ResolveHandles`). Each event gets a short handle ("E1",
+"E2", ...) in input order; `RedactEvent` returns a copy with `event_id`
+replaced by `handle` and `schema_v`/`ts_mono` (analytically meaningless)
+stripped - every other field (kind, subject, attrs, evidence, severity,
+confidence, ts_wall, source, observer_id, count) passes through
+unchanged, so the fix removes only the field that caused fabrication, not
+information the model used to reason.
+
+`harness.ModelOutput.EvidenceEventIDs` -> `EvidenceHandles`; `Grade` now
+takes a `HandleMap` instead of a bare `known-IDs` set, resolves the
+model's cited handles back to real IDs via `ResolveHandles`, and reports
+any handle outside the offered set as a violation by name - structurally
+the same hard-fail severity as a fabricated ULID always was, but now
+checked against a small closed set instead of a large ID space.
+
+`ai/eval/run/main.go`: `jsonSchemaFor(handles []string)` builds the
+per-case schema with `evidence_handles` as a closed `enum` of exactly the
+handles offered for that case - sent per-request via
+`response_format.json_schema` (llama-server's OpenAI-compatible
+structured-output field) instead of the old server-wide `-jf` flag,
+because only a per-request field can vary the enum case to case as
+execution order §4.10 actually specifies ("a dynamic JSON-schema/grammar
+built per-request from the actual evidence set"). The events shown to the
+model are now `hm.RedactEvent(e)` for every event, not the raw event -
+the real ULID is never present anywhere in the prompt at all, so there is
+nothing shaped like a real ID left to fabricate a plausible variant of.
+The system prompt was rewritten to talk about handles instead of event
+IDs throughout.
+
+## 4. Full regression
+
+    $ go build ./...                               clean
+    $ go vet ./...                                  clean
+    $ CGO_ENABLED=0 go test ./...                   all packages pass (ai/eval/harness, ai/eval/run, and every pre-existing package unaffected)
+    $ CGO_ENABLED=0 go test ./ai/eval/harness/... -v   12 tests, including all 33 real generated cases individually
+
+## 5. Proven, not just passing once
+
+Two things proven by deliberate breakage, not merely asserted:
+- `TestAHandleOutsideTheOfferedSetIsAlwaysAViolation`: the actual
+  `hm.ResolveHandles` call in `Grade` was replaced with a version that
+  always reports zero unknown handles (`var unknownHandles []string`,
+  discarding the real result) - the test failed with exactly "a handle
+  never offered for this case must never pass", confirming the test
+  depends on that check firing, not on some unrelated code path. Restored
+  immediately after (`git diff --stat` shows zero remaining diff from the
+  pre-break state, confirming a clean restore).
+- `TestRedactEventNeverLeavesTheRealEventIDReachable`: marshals the
+  redacted event to JSON and asserts the real ULID string is not a
+  substring anywhere in the output - a positive proof the anti-
+  fabrication fix holds at the source (the model is never shown the ID at
+  all), not just that the field was renamed.
+
+`TestHarnessRunsAgainstEveryGeneratedCase` re-ran against all 33 real
+cases from `ai/eval/cases/` (not a synthetic subset) with the new
+handle-based grading and passed every one - confirming the refactor
+integrates correctly across the entire existing corpus, not only
+hand-picked fixtures.
+
+## 6. What remains before a real benchmark run is possible
+
+Guardrails not yet built: the deterministic confidence-ceiling
+computation (currently only graded as an upper bound in the harness, not
+computed and enforced by a real backend), forced `insufficient_evidence`
+on a required-collector-down/in-window gap, and DNS/IP redaction before
+prompt construction (the existing `-deidentified` case variant proves the
+concept works for lab addresses, but the real evidence-bundle privacy
+toggle this is supposed to reuse is not wired in yet). The Tauri sidecar
+(pinned llama.cpp binary, loopback/random-port/session-token/RAM/thread/
+context/timeout limits) and the model manager (signed manifest, resumable
+download, hash+signature verification, quarantine) do not exist yet
+either - both needed before any UI, and both pure-code work with no
+download risk, so next.
+
+The actual model download and CPU benchmark run itself is deferred to the
+second test machine (§1) - not attempted here.

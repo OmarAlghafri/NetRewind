@@ -15,13 +15,17 @@ import "github.com/OmarAlghafri/netrewind/ai/eval/schema"
 type Expected = schema.Expected
 
 // ModelOutput is the constrained JSON shape every AI answer must take,
-// verbatim from PRODUCT_RELEASE_PLAN_AR.md §6.2 point 3: "Output مقيد
+// starting from PRODUCT_RELEASE_PLAN_AR.md §6.2 point 3: "Output مقيد
 // grammar/JSON schema: summary, ranked_hypotheses[], evidence_event_ids[],
-// counter_evidence[], unknowns[], confidence_ceiling, next_checks[]."
+// counter_evidence[], unknowns[], confidence_ceiling, next_checks[]" -
+// superseded on the evidence field by execution order §4.10's handle
+// contract: EvidenceHandles carries short closed handles ("E1", "E2", ...),
+// never a raw event_id, so there is nothing shaped like a real ULID for the
+// model to fabricate a plausible-but-wrong variant of.
 type ModelOutput struct {
 	Summary           string       `json:"summary"`
 	RankedHypotheses  []Hypothesis `json:"ranked_hypotheses"`
-	EvidenceEventIDs  []string     `json:"evidence_event_ids"`
+	EvidenceHandles   []string     `json:"evidence_handles"`
 	CounterEvidence   []string     `json:"counter_evidence"`
 	Unknowns          []string     `json:"unknowns"`
 	ConfidenceCeiling int          `json:"confidence_ceiling"`
@@ -56,22 +60,24 @@ type Result struct {
 // are tracked, not blocking - but never with a Violation present.
 func (r Result) Pass() bool { return len(r.Violations) == 0 }
 
-// Grade checks out against what case expects. knownEventIDs is every real
-// event ID the case's input actually contained (case.EventIDs) - anything
-// cited outside that set is fabricated and always a violation, regardless
-// of anything else.
-func Grade(caseID string, expected Expected, knownEventIDs map[string]bool, out ModelOutput) Result {
+// Grade checks out against what case expects. hm is the exact HandleMap
+// built from the case's own input events (harness.BuildHandles) - the set
+// of handles that were actually offered to the model for this case.
+//
+// A handle outside that set (execution order §4.10's "any handle outside
+// that set fails the whole answer closed") is the model inventing evidence
+// - the single most dangerous failure mode this whole design exists to
+// prevent (§6.2: "لا تخترع حدثاً"), now structurally harder to trigger
+// than a fabricated ULID ever was, but still checked explicitly rather than
+// assumed impossible: a server not actually enforcing the per-request
+// grammar (a misconfiguration, not a model failure) must still be caught
+// here, not silently trusted.
+func Grade(caseID string, expected Expected, hm HandleMap, out ModelOutput) Result {
 	r := Result{CaseID: caseID}
 
-	// A cited event ID that does not exist in the input is the model
-	// inventing evidence - the single most dangerous failure mode this
-	// whole design exists to prevent (§6.2: "لا تخترع حدثاً"). Checked
-	// first and unconditionally: nothing below matters if the citations
-	// themselves are not real.
-	for _, id := range out.EvidenceEventIDs {
-		if !knownEventIDs[id] {
-			r.Violations = append(r.Violations, "cited event id not present in the input: "+id)
-		}
+	citedIDs, unknownHandles := hm.ResolveHandles(out.EvidenceHandles)
+	for _, h := range unknownHandles {
+		r.Violations = append(r.Violations, "handle not in the offered evidence set: "+h)
 	}
 
 	if expected.RefusalExpected {
@@ -107,7 +113,7 @@ func Grade(caseID string, expected Expected, knownEventIDs map[string]bool, out 
 		}
 	}
 
-	r.CitationPrecision = precision(out.EvidenceEventIDs, expected.MustCiteEventIDs)
+	r.CitationPrecision = precision(citedIDs, expected.MustCiteEventIDs)
 	return r
 }
 

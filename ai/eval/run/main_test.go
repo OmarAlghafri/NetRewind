@@ -23,7 +23,7 @@ func TestExtractModelOutputIgnoresNestedBraces(t *testing.T) {
   "ranked_hypotheses": [
     {"cause": "l2.arp_binding_changed", "entity": "10.99.0.201", "confidence": 90}
   ],
-  "evidence_event_ids": ["ev1"],
+  "evidence_handles": ["E1"],
   "counter_evidence": [],
   "unknowns": [],
   "confidence_ceiling": 90,
@@ -88,7 +88,7 @@ func TestBuildDeidentifyTableMatchesGeneratorOrder(t *testing.T) {
 }
 
 func TestExtractModelOutputHandlesStrayClosingBrace(t *testing.T) {
-	raw := `} {"summary": "ok", "ranked_hypotheses": [], "evidence_event_ids": [], "counter_evidence": [], "unknowns": ["x"], "confidence_ceiling": 0, "next_checks": []}`
+	raw := `} {"summary": "ok", "ranked_hypotheses": [], "evidence_handles": [], "counter_evidence": [], "unknowns": ["x"], "confidence_ceiling": 0, "next_checks": []}`
 	out, err := extractModelOutput(raw)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -117,5 +117,58 @@ func TestRequestDisablesThePromptCache(t *testing.T) {
 func TestSystemPromptNamesTheAnswerLanguage(t *testing.T) {
 	if !strings.Contains(systemPrompt, "same language as the question") {
 		t.Errorf("system prompt no longer instructs the answer language")
+	}
+}
+
+// TestJSONSchemaForConstrainsEvidenceHandlesToExactlyWhatWasOffered pins
+// execution order §4.10's actual fix: "evidence_handles" is a closed enum
+// of exactly the handles passed in, not a free-form string array - a model
+// literally cannot sample a handle outside this list once llama-server
+// applies this schema, regardless of what the system prompt merely asks
+// for.
+func TestJSONSchemaForConstrainsEvidenceHandlesToExactlyWhatWasOffered(t *testing.T) {
+	s := jsonSchemaFor([]string{"E1", "E2", "E3"})
+	props := s["properties"].(map[string]any)
+	handles := props["evidence_handles"].(map[string]any)
+	items := handles["items"].(map[string]any)
+	enum := items["enum"].([]any)
+	if len(enum) != 3 || enum[0] != "E1" || enum[2] != "E3" {
+		t.Errorf("evidence_handles enum = %v, want exactly [E1 E2 E3]", enum)
+	}
+}
+
+// TestJSONSchemaForWithNoEvidenceForcesAnEmptyCitationList proves a case
+// with zero real events (or all malformed) produces an enum with zero
+// allowed values, not an unconstrained array - a schema.Case that offers no
+// evidence must make it impossible to cite any, not merely unlikely.
+func TestJSONSchemaForWithNoEvidenceForcesAnEmptyCitationList(t *testing.T) {
+	s := jsonSchemaFor(nil)
+	props := s["properties"].(map[string]any)
+	handles := props["evidence_handles"].(map[string]any)
+	items := handles["items"].(map[string]any)
+	enum := items["enum"].([]any)
+	if len(enum) != 0 {
+		t.Errorf("evidence_handles enum = %v, want empty", enum)
+	}
+}
+
+// TestChatCompletionRequestSendsThePerCaseSchema pins that the schema
+// actually travels on the wire as response_format, not just built and
+// discarded - the mechanism this program relies on instead of a
+// server-wide -jf flag, which cannot vary the enum per case.
+func TestChatCompletionRequestSendsThePerCaseSchema(t *testing.T) {
+	body, err := json.Marshal(chatCompletionRequest{
+		Temperature:    0,
+		MaxTokens:      1,
+		ResponseFormat: &responseFormat{Type: "json_schema", JSONSchema: jsonSchemaBody{Name: "x", Schema: jsonSchemaFor([]string{"E1"})}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), `"E1"`) {
+		t.Errorf("request body does not carry the per-case handle enum: %s", body)
+	}
+	if !strings.Contains(string(body), `"response_format"`) {
+		t.Errorf("request body missing response_format entirely: %s", body)
 	}
 }
