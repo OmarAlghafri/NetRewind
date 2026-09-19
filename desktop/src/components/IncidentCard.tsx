@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { Incident, Relation } from "../types";
 import { nsToDate } from "../types";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -42,6 +43,46 @@ function KindName({ kind, lang }: { kind: string; lang: Lang }) {
   );
 }
 
+// PRD U3: "التحقق من هل كان هذا هجوماً أم فشلاً عادياً... مع أدلة خام
+// قابلة للفتح" (verifying attack vs. ordinary failure, with raw evidence
+// that can be opened) - internal/incident.Link.Evidence (map[string]any,
+// always at least {describe}, sometimes {matched_count, last_event_id}
+// when a clause needed more than one match - internal/correlate/engine.go
+// build()'s only two write sites) existed on the wire and the TS type but
+// was never rendered anywhere before this. Kept as raw/technical content
+// (TechnicalValue on every value, not narrative prose) rather than
+// something to translate: this is forensic evidence, deliberately shown
+// as what the engine actually recorded, not a written account of it -
+// translating individual events' event.Describe() sentences is a
+// separate, much larger undertaking (internal/event/describe.go's ~40
+// per-kind templates) this disclosure does not attempt.
+const EVIDENCE_LABELS: Record<string, "evidence_describe_label" | "evidence_matched_count_label" | "evidence_last_event_label"> = {
+  describe: "evidence_describe_label",
+  matched_count: "evidence_matched_count_label",
+  last_event_id: "evidence_last_event_label",
+};
+
+function EvidenceDisclosure({ evidence }: { evidence?: Record<string, unknown> }) {
+  const { t } = useLanguage();
+  const entries = Object.entries(evidence ?? {});
+  if (entries.length === 0) return null;
+  return (
+    <details className="evidence-disclosure">
+      <summary>{t("evidence_raw_title")}</summary>
+      <dl className="evidence-disclosure-list">
+        {entries.map(([key, value]) => (
+          <Fragment key={key}>
+            <dt>{EVIDENCE_LABELS[key] ? t(EVIDENCE_LABELS[key]) : <TechnicalValue>{key}</TechnicalValue>}</dt>
+            <dd>
+              <TechnicalValue>{String(value)}</TechnicalValue>
+            </dd>
+          </Fragment>
+        ))}
+      </dl>
+    </details>
+  );
+}
+
 export function IncidentCard({ incident, rules = [] }: { incident: Incident; rules?: RuleSummary[] }) {
   const { t, lang } = useLanguage();
   const rule = findRule(incident.rule_id, rules);
@@ -72,6 +113,7 @@ export function IncidentCard({ incident, rules = [] }: { incident: Incident; rul
             <div style={{ fontSize: "0.88rem", color: "var(--text-muted)" }}>
               {whyFor(rule, link.clause, lang, link.why)}
             </div>
+            <EvidenceDisclosure evidence={link.evidence} />
             {i < incident.chain.length - 1 && (
               <div>
                 <hr className={`relation-line ${relationLine(incident.chain[i + 1]?.relation)}`} />

@@ -1,0 +1,84 @@
+GUI modernization, Phase 5 (first slice): raw evidence disclosure on
+every incident chain link - PRD U3 ("التحقق من هل كان هذا هجوماً أم
+فشلاً عادياً... مع أدلة خام قابلة للفتح", verifying attack vs. ordinary
+failure, with raw evidence that can be opened).
+
+## 1. The gap
+
+`internal/incident.Link.Evidence` (`map[string]any`, JSON `evidence,
+omitempty`) has existed on the wire and on the TypeScript `IncidentLink`
+type (`evidence?: Record<string, unknown>`) the whole time - confirmed
+by grep before assuming it was missing entirely, not just untranslated.
+`IncidentCard.tsx` never rendered it anywhere. `internal/correlate/
+engine.go`'s only write site (`build()`, line ~670) always sets
+`describe` (`event.Describe()`'s sentence for that specific matched
+event - not the same text as the clause-level `why` already shown),
+and additionally `matched_count`/`last_event_id` when a clause needed
+more than one match to satisfy a `min_count`. Confirmed by grepping
+`Evidence[` and `Evidence:` in `engine.go` rather than assuming the
+shape from the one demo example first spotted - three keys total, not
+an open-ended one.
+
+## 2. Why this stays raw/technical rather than translated
+
+PRD U3 calls this "أدلة خام" - *raw* evidence, not a narrative account.
+`evidence.describe` is `event.Describe()`'s own English sentence for one
+specific event (`internal/event/describe.go`, ~40 per-kind templates) -
+a genuinely separate, much larger translation project than anything
+ADR 0004 covered (which stopped at rule-level title/advice/clause-why
+and the kind catalogue). Translating it here would be silent, large
+scope creep disguised as one disclosure. Instead every value in this
+disclosure is wrapped in `TechnicalValue` - forensic evidence shown as
+what the engine actually recorded, matching how event/rule IDs and
+timestamps already render, not prose meant for a general reader. This
+also means the untagged-Latin-sentence scanner correctly does not flag
+any of it (verified below), instead of needing a new `KNOWN_GAPS` entry.
+
+## 3. What was built
+
+`desktop/src/components/IncidentCard.tsx`: `EvidenceDisclosure`, a
+`<details>/<summary>` per chain link, collapsed by default ("قابلة
+للفتح" - can be opened, not shown unconditionally). `describe`/
+`matched_count`/`last_event_id` get friendly, translated labels
+(`evidence_describe_label`/`evidence_matched_count_label`/
+`evidence_last_event_label`, new keys in both languages); any other key
+(forward-compat for a future engine addition) falls back to showing the
+raw key name in `TechnicalValue`, the same "never crash, never blank"
+pattern used everywhere else in this ADR-adjacent work.
+
+`desktop/src/components/IncidentCard.test.tsx` (new - this component
+had no dedicated test file at all before this): three tests prove the
+known-key labels render with their values, an unrecognised key falls
+back to its raw name, and a link with no evidence renders no disclosure
+at all (not an empty one).
+
+## 4. Full regression
+
+    $ npx tsc --noEmit                             clean
+    $ npm test                                     10 files, 59 tests passed
+    $ npm run build                                clean
+    $ npx playwright test                          35 passed (0 failed) -
+        the untagged-Latin-sentence scanner (evidence 38) found zero new
+        violations, confirming the TechnicalValue-wrapping choice above
+        actually avoids the scope question rather than merely intending to
+
+## 5. Actually looked at it
+
+Fresh browser tab against the demo recording, both languages. Every one
+of the demo's 16 incidents' chain links now shows a "Raw evidence" /
+"الدليل الخام" disclosure, collapsed (▶) by default. Opened one:
+English shows "What happened" -> "nrlab0 lost carrier" (in monospace);
+Arabic shows "ما الذي حدث" -> the same raw English value unchanged,
+confirming the label translates while the forensic content deliberately
+does not. Console clean in both languages.
+
+## 6. What remains in Phase 5
+
+This is the first slice of a large phase (execution order §9): Incidents
+master/detail with search/sort/filter, Rules bilingual catalogue
+improvements, Evidence's incident-scoped export with an adjustable
+padding window (PRD U5), Settings regrouped into six sections with a
+sticky save/discard bar, Diagnostics' secret-free support-summary copy
+button. None of those are started by this slice. No new ADR needed here
+- this is a pure frontend rendering addition with no contract change,
+same as the earlier Button/TechnicalValue component work.

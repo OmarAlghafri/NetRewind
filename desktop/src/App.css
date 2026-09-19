@@ -503,6 +503,34 @@ body {
   margin-inline-start: 6px;
 }
 
+/* PRD U3: raw evidence behind a chain link, collapsed by default -
+   "أدلة خام قابلة للفتح" (raw evidence that can be opened), not shown
+   unconditionally on every link. */
+.evidence-disclosure {
+  margin-top: 4px;
+  font-size: 0.82rem;
+}
+
+.evidence-disclosure summary {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.evidence-disclosure-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 6px 0 0;
+}
+
+.evidence-disclosure-list dt {
+  color: var(--text-muted);
+}
+
+.evidence-disclosure-list dd {
+  margin-inline-start: 0;
+}
+
 .root-cause-box {
   background: var(--warn-bg);
   border: 1px solid var(--warn-line);
