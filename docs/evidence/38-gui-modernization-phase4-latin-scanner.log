@@ -1,0 +1,126 @@
+GUI modernization, Phase 4 (fourth slice): the automated "no untagged
+Latin sentence" scan - execution order P0-02's actual gate, ADR 0004's
+last unimplemented test - plus a real, unplanned finding it led to.
+
+## 1. What the scanner does and does not flag
+
+`desktop/tests/visual/latin-text-scan.spec.ts` (new). The execution
+order's exact wording: "an automated scan of the rendered Arabic app
+that flags any Latin-script sentence not inside a `<bdi dir="ltr">`/
+`TechnicalValue` wrapper." Built as a Playwright test reusing the
+existing `openShell` helper (`tests/visual/helpers.ts`) rather than a
+separate tool, since it needs a real rendered DOM the same way
+`accessibility.spec.ts`'s axe scans do.
+
+`sentenceLikeLatinRuns(text)`: finds every maximal run of Latin-script
+words in a text node not excluded by ancestor (`bdi, code, pre, script,
+style, [dir='ltr'], .ltr-field, .technical-value`), and flags a run only
+if it has 3+ words AND contains at least one plain English function word
+(the/is/which/from/...). This is deliberately not "any Latin text" - the
+writing rules (execution order §10.4) keep short technical terms and
+one-or-two-word parenthetical glosses inline in Latin script on purpose
+("منفذ المبدّل (switch port)"), which is correct Arabic technical
+writing, not a gap. A genuine leftover English sentence almost always
+contains a function word; a technical noun, acronym or gloss almost
+never does. Proven directly, not just asserted:
+
+    proves the scanner itself catches an untranslated sentence, not
+    just passes trivially
+      clean:     "الوصلة منقطعة l2.neighbor_failed nrlab0 (LAN) VPN"        -> []
+      dirty:     "النص: An interface went down. باقي الجملة"                -> ["An interface went down."]
+      glossOnly: "حدّد منفذ المبدّل (switch port) الذي يتعطل"                -> []
+
+## 2. What it found on first run, and how the exception list works
+
+Every page (`overview, incidents, timeline, host, rules, evidence,
+diagnostics, settings`) and all 6 wizard steps scanned clean except the
+Incidents page and the wizard's sample-investigation step (which reuses
+`IncidentCard` against the demo recording's longest-chain incident) -
+192 flagged runs, all traced to one single, already-diagnosed cause:
+`desktop/src/demo/demo-incidents.json` predates `Link.Clause`
+(this session's third Phase 4 slice found this - see evidence 37), so
+`rulesCatalogue.ts`'s `whyFor` correctly falls back to the original
+English `why` on every chain link, exactly as designed against a fixture
+it has no clause to translate from. Not a code defect: verified by
+reading the actual flagged strings against the incident chain text
+already captured in evidence 37 - every one matches.
+
+Rather than weaken the scanner or blanket-exempt the Incidents page
+(which would hide any *future*, *different* violation there too),
+`KNOWN_GAPS` in the spec pins the **exact** 26 English sentences (+3 on
+the wizard step) currently found. The assertion checks both directions:
+anything beyond this exact list still fails (a new or different gap is
+still caught), and every listed entry must still actually reproduce (if
+the fixture is ever fixed, the now-stale entry fails the test too,
+forcing its removal rather than letting a dead exception rot in place).
+Both directions proven, not assumed: removed one entry, watched the
+"unexpected violations" assertion fail with exactly that string; restored
+it and confirmed all 3 tests pass again.
+
+    $ npx playwright test latin-text-scan.spec.ts
+    ok - proves the scanner itself catches an untranslated sentence...
+    ok - the rendered Arabic app has no untagged Latin sentence on any page
+    ok - the Arabic onboarding wizard has no untagged Latin sentence on any step
+    3 passed
+
+## 3. The unplanned finding: demo-incidents.json may itself be stale
+
+Attempting to close the KNOWN_GAPS list for real (regenerate
+`demo-incidents.json` with `Link.Clause` populated) surfaced something
+bigger than an i18n gap. `internal/correlate/replaydemo/main.go` (new)
+replays the unchanged `demo-events.json` (44 events, verified: no
+duplicate `event_id`s, already sorted by `ts_wall`) through
+`correlate.LoadRules` + `correlate.NewEngine(...).Offer(e)` per event, in
+order - the same sequence `cmd/netrewindd/writer.go`'s `flush()` closure
+runs live, minus the store (not needed: `Offer` returns the incidents
+directly, and this tool only needs those, not persistence).
+
+Running it produces **21 incidents, not the checked-in 16**:
+
+    link-down-isolated-hosts: 2 -> 1        gateway-hijack:      1 -> 3
+    contested-address:        1 -> 2        reachability-lost:   1 -> 2
+    default-route-moved:      1 -> 2        default-route-lost:  1 -> 2
+    service-unreachable:      2 -> 1        change-broke-a-path: 1 -> 2
+    rogue-dhcp-server:        1 -> 2        port-flapping:       1 -> 0
+
+Every other rule's count matched. This is a real, substantive divergence
+between what the rules/engine concluded when this fixture was captured
+and what they conclude now given the identical input - either a genuine
+behavior change in `internal/correlate` since then (bug fix, regression,
+or an intentional change never reflected back into the demo fixture) or
+a gap in what this replay tool reproduces versus the live pipeline (fold/
+dedup timing was the first thing checked and ruled out: the events file
+has no duplicate IDs and is already time-ordered).
+
+**Did not overwrite the checked-in fixture.** Restored it from a backup
+immediately (`git status` on it confirmed clean) rather than trust
+21-incidents output that could be silently wrong in either direction.
+This is a genuinely separate question from rule/kind localization -
+tracked as its own investigation task rather than chased down inside
+this slice, per this execution order's own instruction not to let one
+task's scope swallow an unrelated discovery. `replaydemo` is committed
+as-is: a correct, working, but not-yet-applied tool, because building it
+correctly is exactly what surfaced the finding, and it is what that
+investigation will use.
+
+## 4. Full regression
+
+    $ gofmt -l cmd internal                       (empty)
+    $ go vet ./...                                 clean
+    $ go build ./...                               clean
+    $ CGO_ENABLED=0 go test ./...                  all packages ok
+    $ npx tsc --noEmit                             clean
+    $ npm test                                     7 files, 44 tests passed
+    $ npm run build                                clean
+    $ npx playwright test                          35 passed (0 failed)
+
+## 5. What remains open
+
+Rust/Go structured error codes for capability `reason` and shell
+connection failures - the last unimplemented piece of ADR 0004's original
+scope. The demo-incidents.json investigation (§3) - separate from ADR
+0004, tracked on its own. Once that investigation lands a trustworthy
+regenerated fixture, `KNOWN_GAPS["page:incidents"]` and
+`KNOWN_GAPS["wizard-step:5"]` in this scanner should both go empty and
+can be deleted - the test will say so itself if they are ever left in
+place after the gap actually closes.

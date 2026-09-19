@@ -8,9 +8,13 @@ The 49-kind event catalogue is implemented and rendering in the GUI
 `IncidentCard.tsx`, `Diagnostics.tsx`). `desktop/src/i18n/generated/rules.json`
 is also implemented and rendering: `IncidentCard.tsx`'s title/advice/
 per-clause-why and `Rules.tsx`'s title now use `i18n.ar` instead of the
-raw English rule fields, in live, demo and bundle modes alike. Rust/Go
-error codes and the untagged-Latin scanner remain not-yet-started -
-tracked below, not silently folded into "done".
+raw English rule fields, in live, demo and bundle modes alike. The
+untagged-Latin-sentence scanner (execution order P0-02's actual gate) is
+built and green (`desktop/tests/visual/latin-text-scan.spec.ts`), with an
+exact, self-checking exception list for the one remaining known gap (see
+its Verification entry below). Rust/Go error codes for capability
+`reason` and shell connection failures remain not-yet-started - tracked
+below, not silently folded into "done".
 **Date:** 2026-09-19.
 
 ## Context
@@ -158,8 +162,27 @@ the Go struct, or every one of the 19 shipped rules fails to load.
   directly) - a data-freshness gap, not a code defect, tracked as a
   follow-up rather than silently left unmentioned.
 
+**Untagged-Latin-sentence scanner (done):**
+- `desktop/tests/visual/latin-text-scan.spec.ts`: scans every page and
+  wizard step in Arabic mode for a Latin-script run of 3+ words containing
+  an English function word, outside `<bdi>`/`.ltr-field`/`.technical-value`
+  - proven to actually catch a real case and to correctly pass approved
+  inline technical glosses like "(switch port)" (`docs/evidence/38-...log`).
+- One exact, self-checking exception list (`KNOWN_GAPS`) for the single
+  currently-known gap: the demo fixture's chain-link `why` text, which
+  cannot translate without `Link.Clause` on its incidents (see below).
+  Proven to reject anything beyond the exact listed strings, and to fail
+  if a listed one stops reproducing - not a blanket per-page exemption.
+
 **Not started:** Rust/Go error codes for capability `reason` and shell
-connection failures; the automated scan for untagged Latin sentences
-(now has real frontend content worth scanning); regenerating
-`demo-incidents.json` against the current engine so the per-clause `why`
-translation path has real data to render against.
+connection failures.
+
+**Separate, unplanned finding (not part of this ADR, tracked on its
+own):** regenerating `demo-incidents.json` with `Link.Clause` populated
+(needed to close the scanner's last `KNOWN_GAPS` entries) required
+replaying `demo-events.json` through the current engine
+(`internal/correlate/replaydemo`, new). Doing so produces 21 incidents,
+not the checked-in 16 - a real divergence in what `internal/correlate`
+concludes from the same input today versus when the fixture was
+captured, unrelated to localization. Not applied; the checked-in fixture
+is untouched. See `docs/evidence/38-...log` §3.
