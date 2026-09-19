@@ -11,6 +11,7 @@
 *.o binary
 *.img binary
 *.gz binary
+*.woff2 binary
 
 # eBPF C sources and Go sources are always LF.
 *.c text eol=lf
