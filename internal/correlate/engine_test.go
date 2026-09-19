@@ -3,6 +3,7 @@ package correlate
 import (
 	"io"
 	"log/slog"
+	"sort"
 	"testing"
 	"time"
 
@@ -181,6 +182,47 @@ func TestAMatchIsReportedOnce(t *testing.T) {
 	}
 	if got := e.Offer(at(event.KindLinkDown, "eth1", now.Add(10*time.Second))); len(got) != 0 {
 		t.Error("re-reported a match that was already reported")
+	}
+}
+
+// TestVictimsAreSortedDeterministically pins a real, previously-unnoticed
+// non-determinism: build() collects victims into a map keyed by subject
+// label, and Go deliberately randomizes map iteration order per run, so
+// two correlation passes over byte-identical input used to produce
+// byte-different incidents (found while regenerating desktop/src/demo/
+// demo-incidents.json and diffing the result programmatically against a
+// prior run instead of only checking incident counts and titles). Five
+// distinct hosts, not two, so the odds a randomized map iteration would
+// happen to come out already sorted by chance are negligible (1/120) -
+// this needs to fail reliably before the fix, not by luck.
+func TestVictimsAreSortedDeterministically(t *testing.T) {
+	r := &Rule{
+		ID: "multi-victim", Title: "many hosts affected", Severity: "warn", Confidence: 90,
+		Window: time.Minute, RootCause: "failed",
+		Match: []Clause{{As: "failed", Kinds: []string{"l2.neighbor_failed"}, MinCount: 5, Why: "stopped answering"}},
+	}
+	e := NewEngine([]*Rule{r}, quietLog())
+	now := time.Now()
+
+	hosts := []string{"zeta", "mike", "alpha", "yankee", "bravo"}
+	var got []*incident.Incident
+	for i, h := range hosts {
+		got = e.Offer(at(event.KindNeighborFailed, h, now.Add(time.Duration(i)*time.Second)))
+	}
+	if len(got) != 1 {
+		t.Fatalf("got %d incidents, want 1", len(got))
+	}
+	inc := got[0]
+	if len(inc.Victims) != len(hosts) {
+		t.Fatalf("Victims = %v, want all %d hosts", inc.Victims, len(hosts))
+	}
+	want := append([]string(nil), hosts...)
+	sort.Strings(want)
+	for i := range want {
+		if inc.Victims[i] != want[i] {
+			t.Errorf("Victims = %v, want sorted %v", inc.Victims, want)
+			break
+		}
 	}
 }
 

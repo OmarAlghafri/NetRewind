@@ -3,6 +3,7 @@ package correlate
 import (
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -706,8 +707,17 @@ func build(r *Rule, matched []match) *incident.Incident {
 		last := matched[len(matched)-1].events
 		inc.ClosedAt = last[len(last)-1].TSWall
 	}
+	// Sorted, not map iteration order: Go deliberately randomizes that order
+	// per run, which made two correlation passes over the identical,
+	// unchanged input produce byte-different Victims slices - found while
+	// regenerating desktop/src/demo/demo-incidents.json and diffing it
+	// programmatically against a prior run instead of only checking
+	// incident counts. Nothing about "who was a victim" depends on
+	// insertion order, so sorting costs nothing real and makes the output
+	// reproducible.
 	for v := range victims {
 		inc.Victims = append(inc.Victims, v)
 	}
+	sort.Strings(inc.Victims)
 	return inc
 }

@@ -98,64 +98,29 @@ const PAGES = ["overview", "incidents", "timeline", "host", "rules", "evidence",
 /**
  * One exact, closed, tracked exception - not a general escape hatch.
  *
- * desktop/src/demo/demo-incidents.json predates internal/incident.Link's
- * `Clause` field (added in the first Phase 4 slice, before this scanner
- * existed), so every chain link's `why` on the Incidents page falls back
- * to its original English text - `rulesCatalogue.ts`'s `whyFor` working
- * exactly as designed against a fixture it cannot translate, not a code
- * defect. Investigation into safely regenerating that fixture is tracked
- * separately (a replay of it through the current engine surfaced a real,
- * unrelated incident-count divergence worth its own investigation before
- * being trusted - see internal/correlate/replaydemo and
- * docs/evidence/38-gui-modernization-phase4-latin-scanner.log).
+ * desktop/src/demo/demo-incidents.json used to predate internal/incident.
+ * Link's `Clause` field, so every chain link's `why` on the Incidents page
+ * (and the wizard step that reuses IncidentCard against it) fell back to
+ * English - `rulesCatalogue.ts`'s `whyFor` working exactly as designed
+ * against a fixture it could not yet translate, not a code defect. Fixed
+ * by regenerating the fixture through internal/correlate/replaydemo, which
+ * needed its own fix first (see the tool's doc comments and
+ * docs/evidence/38-gui-modernization-phase4-latin-scanner.log and
+ * docs/evidence/53-replaydemo-fold-aware-regeneration.log): the naive
+ * replay this tool started as offered the engine one Offer() call per
+ * already-folded JSON entry instead of one per raw occurrence, which
+ * silently changed what several rules concluded - fixed, verified against
+ * the original fixture field-by-field, and confirmed here by every entry
+ * that used to be in this list no longer reproducing.
  *
- * This list is the exact set of English sentences the scan currently finds
- * on the Incidents page - not "ignore anything on this page." A NEW or
- * DIFFERENT violation on this page still fails the test below, and so does
- * one of these disappearing (the fixture getting fixed makes this list
- * stale, which is deliberately also a failure - the fix is to remove the
- * entry, not to leave a rotting exception nothing checks any more).
+ * Empty for now: every previously-known gap is gone. Kept, rather than
+ * replaced with a bare `expect(violations).toEqual([])`, because a real
+ * future gap (a new rule shipped without its `i18n.ar` block, say) should
+ * be recorded here deliberately while it is being fixed, the same way this
+ * one was - not left for `assertOnlyKnownGaps` to fail without context on
+ * whoever hits it next.
  */
-const KNOWN_GAPS: Record<string, string[]> = {
-  "page:incidents": [
-    "A DHCP server answered on a segment that already had one. Every client that renews from here on gets whichever of them replies first.",
-    "An interface went down.",
-    "Clients began taking different addresses, gateways or resolvers, which is the second server's configuration arriving.",
-    "Connectivity was lost while the gateway was being answered elsewhere.",
-    "Hosts stopped answering at layer 2 immediately afterwards, which is the link failure showing up as apparent host failures.",
-    "It came back each time, which is why nobody noticed it was failing.",
-    "It later answered again, which bounds how long the outage lasted.",
-    "Other connections started failing in the same window.",
-    "Probes to this address began going unanswered. Packet loss announces itself to nobody",
-    "Reachability began failing once there was no default path.",
-    "Reachability changed once the traffic started taking the new path.",
-    "Repeated connections to this service went from the opening SYN straight to closed without ever being answered. Something refused them, dropped them, or was not listening.",
-    "Routing followed the change, so traffic is now leaving through a path nobody chose.",
-    "The address stopped answering reliably while it was contested.",
-    "The default route was withdrawn. Nothing beyond the local segment is reachable from here.",
-    "The hardware address answering for the default gateway changed. Every host on this segment now sends its outbound traffic to a different machine.",
-    "The hardware address answering for this address kept changing between the same few machines, which is what an address conflict looks like from the neighbour table.",
-    "The route all outbound traffic follows now points somewhere else.",
-    "The same interface went down repeatedly in a few minutes. One outage is an event",
-    "This address is now answered by hardware that was not previously bound to it, so the machine behind it is a different machine.",
-    "This is the last thing that changed before the path stopped answering.",
-    "This is the last thing that changed on the path before it broke.",
-    "This is what changed on the path just before the resolver did.",
-    "This machine started sending its lookups somewhere else. Every name it resolves from here on is answered by a different party.",
-    "Two machines that had been connecting successfully can no longer complete a handshake. Whatever else is true, something between them changed.",
-    "a run of them is a fault in the link itself.",
-    "it has to be measured, and it was.",
-  ],
-  // The wizard's sample-investigation step (onboarding/steps/
-  // SampleInvestigationStep.tsx) reuses IncidentCard against the one demo
-  // incident with the longest chain (gateway-hijack, 3 links) - the same
-  // gap as above, for the same reason, on this one incident's 3 why texts.
-  "wizard-step:5": [
-    "Connectivity was lost while the gateway was being answered elsewhere.",
-    "Routing followed the change, so traffic is now leaving through a path nobody chose.",
-    "The hardware address answering for the default gateway changed. Every host on this segment now sends its outbound traffic to a different machine.",
-  ],
-};
+const KNOWN_GAPS: Record<string, string[]> = {};
 
 /** Asserts a scanned page/step against KNOWN_GAPS[where]: nothing beyond
  *  the exact tracked exceptions (a new or different violation still

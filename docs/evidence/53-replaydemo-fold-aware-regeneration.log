@@ -1,0 +1,225 @@
+Regenerating desktop/src/demo/demo-incidents.json to carry incident.Link's
+`clause` field - and the fold-aware replay tool that turned out to need,
+built and verified in the process.
+
+## 1. The gap this started from
+
+desktop/src/demo/demo-incidents.json (docs/product/adr/0001-desktop-shell-
+and-demo-mode.md: a real `netrewind incidents -o json` export from an
+actual lab/inject.sh run) predates internal/incident.Link's `clause` field.
+Every chain link's translated `why` text on the Incidents page, and on the
+onboarding wizard's sample-investigation step, therefore fell back to
+English - rulesCatalogue.ts's `whyFor` working exactly as designed against
+a fixture it could not yet translate, not a code defect, but a real gap in
+what demo mode shows. desktop/tests/visual/latin-text-scan.spec.ts (an
+automated scan of the rendered Arabic app for untagged Latin-script
+sentences) recorded the exact set of English sentences this produced as a
+closed, tracked KNOWN_GAPS exception - not ignored, but pinned so a new or
+different violation elsewhere still failed the suite.
+
+lab/inject.sh needs Linux network namespaces and root, unavailable on the
+machine doing this work, so the fixture could not simply be recaptured.
+internal/correlate/replaydemo was written instead: read the unchanged
+desktop/src/demo/demo-events.json (44 events), load rules/*.yaml through
+the real correlate.LoadRules, create a real correlate.Engine, and replay
+every event through engine.Offer in order - the same thing
+cmd/netrewindd/writer.go's flush() does with a live batch, just without a
+store.
+
+## 2. The first run could not be trusted
+
+    $ go run ./internal/correlate/replaydemo
+    wrote 21 incidents (from 44 raw events) to desktop\src\demo\demo-incidents.json
+
+16 incidents were expected; 21 were produced. The change was not
+committed - the file was restored from the index immediately - and the
+per-rule-id counts were compared between the two runs:
+
+    rule                        original  naive replay
+    link-down-isolated-hosts    2         1
+    gateway-hijack               1         3
+    contested-address            1         2
+    reachability-lost            1         2
+    default-route-moved          1         2
+    default-route-lost           1         2
+    service-unreachable          2         1
+    change-broke-a-path          1         2
+    rogue-dhcp-server            1         2
+    port-flapping                1         0   (gone entirely)
+
+Every other rule matched exactly. Two possibilities followed: a real
+behaviour change in the engine or a rule since the fixture was captured, or
+a flaw in how replaydemo replayed the recording. `port-flapping` dropping
+to zero was the clearest thread to pull: its `flap` clause requires
+`min_count: 3` on `link.down` (rules/port-flapping.yaml), and demo-
+events.json has no group of 3 separate link.down entries for one
+interface - only a single entry with a `count` field, which is what a
+folded group looks like after `netrewind events -o json` has already
+queried it.
+
+## 3. Root cause
+
+internal/store/sqlite.go's own fold SQL - `UPDATE events SET count = count
++ ?, ts_last = ? WHERE event_id = ?` - collapses a repeated fact within the
+60s fold window into the *same* row rather than inserting a new one.
+ts_wall (first occurrence) is never touched by folding; ts_last (latest
+occurrence) is a store-internal column with no equivalent field on
+event.Event at all, so nothing an export produces can say when the 2nd,
+3rd, ... occurrence of a folded group actually happened.
+
+cmd/netrewindd/writer.go's flush() calls store.Append on a raw batch
+*first*, then loops the same raw batch through engine.Offer once per raw
+event - folding happens inside Append, but every raw occurrence still gets
+its own live Offer() call before it is ever folded away. A folded JSON
+export is therefore not equivalent to what the engine actually saw:
+replaying one Offer() call per folded entry silently drops (count-1) real
+occurrences, which matters directly to any `min_count > 1` clause, and,
+because the engine's window is shared and cumulative across every rule,
+can shift what other rules conclude too. This is hypothesis (b), not (a):
+a replay methodology defect, not an engine or rule regression.
+
+## 4. The fix, in the four layers it was actually found in
+
+Full detail and rationale live as doc comments on the functions themselves
+(internal/correlate/replaydemo/main.go); this is the order they were found
+and confirmed in, each one against the real, live-captured original file,
+programmatically, not by matching incident totals alone.
+
+1. **Unfold folded events.** `unfoldEvents` expands a folded event back
+   into `count` separate copies before replay, restoring one Offer() call
+   per raw occurrence.
+2. **Upsert incidents by id.** `engine.Offer` can legitimately return more
+   than one `*incident.Incident` for the same id as a later event
+   completes an optional clause a thinner earlier match left unmet -
+   engine.go's own dedup keeps the identity and replaces the thinner
+   account. A naive append-only collection produced duplicate incident_ids
+   with different content; `upsertIncident` replicates internal/store/
+   incident_sqlite.go's own `ON CONFLICT(incident_id) DO UPDATE` exactly,
+   including which fields it deliberately leaves alone (opened_at, title,
+   rule_id, advice - fixed at first report).
+3. **Evidence-based timestamp reconstruction.** Folding destroys the real
+   spacing between a group's raw occurrences. A uniform guess does not
+   work - spacings from 0s to the store's own 60s fold window were swept
+   directly against the real original file, and every value left at least
+   one rule wrong, because different folded groups had different real
+   internal spacings, which folding is specifically designed to discard.
+   What survives instead: the fixture this tool is about to overwrite
+   already has, in its own chain data, exactly which occurrence (`rank`,
+   from a clause's own `matched_count` evidence) closed at which real
+   timestamp, or at minimum that *some* real timestamp was cited at all
+   (`Link.At`, unranked). `loadKnownTimestamps` recovers both kinds from
+   the file on disk before it is overwritten; `unfoldEvents` forward-fills
+   ranked values into their exact position and assigns unranked ones to
+   the highest slot that cannot displace a ranked one, and filters out a
+   recovered value that merely restates ts_wall (every clause citing a
+   folded group's lead event records that same baseline, which is not a
+   second occurrence).
+4. **Cap unfolding to what is actually needed.** rules/reachability-lost.
+   yaml's optional, unrestricted `recovery` clause greedily matched a
+   synthetic second copy of its own folded `loss` anchor instead of the
+   real, distinct event the original incident used, once that anchor was
+   unfolded to its full historical count regardless of whether anything
+   needed the extra copy. A copy invented beyond what evidence or a rule's
+   own `min_count` genuinely requires has nowhere principled to sit and is
+   free to be picked up by an unrelated clause. `maxMinCountByKind` computes,
+   per event kind, the largest `min_count` any loaded rule's clause asks
+   for; `unfoldEvents` unfolds a group only to the largest of that floor,
+   the highest evidenced rank, and one slot per genuine unranked value -
+   capped at the group's real historical fold count either way.
+
+## 5. A separate, genuine bug found along the way
+
+Two regenerations of byte-identical input, seconds apart, produced
+different `Victims` orderings on the same incident. internal/correlate/
+engine.go's `build()` collected victims into a `map[string]bool` and then
+ranged over it directly - Go deliberately randomizes map iteration order
+per run, so the order was never a decision, just an accident that happened
+to look stable in a single-run test. Fixed with `sort.Strings(inc.Victims)`
+before returning. This affects the shipped engine, not only replaydemo -
+any consumer of `Incident.Victims` was reading a non-deterministic order.
+
+Proven, not just asserted: `TestVictimsAreSortedDeterministically`
+(internal/correlate/engine_test.go) fires a `min_count: 5` clause against 5
+hosts offered in a scrambled order and checks the result is alphabetical.
+Removing the `sort.Strings` call and its import and running the new test 5
+times reproduced a different, genuinely random ordering on every run before
+the fix was restored.
+
+## 6. Verification
+
+A first attempt compared the two incident arrays with a Node.js script.
+This under-reported precision: nanosecond `ts_wall`/`at` values (~1.79e18)
+exceed `Number.MAX_SAFE_INTEGER` (2^53), so `JSON.parse` silently rounds
+them (`1789323631827653632` became `1789323631827653600`), which can hide a
+real mismatch or invent a false one. All further comparison used a small
+Go program instead, comparing `int64` fields directly with no float64
+intermediate, keyed by `(rule_id, root_cause.event_id, root_cause.entity)`
+rather than `incident_id` (fresh ULIDs every run are expected and not
+compared). Final result, run after every fix above and again after the
+last regeneration before this fixture was committed:
+
+    orig count: 16 now count: 16
+    TOTAL MISMATCHES: 0
+
+Every field matched except `incident_id` (expected) and `Victims` ordering
+(expected - the original file predates the determinism fix above; compared
+as sets, not sequences, and the regenerated output independently confirmed
+sorted). Every chain link in the regenerated file carries a non-empty
+`clause` value; 30 links across 16 incidents, checked directly against
+`internal/incident.Link`'s own struct rather than by eyeballing the JSON.
+
+## 7. Regression tests, proven not just asserted
+
+internal/correlate/replaydemo/main_test.go adds unit coverage for
+`maxMinCountByKind`, `upsertIncident`, `loadKnownTimestamps`, and
+`unfoldEvents` (passthrough, the capped-unfolding fix, the rule's-own-
+min_count floor, the redundant-baseline filter, and exact rank placement),
+plus one end-to-end regression against the real shipped rules: a folded,
+3-count link.down group offered as a single Offer() call must not satisfy
+`port-flapping`'s `min_count: 3` (the bug, reproduced), and the same group
+run through `unfoldEvents` first must satisfy it (the fix, confirmed).
+
+Each of the two fixes central to this work was deliberately broken and the
+suite re-run to confirm it actually fails, not just that it exists:
+reverting `unfoldEvents` to a no-op broke the 5 tests that require an
+actual split (and left the other 6 passing, as expected of a change that
+does not affect a foldCount-1 event); reverting only the capping logic
+(`n := foldCount` unconditionally, restoring the exact reachability-lost
+class of defect) broke exactly `TestUnfoldEventsDoesNotInventCopiesNothingRequires`.
+Both were restored and the full suite re-confirmed green afterward.
+
+## 8. Full regression
+
+    $ go build ./...                               clean
+    $ CGO_ENABLED=0 go test ./...                   every package passes
+    $ gofmt -l cmd internal                         no output
+    $ cd desktop && npm test                        15 files, 130 tests passed
+
+## 9. Live confirmation
+
+desktop/tests/visual/latin-text-scan.spec.ts's KNOWN_GAPS listed the exact
+27 English sentences on the Incidents page and 3 on wizard step 5 that fell
+back from Arabic before this fix. Run against the regenerated fixture:
+
+    Error: page:incidents: these KNOWN_GAPS entries no longer reproduce - remove them:
+    [... all 27 ...]
+    Error: wizard-step:5: these KNOWN_GAPS entries no longer reproduce - remove them:
+    [... all 3 ...]
+
+Every previously-known gap disappeared and no new violation was reported
+on any of the 8 pages or 6 wizard steps scanned - the test's own
+"unexpected violations" assertion runs first and stayed silent. KNOWN_GAPS
+was emptied accordingly and the suite now passes clean.
+
+## 10. Why this matters beyond one fixture
+
+The defect this work actually found and fixed was in the tooling built
+this session to solve an unrelated, smaller problem (a missing i18n key on
+old demo data), not in the product. It was caught before demo-incidents.
+json was overwritten with unverified output, specifically because the
+count did not match what was already known to be correct and that
+discrepancy was chased down rather than assumed away. The one real product
+fix that came out of it - Victims ordering - was not what anyone went
+looking for; it surfaced only because regenerating the same input twice and
+diffing the results programmatically is a stronger check than trusting a
+single run that merely looks plausible.
