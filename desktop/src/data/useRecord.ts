@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Incident, NetRewindEvent } from "../types";
 import type { Capability, Health, RuleSummary, BundleManifest } from "./types";
 import type { SourceSettings } from "./source";
+import type { AgentErrorPayload } from "../i18n/agentErrorCatalogue";
 import { loadDemoEvents, loadDemoIncidents } from "../demo/loadDemoData";
-import { CancelledError, agentCancel, agentGetRaw, bundleOpen, isTauri } from "./tauri";
+import { CancelledError, agentCancel, agentGetRaw, bundleOpen, isAgentErrorPayload, isTauri } from "./tauri";
 
 /** How far back a live view reaches on its first load. The API's own
  *  default is one hour; a viewer opened after an overnight incident needs
@@ -24,8 +25,14 @@ export type RecordStatus = "loading" | "ready" | "error";
 
 export interface Record {
   status: RecordStatus;
-  /** Set when status is "error": what went wrong, in the recorder's or the shell's words. */
-  error: string;
+  /** Set when status is "error": what went wrong. `"shell_required"`/
+   *  `"no_bundle"` are internal sentinels `SourceBanner.tsx` translates by
+   *  name; a live poll failure is the structured `AgentErrorPayload` a
+   *  Tauri command now rejects with (ADR 0004 §4.5) so the banner can show
+   *  a translated sentence instead of `agent.rs`'s own English one; a
+   *  bundle-open failure (a different Rust command, out of this ADR's
+   *  scope) is still a plain string. */
+  error: string | AgentErrorPayload;
   events: NetRewindEvent[];
   incidents: Incident[];
   /** Live source only. */
@@ -316,7 +323,7 @@ export function useRecord(settings: SourceSettings): Record {
         // to call "stale", it is just an error with nothing to show yet.
         apply({
           status: "error",
-          error: e instanceof Error ? e.message : String(e),
+          error: isAgentErrorPayload(e) ? e : e instanceof Error ? e.message : String(e),
           stale: live.current.health !== null,
         });
       }

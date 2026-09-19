@@ -232,7 +232,7 @@ func run(ctx context.Context, log *slog.Logger, cfg config) error {
 	for _, d := range collectorDescriptors {
 		reg.Register(d)
 		if !running[d.Name] {
-			reg.Unsupported(d.Name, "requires "+d.Platform)
+			reg.UnsupportedCoded(d.Name, registry.ReasonRequiresPlatform, map[string]string{"platform": d.Platform}, "requires "+d.Platform)
 		}
 	}
 
@@ -299,7 +299,7 @@ func run(ctx context.Context, log *slog.Logger, cfg config) error {
 					WithDedup("system.collector_down|"+c.Name()))
 				return
 			}
-			reg.Down(c.Name(), "stopped")
+			reg.DownCoded(c.Name(), registry.ReasonCollectorStopped, nil, "stopped")
 		}(c)
 	}
 

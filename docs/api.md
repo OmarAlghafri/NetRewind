@@ -64,7 +64,8 @@ about, whether it is watching, and — when it is not — why.
     "coverage": ["link.*"], "status": "up",
     "last_change": "2026-09-14T06:53:49Z", "last_seen": "2026-09-14T06:53:49Z" },
   { "name": "ebpf.flow", "platform": "linux", "privilege": "CAP_BPF (or root) + kernel BTF",
-    "coverage": ["flow.*"], "status": "unsupported", "reason": "requires linux", ... }
+    "coverage": ["flow.*"], "status": "unsupported", "reason": "requires linux",
+    "reason_code": "requires_platform", "reason_params": {"platform": "linux"}, ... }
 ] }
 ```
 
@@ -78,6 +79,13 @@ list every time.
 in the collector's own words, the same text as its `system.collector_down`
 event), `unsupported` (this platform cannot run it) or `unknown` (registered,
 not reported yet).
+
+`reason_code`/`reason_params`, when present, are a structured form of
+`reason` a client can translate (see
+[rules.md](rules.md#an-arabic-translation-if-you-have-one) for the same
+idea applied to rule text) - `reason` itself is always present alongside
+them, unchanged, for a client that has no translation for the code or
+predates this field.
 
 ### `GET /v1/events`
 

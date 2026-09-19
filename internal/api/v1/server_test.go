@@ -79,6 +79,51 @@ func TestCapabilitiesReflectsTheRegistry(t *testing.T) {
 	}
 }
 
+// ADR 0004 §4.5: a coded reason (registry.UnsupportedCoded/DownCoded, this
+// session's second Phase 4 slice) must survive the same HTTP/JSON round
+// trip TestRulesIncludesTranslationsWhenTheRuleHasThem proves for rule
+// i18n - capabilitiesResponse wraps registry.Snapshot directly, so this is
+// really proving that wrapping does not drop the new fields, not
+// reproving registry.go's own already-tested behaviour.
+func TestCapabilitiesIncludesTheStructuredReasonWhenCoded(t *testing.T) {
+	srv, _ := newTestServer(t)
+	reg := registry.New(nil)
+	reg.Register(registry.Descriptor{Name: "ebpf.flow", Platform: "linux"})
+	reg.UnsupportedCoded("ebpf.flow", "requires_platform", map[string]string{"platform": "linux"}, "requires linux")
+	srv.Registry = reg
+
+	rec := get(t, srv.Handler(), "/v1/capabilities")
+	var body capabilitiesResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Capabilities) != 1 {
+		t.Fatalf("capabilities = %+v", body.Capabilities)
+	}
+	entry := body.Capabilities[0]
+	if entry.Reason != "requires linux" {
+		t.Errorf("reason = %q, want the plain-text fallback still present", entry.Reason)
+	}
+	if entry.ReasonCode != "requires_platform" {
+		t.Error("reason_code did not survive the HTTP/JSON round trip")
+	}
+	if entry.ReasonParams["platform"] != "linux" {
+		t.Errorf("reason_params = %+v, want platform=linux", entry.ReasonParams)
+	}
+}
+
+// The uncoded path (newTestServer's own netlink.link, Up() with no reason
+// at all) must not grow reason_code/reason_params out of nowhere - the
+// zero-value struct fields must stay omitted by the JSON tag, not become
+// present-but-empty over the wire.
+func TestCapabilitiesOmitsTheReasonCodeFieldsWhenThereIsNone(t *testing.T) {
+	srv, _ := newTestServer(t)
+	rec := get(t, srv.Handler(), "/v1/capabilities")
+	if strings.Contains(rec.Body.String(), "reason_code") || strings.Contains(rec.Body.String(), "reason_params") {
+		t.Errorf("an uncoded capability's JSON has reason_code/reason_params present: %s", rec.Body.String())
+	}
+}
+
 func TestEventsWithinWindow(t *testing.T) {
 	srv, st := newTestServer(t)
 	now := time.Now()

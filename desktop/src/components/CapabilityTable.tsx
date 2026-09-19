@@ -1,5 +1,30 @@
 import { useLanguage } from "../i18n/LanguageContext";
+import { reasonMessageFor } from "../i18n/capabilityReasonCatalogue";
+import { TechnicalValue } from "./TechnicalValue";
 import type { Capability } from "../data/types";
+
+// A translated sentence for a "down" reason (ADR 0004 §4.5), with the
+// recorder's own English text kept available - not discarded - behind a
+// collapsed <details> rather than shown on every row regardless of
+// whether there is even a translation to show alongside it. Its own
+// component (not inlined in the row .map below) because it needs its own
+// derived value (reasonMessageFor's result) rather than sharing the row's.
+function CapabilityReason({ capability }: { capability: Capability }) {
+  const { t, lang } = useLanguage();
+  const reason = reasonMessageFor(capability, lang);
+  return (
+    <span className="capability-reason">
+      {" — "}
+      {reason.message}
+      {reason.known && (
+        <details className="capability-reason-detail">
+          <summary>{t("status_technical_detail")}</summary>
+          <TechnicalValue>{capability.reason}</TechnicalValue>
+        </details>
+      )}
+    </span>
+  );
+}
 
 // The capability matrix the product plan requires instead of a bare
 // "supported" claim: every collector the recorder knows about, whether it
@@ -36,9 +61,7 @@ export function CapabilityTable({ capabilities }: { capabilities: Capability[] }
               <span className="capability-status">
                 <span className={`status-dot ${s.cls}`} />
                 {s.label}
-                {c.reason && c.status !== "unsupported" && (
-                  <span className="ltr-field capability-reason"> — {c.reason}</span>
-                )}
+                {c.reason && c.status !== "unsupported" && <CapabilityReason capability={c} />}
               </span>
             </div>
             <div className="capability-detail">

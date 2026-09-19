@@ -303,6 +303,20 @@ body {
   gap: 8px;
 }
 
+/* The raw technical_detail behind a structured connection error (ADR
+   0004 §4.5) - "available on demand", so collapsed by default rather
+   than shown alongside the translated sentence it exists to keep
+   available for someone who wants it. */
+.source-banner-detail {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.source-banner-detail summary {
+  cursor: pointer;
+}
+
 /* A capability or rule row with a second line of detail under the name.
    Both classes are named so this wins over .capability-row's flex layout
    whatever their order in this file. */
@@ -329,6 +343,21 @@ body {
 
 .capability-reason {
   color: var(--text-muted);
+}
+
+/* The raw reason text behind a translated capability reason (ADR 0004
+   §4.5) - "available on demand", so collapsed by default; inline rather
+   than the block <details> normally is, so it does not break the row's
+   own inline-flex layout when opened. */
+.capability-reason-detail {
+  display: inline;
+  margin-inline-start: 6px;
+  font-size: 0.85em;
+}
+
+.capability-reason-detail summary {
+  display: inline;
+  cursor: pointer;
 }
 
 .capability-detail {

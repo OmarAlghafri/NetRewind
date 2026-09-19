@@ -10,6 +10,15 @@ export interface Capability {
   coverage: string[];
   status: CollectorStatus;
   reason?: string;
+  // The structured form of `reason` (ADR 0004 §4.5,
+  // internal/registry.Snapshot.ReasonCode/ReasonParams) - present only
+  // when the recorder set this status through DownCoded/UnsupportedCoded.
+  // Absent for the plain Down/Unsupported path (a collector's own
+  // free-text startup error has no closed set of codes to belong to) or
+  // for a recorder build that predates this field - never an empty
+  // object either way.
+  reason_code?: string;
+  reason_params?: Record<string, string>;
   last_change: string;
   last_seen: string;
 }

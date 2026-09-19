@@ -1,0 +1,198 @@
+GUI modernization, Phase 4 (fifth and final slice): Rust connection
+errors and the Go capability `reason` become {code, params,
+technical_detail} - the last item in ADR 0004's original Decision
+section. Closes Phase 4.
+
+## 1. Rust connection errors (desktop/src-tauri/src/agent.rs)
+
+Twelve hard-coded English `Result<_, String>` messages across
+`get`/`get_inner`/`connect` (both platforms) and `lib.rs`'s
+`agent_get`/`race_cancellable` - confirmed by reading the whole file
+before writing anything, not assumed from the earlier baseline survey.
+`AgentError { code, params, technical_detail }` (new, `#[derive(Serialize)]`)
+replaces every one of them; `technical_detail` is the exact sentence
+this crate always produced, so nothing about what a raw-detail viewer
+sees is lost.
+
+Codes are named constants (`agent::codes::TIMEOUT`, `NOT_LISTENING`,
+`ACCESS_DENIED_WINDOWS`/`_UNIX`, ...), not string literals typed at each
+call site - a typo in a literal ("hadshake_failed") would silently
+produce an untranslatable code no test could catch; a typo in a constant
+name is a compile error. `agent_export_bundle`'s own `Result<_, String>`
+still compiles unchanged via `impl From<AgentError> for String` (falls
+back to `technical_detail`) - it is a different Rust command, not part
+of this ADR's connection-error scope.
+
+`race_cancellable` (Phase 3's own extracted, directly-testable
+cancellation race) is now generic over the error type instead of
+hard-coded to `String`, taking the "cancelled" value as a parameter -
+`agent_get` passes `cancelled_error()` (`code: "cancelled"`) instead of
+the old bare `"__cancelled__"` string sentinel `isCancelledRejection`
+used to match on. Both existing `race_cancellable` tests (from Phase 3's
+`std::future::pending()` proof) updated and still pass, unchanged in
+what they prove.
+
+    $ cargo build --lib && cargo test --lib && cargo clippy --lib && cargo fmt --check
+    12 tests passed, 0 clippy warnings, fmt clean
+
+A new `agent.rs` test (`all_codes_have_no_duplicates_and_match_the_expected_count`)
+asserts `codes::ALL` has no duplicate and the exact count 12 - the
+counterpart to `desktop/src/i18n/agentErrorCatalogue.ts`'s own hand-kept
+`EXPECTED_CODES` list, which its own test checks the catalogue against.
+Two lists, not a generated cross-language bridge (unlike kinds.json/
+rules.json's real AST-derived generators) - documented as a lighter,
+proportionate guarantee for a small, stable set of twelve strings
+defined in one function, not forty-nine kinds or nineteen-plus rules
+that genuinely grow over time.
+
+## 2. Frontend: agentErrorCatalogue.ts, tauri.ts, useRecord.ts, SourceBanner.tsx
+
+`desktop/src/i18n/agentErrorCatalogue.ts`: `{en, ar}` templates for all
+12 codes, `{param}` interpolation, `messageFor` returning `{message,
+known}` - `known: false` (a code this build predates) falls back to
+`technical_detail` itself, tagged unknown, per the ADR's existing
+fallback rule applied to this new content.
+
+`tauri.ts`'s `isCancelledRejection` now checks `e.code === "cancelled"`
+on the plain object Tauri rejects a command's promise with (confirmed:
+Tauri serialises `Err(AgentError)` as that struct directly, not wrapped
+in a JS `Error`) instead of the old bare-string equality check.
+`isAgentErrorPayload` (exported) is the one place that object shape is
+checked, reused by `useRecord.ts` rather than duplicated.
+
+`Record.error`'s type widened from `string` to `string | AgentErrorPayload`
+- the two existing sentinels (`"shell_required"`, `"no_bundle"`) and a
+bundle-open failure (a different Rust command, unaffected, still a plain
+string) stay strings; a live-poll connection failure is now the
+structured object, checked with `isAgentErrorPayload` at the one place
+it is caught (`useRecord.ts`'s live-poll catch block) rather than
+coerced through `String(e)`, which would have produced the useless
+`"[object Object]"` for this exact case.
+
+`SourceBanner.tsx`: the primary message is now `messageFor(...).message`
+- a real translated sentence, not the whole rejection wrapped in one
+`TechnicalValue` span regardless of what it actually was (the ADR's
+named complaint). `technical_detail` is kept, not discarded, behind a
+native `<details>`/`<summary>` - "available on demand" read literally,
+collapsed by default - shown only when `known` is true, so an
+unrecognised code (whose "translated" message already *is*
+`technical_detail`) does not show the identical sentence twice.
+
+## 3. Go capability reason (internal/registry, cmd/netrewindd, internal/api/v1)
+
+`registry.Snapshot` gains `ReasonCode`/`ReasonParams` (`omitempty`),
+additive - `capabilitiesResponse` and `bundle.Manifest` both already
+embed `registry.Snapshot` directly (confirmed by reading both files
+before assuming), so `/v1/capabilities` and every evidence bundle get
+the new fields with no other server-side code change at all.
+`Registry.DownCoded`/`UnsupportedCoded` are new methods alongside the
+unchanged `Down`/`Unsupported` - existing callers, existing bundle
+fixtures, and every already-passing test are untouched.
+
+Only the two call sites with a genuinely closed, small reason space were
+converted (`cmd/netrewindd/main.go`): `"requires "+platform` (now
+`registry.ReasonRequiresPlatform` with a `platform` param) and the
+"stopped after Run() returned cleanly" case (now
+`registry.ReasonCollectorStopped`). The third site - `err.Error()` for a
+collector that failed with its own arbitrary internal error - is
+deliberately left uncoded: a collector's startup error has no closed set
+of translatable codes without a much larger refactor across every
+collector package (`internal/collect/*`), which this slice does not
+attempt. It keeps working exactly as before, falling back to showing the
+raw reason - the same "no code, no crash, show the original" path an
+older recorder or an unrecognised code already takes.
+
+    $ gofmt -l cmd internal && go build ./... && go vet ./... && CGO_ENABLED=0 go test ./...
+    all clean
+
+New tests: `registry_test.go` proves `DownCoded`/`UnsupportedCoded`
+populate the fields, proves the plain `Down`/`Unsupported` path leaves
+them empty (not a zero-value placeholder), and proves `omitempty`
+actually omits them from JSON rather than emitting empty strings/null.
+`server_test.go`'s `TestCapabilitiesIncludesTheStructuredReasonWhenCoded`/
+`TestCapabilitiesOmitsTheReasonCodeFieldsWhenThereIsNone` prove the same
+two facts survive the real HTTP/JSON round trip, mirroring
+`TestRulesIncludesTranslationsWhenTheRuleHasThem`'s pattern from the
+first Phase 4 slice.
+
+`ReasonCodesUsedByThisBuild` (new, in `registry.go`) plus a test proving
+it has no duplicate and the expected count is the same
+proportionate-not-generated pairing `agent.rs`'s `codes::ALL` uses,
+matched against `desktop/src/i18n/capabilityReasonCatalogue.test.ts`'s
+own hand-kept `EXPECTED_CODES` list.
+
+## 4. Frontend: capabilityReasonCatalogue.ts, CapabilityTable.tsx
+
+`desktop/src/i18n/capabilityReasonCatalogue.ts`: the same `{message,
+known}` shape as `agentErrorCatalogue.ts`, two codes. `CapabilityTable.tsx`
+- named in the execution order as wrapping `c.reason` in `ltr-field`,
+"which forces monospace/LTR onto what is usually an English sentence" -
+now shows the translated sentence as normal text, with the raw `reason`
+behind a collapsed `<details>` exactly like `SourceBanner.tsx`'s new
+pattern, only when there is an actual translation to disclose it behind.
+
+An unsupported collector's reason was already never shown at all before
+this change (`c.status !== "unsupported"` in the existing render
+condition, backed by an existing, unmodified test:
+"an unsupported collector's reason is the platform, not shown as a
+failure") - that deliberate, pre-existing UX decision is unchanged. The
+`requires_platform` code and its catalogue entry are still real and
+correctly populated end to end (proven by the Go and TS tests above);
+they simply have no current visible effect in `CapabilityTable.tsx`
+today, which is this component's existing design, not a gap this slice
+introduced or was asked to close.
+
+## 5. Full regression
+
+Rust: `cargo build --lib`, `cargo test --lib` (12 passed), `cargo clippy
+--lib` (0 warnings), `cargo fmt --check` (clean).
+Go: `gofmt -l cmd internal`, `go build ./...`, `go vet ./...`,
+`CGO_ENABLED=0 go test ./...` - all clean.
+Frontend: `npx tsc --noEmit` clean; `npm test` - 9 files, 56 tests
+passed (component tests for both `SourceBanner`'s and `CapabilityTable`'s
+new coded-reason rendering, catalogue completeness/interpolation/
+fallback tests for both new i18n modules); `npm run build` clean;
+`npx playwright test` - 35 passed, unchanged from the previous slice
+(this change touches error-path rendering, not the happy-path layout or
+content those tests already cover).
+
+## 6. What was not, and could not be, verified in this environment
+
+Both halves of this slice only actually render with a real live
+recorder connection: `SourceBanner`'s error banner needs a live-mode
+connection failure, and `CapabilityTable` is not shown at all in demo
+mode (`Overview.tsx`: `capabilities.length > 0`, and demo mode's
+`record.capabilities` is always `[]` by design - confirmed by reading
+`Overview.tsx` and ADR 0001's "Capability honesty in Demo mode" note).
+No live recorder is reachable from this sandboxed environment. What was
+verified instead, deliberately not overstated as more than it is:
+- Rust: real unit tests of `AgentError` construction and the codes
+  registry, `cargo test`, `cargo clippy`, `cargo fmt` all clean.
+- Go: real unit and HTTP-handler tests of the registry and
+  `/v1/capabilities`, including two tests that would fail if the new
+  fields leaked into JSON when absent or were missing when present.
+- Frontend: real React Testing Library component tests exercising the
+  actual `SourceBanner`/`CapabilityTable` render output (text content,
+  the `<details>` element's `open` attribute, DOM structure) against
+  both a coded and an uncoded/unrecognised-code input - not merely
+  "compiles" or "the catalogue function returns the right string in
+  isolation."
+This is real, load-bearing verification at every layer up to the actual
+Tauri IPC round trip and a real socket/pipe failure, which needs the
+compiled desktop app talking to an absent recorder - not achievable
+here, and not claimed to have been checked.
+
+## 7. Phase 4 status
+
+Every item ADR 0004's Decision section named is now implemented: the
+rule i18n contract and all 19 rules translated (first slice); the
+event-kind catalogue (second slice); rules.json and real frontend
+rendering of rule text (third slice); the untagged-Latin-sentence
+scanner (fourth slice); Rust/Go structured error codes (this slice).
+ADR 0004 updated to reflect this - Phase 4 is closed.
+
+Still open, tracked separately, not part of ADR 0004: regenerating
+demo-incidents.json so the per-clause `why` translation path
+(implemented and unit-tested since the third slice) has real data to
+render against in demo mode - the `internal/correlate/replaydemo`
+investigation from evidence 38.

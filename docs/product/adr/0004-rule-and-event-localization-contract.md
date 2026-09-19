@@ -12,9 +12,12 @@ raw English rule fields, in live, demo and bundle modes alike. The
 untagged-Latin-sentence scanner (execution order P0-02's actual gate) is
 built and green (`desktop/tests/visual/latin-text-scan.spec.ts`), with an
 exact, self-checking exception list for the one remaining known gap (see
-its Verification entry below). Rust/Go error codes for capability
-`reason` and shell connection failures remain not-yet-started - tracked
-below, not silently folded into "done".
+its Verification entry below). Rust connection errors (`agent.rs`) and
+the Go capability `reason` (`internal/registry.Snapshot`) are now both
+`{code, params, technical_detail}`, rendered as a translated sentence
+with the original kept available on demand in `SourceBanner.tsx` and
+`CapabilityTable.tsx`. **Every item in this ADR's Decision section is now
+implemented - Phase 4 is closed.**
 **Date:** 2026-09-19.
 
 ## Context
@@ -174,8 +177,41 @@ the Go struct, or every one of the 19 shipped rules fails to load.
   Proven to reject anything beyond the exact listed strings, and to fail
   if a listed one stops reproducing - not a blanket per-page exemption.
 
-**Not started:** Rust/Go error codes for capability `reason` and shell
-connection failures.
+**Structured error codes (done):**
+- `desktop/src-tauri/src/agent.rs`: `AgentError { code, params,
+  technical_detail }` replaces all 12 hard-coded English `Result<_,
+  String>` messages across `get`/`get_inner`/`connect` (both platforms)
+  and `lib.rs`'s `agent_get`/`race_cancellable` (cancellation is now
+  `code: "cancelled"`, not the old bare string sentinel). Codes are named
+  constants (`agent::codes::*`), not literals, so a typo is a compile
+  error. `desktop/src/i18n/agentErrorCatalogue.ts` translates every code;
+  `SourceBanner.tsx` shows the translation with `technical_detail`
+  available behind a collapsed `<details>` - exactly "a translated
+  message with the raw detail available on demand."
+- `internal/registry.Snapshot` gains `ReasonCode`/`ReasonParams`
+  (`omitempty`, fully additive - `capabilitiesResponse` and
+  `bundle.Manifest` both already embed `Snapshot` directly, so `/v1/
+  capabilities` and every evidence bundle inherit this with no other
+  server change). `Registry.DownCoded`/`UnsupportedCoded` are new methods
+  beside the unchanged `Down`/`Unsupported`. Only the two call sites with
+  a genuinely closed reason space were converted
+  (`requires_platform`, `collector_stopped`); a collector's own
+  arbitrary `err.Error()` stays uncoded on purpose - coding it would need
+  a much larger refactor across every `internal/collect/*` package, out
+  of this slice's scope, and it already falls back to showing the raw
+  reason exactly like an unrecognised code does.
+  `desktop/src/i18n/capabilityReasonCatalogue.ts` +
+  `CapabilityTable.tsx` mirror the Rust/`SourceBanner.tsx` pattern
+  exactly.
+- Both sides: real Go/Rust tests proving the coded and uncoded paths
+  (including that `omitempty` genuinely omits, not just serializes an
+  empty value), and React Testing Library component tests proving the
+  actual rendered output for both a coded and an unrecognised-code input.
+  **Not verifiable in this environment**: the full path needs a live
+  recorder connection failure (`SourceBanner`'s error banner) or a live
+  recorder's capability list (`CapabilityTable` is not shown in demo mode
+  at all, by design) - not reachable from this sandbox. See
+  `docs/evidence/39-...log` §6 for exactly what was and was not checked.
 
 **Separate, unplanned finding (not part of this ADR, tracked on its
 own):** regenerating `demo-incidents.json` with `Link.Clause` populated

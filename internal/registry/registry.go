@@ -30,6 +30,25 @@ const (
 	StatusUnsupported Status = "unsupported"
 )
 
+// Reason codes a caller can pass to DownCoded/UnsupportedCoded, named
+// rather than typed as a string literal at each call site for the same
+// reason agent.rs's codes module in the desktop shell is - a typo in a
+// literal would silently produce an untranslatable code no test could
+// catch; a typo in a constant name is a compile error instead.
+// desktop/src/i18n/capabilityReasonCatalogue.ts must have an entry for
+// each of these; ReasonCodesUsedByThisBuild below is what a test on that
+// side is hand-kept matching against.
+const (
+	ReasonRequiresPlatform = "requires_platform"
+	ReasonCollectorStopped = "collector_stopped"
+)
+
+// ReasonCodesUsedByThisBuild is every code cmd/netrewindd actually passes
+// to DownCoded/UnsupportedCoded - a registry_test.go test proves this list
+// has no duplicate, and desktop/src/i18n/capabilityReasonCatalogue.test.ts
+// hand-keeps a matching literal list on the TypeScript side.
+var ReasonCodesUsedByThisBuild = []string{ReasonRequiresPlatform, ReasonCollectorStopped}
+
 // Descriptor is what is known about a collector before it ever runs: fixed
 // facts, not live state. Kept separate from Status so a capability page can
 // explain a collector that is down, or one that was never buildable on this
@@ -59,10 +78,12 @@ type Descriptor struct {
 
 type trackedEntry struct {
 	Descriptor
-	status     Status
-	reason     string
-	lastChange time.Time
-	lastSeen   time.Time
+	status       Status
+	reason       string
+	reasonCode   string
+	reasonParams map[string]string
+	lastChange   time.Time
+	lastSeen     time.Time
 }
 
 // Registry is safe for concurrent use: each collector reports its own status
@@ -99,23 +120,40 @@ func (r *Registry) Register(d Descriptor) {
 
 // Up marks a collector as actively watching, right now.
 func (r *Registry) Up(name string) {
-	r.mark(name, StatusUp, "")
+	r.mark(name, StatusUp, "", "", nil)
 }
 
 // Down marks a collector as not watching, and names why. reason should be the
 // same text that goes on the collector's system.collector_down event, so a
 // reader is never given two different explanations for the same fact.
 func (r *Registry) Down(name, reason string) {
-	r.mark(name, StatusDown, reason)
+	r.mark(name, StatusDown, reason, "", nil)
+}
+
+// DownCoded is Down plus a structured reason (ADR 0004 §4.5: "the Go
+// capability reason become{s} {code, params, technical_detail}") for a
+// caller that knows why in a form a GUI can translate, not just a free-text
+// sentence. code should be a short, stable identifier
+// (desktop/src/i18n/capabilityReasonCatalogue.ts must have an entry for
+// it); reason is still required and still goes on the collector_down event,
+// exactly as Down's - an unrecognised or absent code always falls back to
+// it, so this is additive, never a replacement for the plain sentence.
+func (r *Registry) DownCoded(name, code string, params map[string]string, reason string) {
+	r.mark(name, StatusDown, reason, code, params)
 }
 
 // Unsupported marks a collector as impossible on this platform, with the
 // reason a capability report should show (e.g. "requires Linux").
 func (r *Registry) Unsupported(name, reason string) {
-	r.mark(name, StatusUnsupported, reason)
+	r.mark(name, StatusUnsupported, reason, "", nil)
 }
 
-func (r *Registry) mark(name string, s Status, reason string) {
+// UnsupportedCoded is Unsupported plus a structured reason - see DownCoded.
+func (r *Registry) UnsupportedCoded(name, code string, params map[string]string, reason string) {
+	r.mark(name, StatusUnsupported, reason, code, params)
+}
+
+func (r *Registry) mark(name string, s Status, reason, code string, params map[string]string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	e, ok := r.entries[name]
@@ -130,6 +168,8 @@ func (r *Registry) mark(name string, s Status, reason string) {
 	}
 	e.status = s
 	e.reason = reason
+	e.reasonCode = code
+	e.reasonParams = params
 	now := r.now()
 	e.lastChange = now
 	if s == StatusUp {
@@ -140,10 +180,18 @@ func (r *Registry) mark(name string, s Status, reason string) {
 // Snapshot is one collector's descriptor plus its live state, for reporting.
 type Snapshot struct {
 	Descriptor
-	Status     Status    `json:"status"`
-	Reason     string    `json:"reason,omitempty"`
-	LastChange time.Time `json:"last_change"`
-	LastSeen   time.Time `json:"last_seen"`
+	Status Status `json:"status"`
+	Reason string `json:"reason,omitempty"`
+	// ReasonCode and ReasonParams are the structured form of Reason (ADR
+	// 0004 §4.5), present only when the call that set this status used
+	// DownCoded/UnsupportedCoded instead of the plain Down/Unsupported.
+	// Absent entirely - never an empty object - when there is none, so a
+	// GUI's fallback to Reason itself (an older recorder, or a status set
+	// through the uncoded path) is "no code", not "an empty code".
+	ReasonCode   string            `json:"reason_code,omitempty"`
+	ReasonParams map[string]string `json:"reason_params,omitempty"`
+	LastChange   time.Time         `json:"last_change"`
+	LastSeen     time.Time         `json:"last_seen"`
 }
 
 // Snapshot returns every registered collector's current state, in
@@ -156,11 +204,13 @@ func (r *Registry) Snapshot() []Snapshot {
 	for _, name := range r.order {
 		e := r.entries[name]
 		out = append(out, Snapshot{
-			Descriptor: e.Descriptor,
-			Status:     e.status,
-			Reason:     e.reason,
-			LastChange: e.lastChange,
-			LastSeen:   e.lastSeen,
+			Descriptor:   e.Descriptor,
+			Status:       e.status,
+			Reason:       e.reason,
+			ReasonCode:   e.reasonCode,
+			ReasonParams: e.reasonParams,
+			LastChange:   e.lastChange,
+			LastSeen:     e.lastSeen,
 		})
 	}
 	return out

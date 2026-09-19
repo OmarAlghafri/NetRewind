@@ -5,18 +5,21 @@
 mod agent;
 mod bundle;
 
+use agent::AgentError;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::State;
 use tokio::sync::Notify;
 
-/// A request `agent_cancel` was asked to stop returns this exact string as
-/// its error - a sentinel the frontend checks for specifically, so an
-/// intentional cancellation (the investigation moved on before the poll
-/// finished) never shows the user a scary "the recorder is unreachable"
-/// message the way a real transport failure should.
-const CANCELLED: &str = "__cancelled__";
+/// A request `agent_cancel` was asked to stop fails with this exact code
+/// (`agent::codes::CANCELLED`) - the frontend checks for it specifically,
+/// so an intentional cancellation (the investigation moved on before the
+/// poll finished) never shows the user a scary "the recorder is
+/// unreachable" message the way a real transport failure should.
+fn cancelled_error() -> AgentError {
+    AgentError::new(agent::codes::CANCELLED, &[], "cancelled")
+}
 
 /// One `Notify` per in-flight request that was given a `request_id`,
 /// keyed by that id so `agent_cancel` can find and wake the specific
@@ -100,15 +103,15 @@ fn agent_default_endpoint() -> String {
 /// `Option<Arc<Notify>>`/`State` so it can be unit tested directly against
 /// a fake slow future, without spinning up a Tauri app just to exercise
 /// the one part of this command that has real logic worth getting wrong.
-async fn race_cancellable<F, T>(future: F, notify: Option<&Notify>) -> Result<T, String>
+async fn race_cancellable<F, T, E>(future: F, notify: Option<&Notify>, cancelled: E) -> Result<T, E>
 where
-    F: std::future::Future<Output = Result<T, String>>,
+    F: std::future::Future<Output = Result<T, E>>,
 {
     match notify {
         Some(n) => {
             tokio::select! {
                 r = future => r,
-                _ = n.notified() => Err(CANCELLED.to_string()),
+                _ = n.notified() => Err(cancelled),
             }
         }
         None => future.await,
@@ -133,11 +136,19 @@ async fn agent_get(
     headers: Option<HashMap<String, String>>,
     request_id: Option<String>,
     state: State<'_, AgentState>,
-) -> Result<AgentResponse, String> {
+) -> Result<AgentResponse, AgentError> {
     if !path.starts_with("/v1/") {
-        return Err("only /v1/ paths are served".to_string());
+        return Err(AgentError::new(
+            agent::codes::INVALID_PATH,
+            &[],
+            "only /v1/ paths are served",
+        ));
     }
-    let endpoint = if endpoint.trim().is_empty() { agent::default_endpoint() } else { endpoint };
+    let endpoint = if endpoint.trim().is_empty() {
+        agent::default_endpoint()
+    } else {
+        endpoint
+    };
     let extra_headers: Vec<(String, String)> = headers.unwrap_or_default().into_iter().collect();
 
     let notify = request_id.as_ref().map(|id| {
@@ -146,7 +157,12 @@ async fn agent_get(
         n
     });
 
-    let result = race_cancellable(agent::get(&endpoint, &path, &extra_headers), notify.as_deref()).await;
+    let result = race_cancellable(
+        agent::get(&endpoint, &path, &extra_headers),
+        notify.as_deref(),
+        cancelled_error(),
+    )
+    .await;
 
     if let Some(id) = &request_id {
         state.inflight.lock().unwrap().remove(id);
@@ -180,9 +196,21 @@ struct ExportResult {
 /// Asks the recorder for an evidence bundle of the given window and writes
 /// it to `dest` (a path the user chose in a save dialog).
 #[tauri::command]
-async fn agent_export_bundle(endpoint: String, query: String, dest: String) -> Result<ExportResult, String> {
-    let endpoint = if endpoint.trim().is_empty() { agent::default_endpoint() } else { endpoint };
-    let path = if query.is_empty() { "/v1/bundle".to_string() } else { format!("/v1/bundle?{query}") };
+async fn agent_export_bundle(
+    endpoint: String,
+    query: String,
+    dest: String,
+) -> Result<ExportResult, String> {
+    let endpoint = if endpoint.trim().is_empty() {
+        agent::default_endpoint()
+    } else {
+        endpoint
+    };
+    let path = if query.is_empty() {
+        "/v1/bundle".to_string()
+    } else {
+        format!("/v1/bundle?{query}")
+    };
     let resp = agent::get(&endpoint, &path, &[]).await?;
     if resp.status != 200 {
         return Err(format!(
@@ -195,8 +223,12 @@ async fn agent_export_bundle(endpoint: String, query: String, dest: String) -> R
     // sits at the chosen path.
     let tmp = format!("{dest}.part");
     std::fs::write(&tmp, &resp.body).map_err(|e| format!("cannot write {tmp}: {e}"))?;
-    std::fs::rename(&tmp, &dest).map_err(|e| format!("cannot move the bundle into place at {dest}: {e}"))?;
-    Ok(ExportResult { bytes: resp.body.len() as u64, path: dest })
+    std::fs::rename(&tmp, &dest)
+        .map_err(|e| format!("cannot move the bundle into place at {dest}: {e}"))?;
+    Ok(ExportResult {
+        bytes: resp.body.len() as u64,
+        path: dest,
+    })
 }
 
 /// Verifies and parses an evidence bundle file for viewing. `public_key`,
@@ -226,15 +258,25 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_launch_options, race_cancellable, CANCELLED};
+    use super::{agent::codes, cancelled_error, parse_launch_options, race_cancellable};
     use tokio::sync::Notify;
 
     #[test]
     fn parses_the_documented_options_and_ignores_the_rest() {
         let o = parse_launch_options(
-            ["--source", "live", "--page", "incidents", "--lang", "en", "--no-wizard", "--unknown", "x"]
-                .into_iter()
-                .map(String::from),
+            [
+                "--source",
+                "live",
+                "--page",
+                "incidents",
+                "--lang",
+                "en",
+                "--no-wizard",
+                "--unknown",
+                "x",
+            ]
+            .into_iter()
+            .map(String::from),
         );
         assert_eq!(o.source.as_deref(), Some("live"));
         assert_eq!(o.page.as_deref(), Some("incidents"));
@@ -255,15 +297,21 @@ mod tests {
         let notify = Notify::new();
         // Never notified - the future must be allowed to run to completion,
         // Some(&notify) or not.
-        let got = race_cancellable(async { Ok::<_, String>(42) }, Some(&notify)).await;
+        let got = race_cancellable(
+            async { Ok::<_, String>(42) },
+            Some(&notify),
+            "cancelled".to_string(),
+        )
+        .await;
         assert_eq!(got, Ok(42));
 
-        let got_no_notify = race_cancellable(async { Ok::<_, String>(7) }, None).await;
+        let got_no_notify =
+            race_cancellable(async { Ok::<_, String>(7) }, None, "cancelled".to_string()).await;
         assert_eq!(got_no_notify, Ok(7));
     }
 
     #[tokio::test]
-    async fn race_cancellable_returns_the_cancelled_sentinel_when_notified_first() {
+    async fn race_cancellable_returns_the_cancelled_error_when_notified_first() {
         let notify = Notify::new();
         notify.notify_one();
         // std::future::pending() never resolves on its own - if this test
@@ -271,7 +319,13 @@ mod tests {
         // cancellation path actually won the race, not because the
         // "real" work happened to finish first (which is impossible here
         // by construction, ruling out a false pass).
-        let got = race_cancellable(std::future::pending::<Result<(), String>>(), Some(&notify)).await;
-        assert_eq!(got, Err(CANCELLED.to_string()));
+        let got = race_cancellable(
+            std::future::pending::<Result<(), _>>(),
+            Some(&notify),
+            cancelled_error(),
+        )
+        .await;
+        assert_eq!(got, Err(cancelled_error()));
+        assert_eq!(got.unwrap_err().code, codes::CANCELLED);
     }
 }

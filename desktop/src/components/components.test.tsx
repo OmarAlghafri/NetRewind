@@ -37,6 +37,30 @@ describe("CapabilityTable", () => {
     const names = screen.getAllByText(/^(iphelper\.link|policy\.nftables|ebpf\.flow)$/).map((el) => el.textContent);
     expect(names).toEqual(["iphelper.link", "policy.nftables", "ebpf.flow"]);
   });
+
+  it("translates a coded down reason and keeps the raw text available, collapsed", () => {
+    const caps: Capability[] = [
+      {
+        name: "netlink.link",
+        platform: "linux",
+        privilege: "none",
+        coverage: ["link.*"],
+        status: "down",
+        reason: "stopped",
+        reason_code: "collector_stopped",
+        reason_params: {},
+        last_change: "",
+        last_seen: "",
+      },
+    ];
+    english(<CapabilityTable capabilities={caps} />);
+    expect(screen.getByText(/This collector stopped\./)).toBeInTheDocument();
+    // The raw reason is still there, just inside a collapsed <details> -
+    // "available on demand" (ADR 0004 §4.5), not gone.
+    const detail = screen.getByText("Technical detail").closest("details");
+    expect(detail).not.toHaveAttribute("open");
+    expect(detail).toHaveTextContent("stopped");
+  });
 });
 
 describe("SourceBanner", () => {
@@ -66,6 +90,47 @@ describe("SourceBanner", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("needs the desktop application");
     fireEvent.click(screen.getByText("Switch to demo"));
     expect(toDemo).toHaveBeenCalledTimes(1);
+  });
+
+  it("translates a structured connection error and keeps the raw detail available, collapsed", () => {
+    english(
+      <SourceBanner
+        settings={{ ...DEFAULT_SETTINGS, kind: "live" }}
+        record={record({
+          status: "error",
+          error: {
+            code: "not_listening",
+            params: { endpoint: "/run/netrewind/api.sock" },
+            technical_detail: "no recorder is listening at /run/netrewind/api.sock (is the netrewindd service running?)",
+          },
+        })}
+        onSwitchToDemo={() => {}}
+      />,
+    );
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("No recorder is listening at /run/netrewind/api.sock");
+    // The raw English sentence is still there, just inside <details> -
+    // "available on demand" (ADR 0004 §4.5), not gone and not shown
+    // unconditionally alongside the translated sentence.
+    expect(screen.getByText("Technical detail").closest("details")).not.toHaveAttribute("open");
+    expect(alert).toHaveTextContent("is the netrewindd service running?");
+  });
+
+  it("falls back to technical_detail for a code this build does not recognise, with no redundant detail toggle", () => {
+    english(
+      <SourceBanner
+        settings={{ ...DEFAULT_SETTINGS, kind: "live" }}
+        record={record({
+          status: "error",
+          error: { code: "some_future_code", params: {}, technical_detail: "a brand new failure mode" },
+        })}
+        onSwitchToDemo={() => {}}
+      />,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("a brand new failure mode");
+    // The message already is technical_detail here - a second copy behind
+    // "Technical detail" would just repeat it.
+    expect(screen.queryByText("Technical detail")).not.toBeInTheDocument();
   });
 
   it("labels a live source as connected when ready", () => {

@@ -4,6 +4,7 @@
 
 import type { Incident, NetRewindEvent } from "../types";
 import type { BundleManifest } from "./types";
+import type { AgentErrorPayload } from "../i18n/agentErrorCatalogue";
 
 interface AgentResponse {
   status: number;
@@ -12,11 +13,11 @@ interface AgentResponse {
   headers: Record<string, string>;
 }
 
-/** The exact string desktop/src-tauri/src/lib.rs's `agent_cancel` uses to
- *  fail an in-flight `agent_get` it was told to interrupt - matched here so
- *  a deliberate cancellation is never mistaken for the recorder actually
- *  being unreachable. */
-const CANCELLED_SENTINEL = "__cancelled__";
+/** The exact code desktop/src-tauri/src/lib.rs's `agent_cancel` fails an
+ *  in-flight `agent_get` with (`agent::codes::CANCELLED`) when it is told
+ *  to interrupt it - matched here so a deliberate cancellation is never
+ *  mistaken for the recorder actually being unreachable. */
+const CANCELLED_CODE = "cancelled";
 
 /** Thrown by `agentGetRaw`/`agentGet` when the request was interrupted by
  *  `agentCancel` before it finished - never a real transport failure, and
@@ -27,8 +28,23 @@ export class CancelledError extends Error {
   }
 }
 
+/** A Tauri command's `Err(AgentError)` rejects the JS promise with exactly
+ *  that struct (Tauri serialises the error value, it does not wrap it in
+ *  an `Error`) - so this is a plain object check, not an `instanceof`.
+ *  Exported so `useRecord.ts` can tell a real transport failure (translate
+ *  it) from anything else a caught rejection might be (a plain string,
+ *  a generic Error - fall back to showing it as-is). */
+export function isAgentErrorPayload(e: unknown): e is AgentErrorPayload {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    typeof (e as { code?: unknown }).code === "string" &&
+    typeof (e as { technical_detail?: unknown }).technical_detail === "string"
+  );
+}
+
 function isCancelledRejection(e: unknown): boolean {
-  return e === CANCELLED_SENTINEL || (e instanceof Error && e.message === CANCELLED_SENTINEL);
+  return isAgentErrorPayload(e) && e.code === CANCELLED_CODE;
 }
 
 export interface BundleContents {

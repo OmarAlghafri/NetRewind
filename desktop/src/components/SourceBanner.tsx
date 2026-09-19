@@ -1,8 +1,13 @@
 import { useLanguage } from "../i18n/LanguageContext";
+import { messageFor, type AgentErrorPayload } from "../i18n/agentErrorCatalogue";
 import { Button } from "./Button";
 import { TechnicalValue } from "./TechnicalValue";
 import type { Record } from "../data/useRecord";
 import type { SourceSettings } from "../data/source";
+
+function isStructuredError(error: Record["error"]): error is AgentErrorPayload {
+  return typeof error === "object";
+}
 
 // The one line at the top of every page that says where the record on
 // screen comes from and whether it is current. An error here is the whole
@@ -24,16 +29,34 @@ export function SourceBanner({
     settings.kind === "live" ? t("live_banner") : settings.kind === "bundle" ? t("bundle_banner") : t("demo_banner");
 
   if (record.status === "error") {
-    const message =
-      record.error === "shell_required"
+    // A structured connection failure (ADR 0004 §4.5) gets a translated
+    // sentence as the primary message, with agent.rs's own English detail
+    // kept available - not discarded - behind a native <details> disclosure
+    // rather than shown by default the way the whole rejection used to be
+    // wrapped in one TechnicalValue span regardless of what it was.
+    const structured = isStructuredError(record.error) ? messageFor(record.error, lang) : null;
+    const message = structured
+      ? structured.message
+      : record.error === "shell_required"
         ? t("status_shell_required")
         : record.error === "no_bundle"
           ? t("status_no_bundle")
-          : record.error;
+          : (record.error as string);
     return (
       <div className="source-banner source-banner-error" role="alert">
         <span>
-          <strong>{t("status_error")}</strong> — <TechnicalValue>{message}</TechnicalValue>
+          <strong>{t("status_error")}</strong> — {message}
+          {/* Only when the primary message is an actual translation of
+              technical_detail, not a stand-in for it (an unrecognised
+              code already shows technical_detail as `message` itself -
+              a second copy behind "Technical detail" would just repeat
+              it). */}
+          {structured?.known && (
+            <details className="source-banner-detail">
+              <summary>{t("status_technical_detail")}</summary>
+              <TechnicalValue>{(record.error as AgentErrorPayload).technical_detail}</TechnicalValue>
+            </details>
+          )}
         </span>
         <span className="source-banner-actions">
           <Button variant="secondary" onClick={record.refresh}>
