@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLanguage } from "../i18n/LanguageContext";
+import { Button } from "../components/Button";
+import { TechnicalValue } from "../components/TechnicalValue";
 import type { SourceKind, SourceSettings } from "../data/source";
 import { agentDefaultEndpoint, agentGet, isTauri } from "../data/tauri";
 import type { Health } from "../data/types";
@@ -95,12 +97,12 @@ export function Settings({
               />
             </label>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <button className="wizard-btn" onClick={testConnection}>
+              <Button variant="secondary" onClick={testConnection}>
                 {t("settings_test_connection")}
-              </button>
+              </Button>
               {test && (
                 <span className={test.ok ? "inline-ok" : "inline-error"} role="status">
-                  <span className="ltr-field">{test.text}</span>
+                  <TechnicalValue>{test.text}</TechnicalValue>
                 </span>
               )}
             </div>
@@ -130,9 +132,9 @@ export function Settings({
         )}
 
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
-          <button className="wizard-btn wizard-btn-primary" onClick={save} disabled={!dirty}>
+          <Button variant="primary" onClick={save} disabled={!dirty}>
             {t("settings_save")}
-          </button>
+          </Button>
           {saved && (
             <span className="inline-ok" role="status">
               {t("settings_saved")}
@@ -144,9 +146,9 @@ export function Settings({
       <div className="card">
         <strong>{t("settings_wizard_title")}</strong>
         <p style={{ color: "var(--text-muted)", fontSize: "0.88rem" }}>{t("settings_wizard_body")}</p>
-        <button className="wizard-btn" onClick={onReopenWizard} style={{ marginTop: 4 }}>
+        <Button variant="secondary" onClick={onReopenWizard} style={{ marginTop: 4 }}>
           {t("settings_wizard_button")}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -28,7 +28,11 @@ export function Sidebar({ page, onNavigate }: { page: Page; onNavigate: (p: Page
       <div className="sidebar-header">
         <div className="app-name">{t("appName")}</div>
       </div>
-      <nav className="sidebar-nav" aria-label={t("nav_landmark_label")}>
+      {/* tabIndex=0: axe's scrollable-region-focusable - see App.tsx's
+          .workspace-body for the same fix and why. Harmless when this list
+          fits without scrolling (today, at every supported size); becomes
+          load-bearing the moment it doesn't. */}
+      <nav className="sidebar-nav" aria-label={t("nav_landmark_label")} tabIndex={0}>
         {ITEMS.map((item) => (
           <button
             key={item.page}

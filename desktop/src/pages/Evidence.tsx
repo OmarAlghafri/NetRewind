@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useLanguage } from "../i18n/LanguageContext";
+import { Button } from "../components/Button";
+import { TechnicalValue } from "../components/TechnicalValue";
 import type { Record } from "../data/useRecord";
 import type { SourceSettings } from "../data/source";
 import { agentExportBundle, isTauri, pickBundleToOpen, pickBundleToSave } from "../data/tauri";
@@ -85,21 +87,21 @@ export function Evidence({
           <strong>{t("evidence_opened_title")}</strong>
           <div className="capability-row">
             <span>{t("evidence_manifest_observer")}</span>
-            <span className="ltr-field">{record.manifest.observer_id}</span>
+            <TechnicalValue>{record.manifest.observer_id}</TechnicalValue>
           </div>
           <div className="capability-row">
             <span>{t("evidence_manifest_window")}</span>
-            <span className="ltr-field">
+            <TechnicalValue>
               {fmt(record.manifest.window_from)} → {fmt(record.manifest.window_to)}
-            </span>
+            </TechnicalValue>
           </div>
           <div className="capability-row">
             <span>{t("evidence_manifest_created")}</span>
-            <span className="ltr-field">{fmt(record.manifest.created_at)}</span>
+            <TechnicalValue>{fmt(record.manifest.created_at)}</TechnicalValue>
           </div>
           <div className="capability-row">
             <span>{t("evidence_manifest_version")}</span>
-            <span className="ltr-field">{record.manifest.app_version}</span>
+            <TechnicalValue>{record.manifest.app_version}</TechnicalValue>
           </div>
           <ul style={{ marginBottom: 0 }}>
             <li>{t("evidence_checksums_ok")}</li>
@@ -113,19 +115,19 @@ export function Evidence({
             {record.manifest.redacted && <li>{t("evidence_redacted")}</li>}
             {record.manifest.truncated && <li>{t("evidence_truncated")}</li>}
           </ul>
-          <button className="wizard-btn" style={{ marginTop: 10 }} onClick={onCloseBundle}>
+          <Button variant="secondary" style={{ marginTop: 10 }} onClick={onCloseBundle}>
             {t("evidence_close_bundle")}
-          </button>
+          </Button>
         </div>
       )}
 
       <div className="card">
         <strong>{t("evidence_export_title")}</strong>
         <div style={{ marginTop: 8 }}>
-          <span className="ltr-field">{record.events.length}</span> {t("evidence_events_count_label")}
+          <TechnicalValue>{record.events.length}</TechnicalValue> {t("evidence_events_count_label")}
         </div>
         <div>
-          <span className="ltr-field">{record.incidents.length}</span> {t("evidence_incidents_count_label")}
+          <TechnicalValue>{record.incidents.length}</TechnicalValue> {t("evidence_incidents_count_label")}
         </div>
         {live ? (
           <div style={{ marginTop: 12 }}>
@@ -142,13 +144,13 @@ export function Evidence({
               {t("evidence_include_secrets")}
             </label>
             <div style={{ marginTop: 10 }}>
-              <button className="wizard-btn wizard-btn-primary" onClick={doExport} disabled={exporting}>
+              <Button variant="primary" onClick={doExport} disabled={exporting}>
                 {exporting ? t("evidence_exporting") : t("evidence_export_button")}
-              </button>
+              </Button>
             </div>
             {exportMessage && (
               <p className={exportMessage.ok ? "inline-ok" : "inline-error"} role="status">
-                <span className="ltr-field">{exportMessage.text}</span>
+                <TechnicalValue>{exportMessage.text}</TechnicalValue>
               </p>
             )}
           </div>
@@ -165,16 +167,16 @@ export function Evidence({
         <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginTop: 8 }}>{t("evidence_import_body")}</p>
         <div style={{ marginTop: 12 }}>
           {inShell ? (
-            <button className="wizard-btn wizard-btn-primary" onClick={doOpen}>
+            <Button variant="primary" onClick={doOpen}>
               {t("evidence_import_button")}
-            </button>
+            </Button>
           ) : (
             <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>{t("settings_shell_note")}</p>
           )}
         </div>
         {openMessage && (
           <p className="inline-error" role="alert">
-            <span className="ltr-field">{openMessage}</span>
+            <TechnicalValue>{openMessage}</TechnicalValue>
           </p>
         )}
         <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 8, marginBottom: 0 }}>

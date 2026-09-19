@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { Button } from "../../components/Button";
+import { TechnicalValue } from "../../components/TechnicalValue";
 import type { SourceSettings } from "../../data/source";
 import { agentGet, isTauri, pickBundleToOpen } from "../../data/tauri";
 import type { Health } from "../../data/types";
@@ -64,9 +66,9 @@ export function AgentChoiceStep({
         <strong>{t("wizard_agent_demo_title")}</strong>
         <p className="wizard-step-note">{t("wizard_agent_demo_body")}</p>
         {settings.kind !== "demo" && (
-          <button className="wizard-btn" onClick={() => onChange({ ...settings, kind: "demo" })}>
+          <Button variant="secondary" onClick={() => onChange({ ...settings, kind: "demo" })}>
             {t("wizard_agent_use_demo")}
-          </button>
+          </Button>
         )}
         {selected("demo")}
       </div>
@@ -75,15 +77,15 @@ export function AgentChoiceStep({
         <strong>{t("wizard_agent_live_title")}</strong>
         <p className="wizard-step-note">{t("wizard_agent_live_body")}</p>
         {inShell ? (
-          <button className="wizard-btn wizard-btn-primary" onClick={connect} disabled={connecting}>
+          <Button variant="primary" onClick={connect} disabled={connecting}>
             {connecting ? t("wizard_agent_connecting") : t("wizard_agent_live_button")}
-          </button>
+          </Button>
         ) : (
           <p className="wizard-step-note">{t("settings_shell_note")}</p>
         )}
         {liveMessage && (
           <p className={liveMessage.ok ? "inline-ok" : "inline-error"} role="status">
-            <span className="ltr-field">{liveMessage.text}</span>
+            <TechnicalValue>{liveMessage.text}</TechnicalValue>
           </p>
         )}
         {selected("live")}
@@ -93,15 +95,15 @@ export function AgentChoiceStep({
         <strong>{t("wizard_agent_import_title")}</strong>
         <p className="wizard-step-note">{t("wizard_agent_import_body")}</p>
         {inShell ? (
-          <button className="wizard-btn wizard-btn-primary" onClick={openBundle}>
+          <Button variant="primary" onClick={openBundle}>
             {t("wizard_agent_import_button")}
-          </button>
+          </Button>
         ) : (
           <p className="wizard-step-note">{t("settings_shell_note")}</p>
         )}
         {bundleMessage && (
           <p className={bundleMessage.ok ? "inline-ok" : "inline-error"} role="status">
-            <span className="ltr-field">{bundleMessage.text}</span>
+            <TechnicalValue>{bundleMessage.text}</TechnicalValue>
           </p>
         )}
         {selected("bundle")}

@@ -1,4 +1,6 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { goToTimeline, openShell } from "./helpers";
 
 /**
  * Found while verifying P0-01's fix, not originally in the execution
@@ -46,4 +48,49 @@ test("wizard actions stay reachable on the longest step at the minimum window si
     expect(box.y + box.height).toBeLessThanOrEqual(480);
   }
   await expect(page.getByRole("button", { name: "تخطّ الآن" })).toBeVisible();
+});
+
+/**
+ * Found by axe (`scrollable-region-focusable`, serious) while widening the
+ * accessibility suite past the wizard: every scroll region this project
+ * added in Phases 1-2 (`.workspace-body`, `.sidebar-nav`,
+ * `.wizard-step-body`) is a plain `<div>` with `overflow-y: auto` and no
+ * way to receive keyboard focus - a keyboard-only user cannot scroll any
+ * of them, because a mouse wheel/touch scroll is the only way in without a
+ * `tabindex`. Fixed by making each one a real Tab stop
+ * (`tabIndex={0}` in App.tsx/Wizard.tsx/Sidebar.tsx). This test checks all
+ * three together since they share one root cause and one fix pattern -
+ * not because they are the same component.
+ */
+test("every scroll region this project added is keyboard-focusable", async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 600 });
+  await openShell(page, { lang: "en" });
+  await goToTimeline(page);
+
+  for (const selector of [".workspace-body", ".sidebar-nav"]) {
+    const tabIndex = await page.locator(selector).getAttribute("tabindex");
+    expect(tabIndex, `${selector} must be a keyboard Tab stop`).toBe("0");
+  }
+
+  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+  const scrollViolations = results.violations.filter((v) => v.id === "scrollable-region-focusable");
+  expect(scrollViolations, JSON.stringify(scrollViolations, null, 2)).toEqual([]);
+});
+
+test("wizard-step-body is keyboard-focusable on the overflowing step", async ({ page }) => {
+  await page.setViewportSize({ width: 720, height: 480 });
+  await page.addInitScript(() => {
+    window.localStorage.removeItem("netrewind.onboardingComplete");
+    window.localStorage.setItem("netrewind.lang", "ar");
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "التالي" }).click();
+  await page.waitForSelector(".wizard-step-body");
+
+  const tabIndex = await page.locator(".wizard-step-body").getAttribute("tabindex");
+  expect(tabIndex, ".wizard-step-body must be a keyboard Tab stop").toBe("0");
+
+  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+  const scrollViolations = results.violations.filter((v) => v.id === "scrollable-region-focusable");
+  expect(scrollViolations, JSON.stringify(scrollViolations, null, 2)).toEqual([]);
 });

@@ -1,4 +1,6 @@
 import { useLanguage } from "../i18n/LanguageContext";
+import { Button } from "./Button";
+import { TechnicalValue } from "./TechnicalValue";
 import type { Record } from "../data/useRecord";
 import type { SourceSettings } from "../data/source";
 
@@ -31,16 +33,16 @@ export function SourceBanner({
     return (
       <div className="source-banner source-banner-error" role="alert">
         <span>
-          <strong>{t("status_error")}</strong> — <span className="ltr-field">{message}</span>
+          <strong>{t("status_error")}</strong> — <TechnicalValue>{message}</TechnicalValue>
         </span>
         <span className="source-banner-actions">
-          <button className="wizard-btn" onClick={record.refresh}>
+          <Button variant="secondary" onClick={record.refresh}>
             {t("status_retry")}
-          </button>
+          </Button>
           {settings.kind !== "demo" && (
-            <button className="wizard-btn wizard-btn-ghost" onClick={onSwitchToDemo}>
+            <Button variant="ghost" onClick={onSwitchToDemo}>
               {t("status_switch_demo")}
-            </button>
+            </Button>
           )}
         </span>
       </div>
@@ -56,9 +58,9 @@ export function SourceBanner({
         {record.status === "ready" && record.refreshedAt && settings.kind === "live" && (
           <span>
             {t("status_refreshed")}{" "}
-            <span className="ltr-field">
+            <TechnicalValue>
               {record.refreshedAt.toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour12: false })}
-            </span>
+            </TechnicalValue>
           </span>
         )}
       </span>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLanguage } from "../i18n/LanguageContext";
+import { Button } from "../components/Button";
 import type { SourceSettings } from "../data/source";
 import type { Record } from "../data/useRecord";
 import { LanguageStep } from "./steps/LanguageStep";
@@ -52,7 +53,9 @@ export function Wizard({
             them - the same containment pattern as the app shell (ADR 0003),
             applied here because the privacy step's body text alone
             overflows a 720x480 window without it. */}
-        <div className="wizard-step-body">
+        {/* tabIndex=0: axe's scrollable-region-focusable - this is the
+            region that actually overflows on the privacy step. */}
+        <div className="wizard-step-body" tabIndex={0}>
           {stepId === "language" && <LanguageStep />}
           {stepId === "privacy" && <PrivacyStep />}
           {stepId === "agent" && <AgentChoiceStep settings={settings} onChange={onChangeSettings} />}
@@ -62,24 +65,24 @@ export function Wizard({
         </div>
 
         <div className="wizard-actions">
-          <button className="wizard-btn wizard-btn-ghost" onClick={onFinish}>
+          <Button variant="ghost" onClick={onFinish}>
             {t("wizard_skip")}
-          </button>
+          </Button>
           <div className="wizard-nav-buttons">
             {index > 0 && (
-              <button className="wizard-btn" onClick={back}>
+              <Button variant="secondary" onClick={back}>
                 {t("wizard_back")}
-              </button>
+              </Button>
             )}
             {!isLast && (
-              <button className="wizard-btn wizard-btn-primary" onClick={next}>
+              <Button variant="primary" onClick={next}>
                 {t("wizard_next")}
-              </button>
+              </Button>
             )}
             {isLast && (
-              <button className="wizard-btn wizard-btn-primary" onClick={onFinish}>
+              <Button variant="primary" onClick={onFinish}>
                 {t("wizard_finish")}
-              </button>
+              </Button>
             )}
           </div>
         </div>

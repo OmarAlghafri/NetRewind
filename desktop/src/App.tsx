@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import "./assets/fonts/fonts.css";
 import "./App.css";
 import { LanguageProvider, useLanguage } from "./i18n/LanguageContext";
 import { Sidebar, type Page } from "./components/Sidebar";
@@ -82,12 +83,12 @@ function Shell() {
           <div className="sidebar-header">
             <div className="app-name">{t("appName")}</div>
           </div>
-          <div className="sidebar-nav" />
+          <div className="sidebar-nav" tabIndex={0} />
           <div className="sidebar-footer" />
         </div>
         <div className="workspace">
           <div className="workspace-header" />
-          <div className="workspace-body" />
+          <div className="workspace-body" tabIndex={0} />
         </div>
       </div>
     );
@@ -127,7 +128,10 @@ function Shell() {
         <div className="workspace-header">
           <SourceBanner settings={settings} record={record} onSwitchToDemo={switchToDemo} />
         </div>
-        <main className="workspace-body">
+        {/* tabIndex=0: a keyboard-only user has no other way to scroll this
+            region (axe `scrollable-region-focusable`, found while auditing
+            the wizard's equivalent region - same fix applies here). */}
+        <main className="workspace-body" tabIndex={0}>
           {page === "overview" && <Overview record={record} settings={settings} />}
           {page === "incidents" && <Incidents incidents={record.incidents} />}
           {page === "timeline" && <Timeline events={record.events} />}
