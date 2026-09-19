@@ -47,7 +47,13 @@ type Link struct {
 	Relation Relation   `json:"relation"`
 	// Why is the sentence explaining this step, taken from the rule that
 	// matched. It is what the operator reads instead of the field names.
-	Why      string         `json:"why"`
+	Why string `json:"why"`
+	// Clause is the matched rule clause's own name (its `as` in the YAML) -
+	// execution order §4.5 / ADR 0004. Lets a client key a translation of
+	// Why by rule_id+clause even when Why itself fell back to
+	// event.Describe's English template because the clause had no `why`
+	// of its own. Empty when Why did not come from a rule clause at all.
+	Clause   string         `json:"clause,omitempty"`
 	Evidence map[string]any `json:"evidence,omitempty"`
 }
 

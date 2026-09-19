@@ -160,6 +160,28 @@ anyone else to. It points at the next place to look:
 That is useful. "Restart the interface" would not be — and on a flapping port
 it would destroy the evidence.
 
+## An Arabic translation, if you have one
+
+`i18n.ar` carries an Arabic version of the same title, advice, and each
+clause's `why` — keyed by the clause's own `as` name, so a translation for a
+clause that does not exist is refused the same way `root_cause` naming an
+unknown clause already is:
+
+```yaml
+i18n:
+  ar:
+    title: مسار كان يعمل توقف عن العمل
+    advice: التغيير المذكور هنا هو الأقرب زمنياً، وليس سبباً مؤكداً...
+    clauses:
+      change: هذا آخر شيء تغيّر على المسار قبل أن يتعطل.
+```
+
+Optional, and additive: a rule with no `i18n` block loads exactly as it
+always has, and the desktop application falls back to the English text,
+labelled as the original, rather than failing or showing nothing. Every
+rule shipped with this project carries one; a contributed rule does not
+need to — the English fields alone are still a complete, working rule.
+
 ## Checking your work
 
 ```bash

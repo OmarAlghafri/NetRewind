@@ -270,6 +270,43 @@ func TestRulesListsTheCatalogueWithoutMatchClauses(t *testing.T) {
 	}
 }
 
+func TestRulesIncludesTranslationsWhenTheRuleHasThem(t *testing.T) {
+	srv, _ := newTestServer(t)
+	srv.Rules = []*correlate.Rule{
+		{
+			ID: "gateway-hijack", Title: "Gateway hijack", Severity: "error", Confidence: 90,
+			Window: 2 * time.Minute, RootCause: "trigger", Advice: "check the switch",
+			Match: []correlate.Clause{{As: "trigger", Kinds: []string{"l2.arp_binding_changed"}}},
+			I18n: map[string]correlate.RuleI18n{
+				"ar": {Title: "اختطاف البوابة", Advice: "افحص المبدّل", Clauses: map[string]string{"trigger": "السبب"}},
+			},
+		},
+	}
+	rec := get(t, srv.Handler(), "/v1/rules")
+	var body rulesResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Rules) != 1 {
+		t.Fatalf("rules = %+v", body.Rules)
+	}
+	ar, ok := body.Rules[0].I18n["ar"]
+	if !ok {
+		t.Fatal("i18n.ar did not survive the HTTP/JSON round trip")
+	}
+	if ar.Title != "اختطاف البوابة" || ar.Clauses["trigger"] != "السبب" {
+		t.Errorf("ar = %+v", ar)
+	}
+
+	// A rule with no i18n block omits the field entirely - not a
+	// placeholder {} a client would have to special-case.
+	srv.Rules = []*correlate.Rule{{ID: "plain", Title: "t", Severity: "warn", Confidence: 80, Window: time.Minute, RootCause: "x", Match: []correlate.Clause{{As: "x", Kinds: []string{"link.down"}}}}}
+	rec2 := get(t, srv.Handler(), "/v1/rules")
+	if strings.Contains(rec2.Body.String(), `"i18n"`) {
+		t.Errorf("i18n key present for a rule with no translations: %s", rec2.Body.String())
+	}
+}
+
 func TestRulesWithNoCatalogueIsAnEmptyArray(t *testing.T) {
 	srv, _ := newTestServer(t)
 	if got := strings.TrimSpace(get(t, srv.Handler(), "/v1/rules").Body.String()); got != `{"rules":[]}` {

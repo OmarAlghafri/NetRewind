@@ -301,7 +301,7 @@ Produced by the correlation engine (M3), not by collectors.
 incident_id, opened_at, closed_at, status
 title, severity, confidence
 root_cause  { kind, entity_ref, confidence }
-chain[]     { seq, event_id, relation, why, evidence_ref }
+chain[]     { seq, event_id, relation, why, clause, evidence_ref }
 victims[]   host_id[]
 rule_id
 ```
@@ -310,6 +310,12 @@ rule_id
 separates this from a log aggregator: the engine states explicitly when it has
 only observed co-occurrence rather than causation. Nothing is permitted to claim
 causality it cannot show.
+
+`clause` names the rule clause (its own `as`) that this link matched -
+letting a client key a translation of `why` by `rule_id` + `clause` even
+when `why` itself is the English `event.Describe` fallback rather than a
+clause-specific sentence. Empty when the link did not come from a rule
+clause at all. See [an Arabic translation](rules.md#an-arabic-translation-if-you-have-one).
 
 A rule's first **required** clause is its anchor. Clauses after it are matched
 forwards in time; clauses before it are matched **backwards**, nearest first.

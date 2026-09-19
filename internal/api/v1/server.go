@@ -358,6 +358,10 @@ type ruleSummary struct {
 	Window     string `json:"window"`
 	RootCause  string `json:"root_cause"`
 	Advice     string `json:"advice"`
+	// I18n carries this rule's translated narrative text (execution order
+	// §4.5 / ADR 0004), keyed by language code - absent entirely for a
+	// rule with no translation yet, never a placeholder empty object.
+	I18n map[string]correlate.RuleI18n `json:"i18n,omitempty"`
 }
 
 type rulesResponse struct {
@@ -378,6 +382,7 @@ func (s *Server) handleRules(w http.ResponseWriter, r *http.Request) {
 			Window:     rule.Window.String(),
 			RootCause:  rule.RootCause,
 			Advice:     rule.Advice,
+			I18n:       rule.I18n,
 		})
 	}
 	writeJSONWithETag(w, r, rulesResponse{Rules: out})

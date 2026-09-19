@@ -45,6 +45,24 @@ type Rule struct {
 	// RootCause names the clause (by its `as`) that the rule blames.
 	RootCause string `yaml:"root_cause"`
 	Advice    string `yaml:"advice"`
+	// I18n carries this rule's translated narrative text, keyed by
+	// language code ("ar") - execution order §4.5 / ADR 0004. Absent
+	// entirely, or missing a field within one language, means "no
+	// translation yet": the GUI falls back to the English Title/Advice/
+	// Clause.Why above, tagged as the original text, never blank and
+	// never a hard failure. Optional so every rule file written before
+	// this field existed keeps loading unchanged.
+	I18n map[string]RuleI18n `yaml:"i18n,omitempty"`
+}
+
+// RuleI18n is one language's translation of a rule's narrative text.
+type RuleI18n struct {
+	Title  string `yaml:"title,omitempty" json:"title,omitempty"`
+	Advice string `yaml:"advice,omitempty" json:"advice,omitempty"`
+	// Clauses is keyed by the clause's own `as` name, matching how
+	// RootCause already refers to a clause - so a translation for the
+	// wrong clause name is a validation error, not a silently-ignored typo.
+	Clauses map[string]string `yaml:"clauses,omitempty" json:"clauses,omitempty"`
 }
 
 // Clause is one event the rule is looking for.
@@ -119,6 +137,13 @@ func (r *Rule) Validate() error {
 	}
 	if r.RootCause != "" && !named[r.RootCause] {
 		return fmt.Errorf("rule %s blames %q, which is not one of its clauses", r.ID, r.RootCause)
+	}
+	for lang, tr := range r.I18n {
+		for as := range tr.Clauses {
+			if !named[as] {
+				return fmt.Errorf("rule %s: i18n.%s.clauses names %q, which is not one of its clauses", r.ID, lang, as)
+			}
+		}
 	}
 	if r.Anchor() < 0 {
 		return fmt.Errorf("rule %s has no required clause, so it would match everything", r.ID)

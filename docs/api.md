@@ -112,8 +112,11 @@ Always ordered oldest first; there is no `order` parameter here.
 ### `GET /v1/rules`
 
 The correlation catalogue the recorder loaded: id, title, severity,
-confidence, window, root cause kind and advice for every rule. Match clauses
-are not exposed; they are the engine's business. Supports conditional GET
+confidence, window, root cause kind and advice for every rule, plus `i18n`
+(a translation of title/advice/each clause's `why`, keyed by language code -
+see [rules.md](rules.md#an-arabic-translation-if-you-have-one)) when the
+rule file has one. Match clauses are not exposed; they are the engine's
+business. Supports conditional GET
 the same way `/v1/capabilities` does (see above).
 
 ### `GET /v1/bundle`

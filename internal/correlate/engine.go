@@ -666,6 +666,7 @@ func build(r *Rule, matched []match) *incident.Incident {
 			Subject:  lead.Subject.Label,
 			Relation: m.clause.Relation,
 			Why:      why,
+			Clause:   m.clause.As,
 			Evidence: map[string]any{"describe": event.Describe(lead)},
 		}
 		if len(m.events) > 1 {
