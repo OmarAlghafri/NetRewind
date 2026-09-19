@@ -18,3 +18,14 @@ match:
     why: >-
       Hosts stopped answering at layer 2 immediately afterwards, which is the
       link failure showing up as apparent host failures.
+i18n:
+  ar:
+    title: تعطّلت وصلة وسحبت معها أجهزة أخرى
+    advice: >-
+      الأجهزة لم تتعطّل. أعِد الوصلة وستعود من تلقاء نفسها؛ التحقيق في كل
+      جهاز على حدة يُهدر وقت معالجة الانقطاع.
+    clauses:
+      link: توقفت واجهة شبكة عن العمل.
+      isolation: >-
+        توقفت أجهزة عن الإجابة على مستوى الطبقة الثانية (L2) فور ذلك، وهذا
+        ظهور تعطّل الوصلة بمظهر تعطّل أجهزة.

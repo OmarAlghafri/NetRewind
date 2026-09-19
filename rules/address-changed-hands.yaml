@@ -16,3 +16,13 @@ match:
     why: >-
       This address is now answered by hardware that was not previously bound to
       it, so the machine behind it is a different machine.
+i18n:
+  ar:
+    title: انتقل عنوان إلى جهاز آخر
+    advice: >-
+      أمر طبيعي بعد انتهاء صلاحية عقد DHCP. يستحق الفحص إذا كان العنوان لخادم، أو
+      مُعيَّناً يدوياً (ثابتاً)، أو انتقل دون تجديد عقد قريب منه.
+    clauses:
+      handover: >-
+        أصبح هذا العنوان يُجاب من عتاد (بطاقة شبكة) لم يكن مرتبطاً به سابقاً، أي
+        أن الجهاز الذي خلفه جهاز مختلف.

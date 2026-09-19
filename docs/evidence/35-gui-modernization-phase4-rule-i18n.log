@@ -1,0 +1,99 @@
+GUI modernization, Phase 4 (backend + content slice): the rule
+localization contract (ADR 0004) implemented on the Go/API side, and all
+19 shipped rules translated into Arabic - title, advice, and every
+clause's `why`.
+
+## 1. Why the Go struct had to change before a single YAML file could
+
+`internal/correlate/rule.go:246` decodes every rule with
+`yaml.Decoder.KnownFields(true)` - confirmed before writing anything by
+re-reading `rule.go` directly, not assumed from memory. Adding an `i18n`
+key to a `.yaml` file without first declaring it on the `Rule`/`Clause`
+Go structs would make every one of the 19 shipped rules fail to load, the
+exact failure mode `TestAnUnknownKeyInARuleIsRefused` exists to catch on a
+genuine typo - so the Go change came first, verified against that exact
+test staying green, then the content.
+
+## 2. The contract
+
+`Rule.I18n map[string]RuleI18n` (`internal/correlate/rule.go`), each
+`RuleI18n` carrying `Title`, `Advice`, and `Clauses map[string]string`
+keyed by the clause's own `as` name. `Validate()` gained a check mirroring
+the existing `root_cause` check: a translation naming a clause that does
+not exist is refused, not silently accepted as a translation for nothing.
+`incident.Link` gained `Clause string` (the matched clause's `as`),
+populated in `internal/correlate/engine.go`'s `build()` - the piece that
+lets a client key a `why` translation by `rule_id+clause` even when `Why`
+itself fell back to the English `event.Describe` template rather than a
+clause-specific sentence. `/v1/rules`' `ruleSummary` gained `I18n`.
+
+    $ go test ./internal/correlate/... -run 'I18n|Translation|Clause' -v
+    --- PASS: TestARuleWithATranslationBlockLoadsAndKeepsBothLanguages
+    --- PASS: TestARuleWithNoTranslationBlockStillLoads
+    --- PASS: TestATranslationForANonexistentClauseIsRejected
+    --- PASS: TestChainLinksNameTheClauseThatMatchedThem
+
+    $ go test ./internal/api/... -run TestRulesIncludesTranslations -v
+    --- PASS: TestRulesIncludesTranslationsWhenTheRuleHasThem
+
+The clause test specifically uses a two-clause rule and checks each
+link's `Clause` by index, so an off-by-one in `build()`'s loop would show
+up as the wrong clause name attached to the wrong link, not just "a
+non-empty string somewhere."
+
+## 3. All 19 rules translated
+
+Every rule under `rules/*.yaml` gained an `i18n.ar` block: `title`,
+`advice`, and a `why` for every clause it has - not a partial pass over
+the "important" ones. Followed the execution order's own writing rules
+(§10.4): meaning written in Arabic first rather than transplanting
+English sentence order, short direct sentences, technical terms (MTU,
+BTF, netlink, DHCP, ARP, VPN, PPPoE, transceiver, duplex, SYN) kept in
+Latin script inline rather than transliterated or invented-Arabic-coined,
+which is standard practice in Arabic technical writing and matches how a
+working network engineer actually talks. Approved terminology from the
+glossary used throughout: المُسجِّل for "the recorder," not الراصد.
+
+Reverified with the project's own real validator, not just a Go unit
+test in isolation - the exact command `CONTRIBUTING.md` asks a
+rule-contributor to run before opening a pull request:
+
+    $ go run ./cmd/netrewind rules --dir rules
+    19 rules loaded from rules
+    [... all 19 listed, English title/severity/confidence/window/clause
+    count exactly as before - the i18n block does not change any of the
+    engine-facing fields it was layered on top of]
+
+Read back literally afterward (not merely checked for the presence of
+Arabic Unicode codepoints, per this execution order's own §1 rule 7):
+spot-checked `gateway-returned-different.yaml` and `collector-not-watching.yaml`
+in full - grammatically correct, natural word order, no leftover English
+sentence structure, technical loanwords (kernel, netlink, sockets,
+transceiver) correctly embedded without breaking the surrounding Arabic
+grammar.
+
+## 4. Docs updated in the same change
+
+`docs/rules.md` gained "An Arabic translation, if you have one" -
+documents the `i18n` key with a real example, states it is optional and
+additive. `docs/schema.md`'s incident chain fields gained `clause`.
+`docs/api.md`'s `/v1/rules` section notes the new field.
+
+## 5. Full regression
+
+    $ gofmt -l cmd internal                     (empty - all formatted)
+    $ go build ./...                             clean
+    $ CGO_ENABLED=0 go test ./...                 all packages ok
+
+## 6. Not yet done (this is a backend + content slice, not all of Phase 4)
+
+The event-kind catalogue (49 kinds, human name + technical code in both
+languages); Rust/Go structured error codes for capability `reason` and
+shell connection failures; the `desktop/src/i18n/generated/rules.json`
+build step so demo/bundle mode also get this Arabic text; any frontend
+consumption at all - `IncidentCard.tsx` and `Rules.tsx` still render the
+raw English `title`/`why`/`advice` fields directly, unchanged, because the
+Go/API side is now ready for them to switch but that switch has not
+happened yet; and the automated "no untagged Latin sentence" scanner,
+which needs that frontend work to exist before it has anything real to
+scan. All tracked in ADR 0004, not silently implied closed by this slice.

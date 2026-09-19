@@ -1,6 +1,12 @@
 # ADR 0004 — Localization contract for rule and event narrative text
 
-**Status:** Proposed.
+**Status:** Rule i18n contract accepted and implemented, all 19 shipped
+rules translated (`internal/correlate/rule.go`, `internal/incident/incident.go`,
+`internal/correlate/engine.go`, `internal/api/v1/server.go`, `rules/*.yaml`).
+Event-kind catalogue, Rust/Go error codes, the generated
+`desktop/src/i18n/generated/rules.json` build step, and the frontend
+rendering/scanner are separate, not-yet-started pieces of this same ADR -
+tracked below, not silently folded into "done".
 **Date:** 2026-09-19.
 
 ## Context
@@ -35,9 +41,9 @@ the Go struct, or every one of the 19 shipped rules fails to load.
   Subject, Relation, Why, Evidence` with no clause identifier) carrying the
   matched clause's `as`, so the GUI can look up `rule_id + clause` in the
   Arabic catalogue even when `Why` fell back to `event.Describe`.
-- `/v1/rules` returns the `i18n` block plus a content `hash` of the loaded
-  catalogue (see ADR 0005 for why - the same hash serves cache-invalidation
-  for both concerns).
+- `/v1/rules` returns the `i18n` block. **Superseded during implementation**:
+  ADR 0005 built a real `ETag`/conditional-GET on this route instead of a
+  same-body hash field - see that ADR's own note on the same substitution.
 - A build step generates `desktop/src/i18n/generated/rules.json` from
   `rules/*.yaml`, so demo mode and bundle mode (neither of which talk to a
   live API) also render Arabic rule text.
@@ -66,9 +72,34 @@ the Go struct, or every one of the 19 shipped rules fails to load.
 
 ## Verification
 
-Pending - closed by the Phase 4 gate: every kind in `internal/event/kinds.go`
-has both an `ar` and `en` catalogue entry (build fails otherwise); a rule
-file without `i18n` still loads and renders with the English-fallback tag;
-`TestAnUnknownKeyInARuleIsRefused` still passes unmodified; an automated scan
-of the rendered Arabic app finds no Latin-script sentence outside a
-`<bdi dir="ltr">`/`TechnicalValue` wrapper.
+**Rule i18n contract (done):**
+- `internal/correlate/i18n_test.go`: a rule with a full `i18n.ar` block
+  loads and keeps both languages (`TestARuleWithATranslationBlockLoadsAndKeepsBothLanguages`);
+  a rule with none still loads unchanged
+  (`TestARuleWithNoTranslationBlockStillLoads` - the actual fallback-safety
+  claim, not merely assumed from the field being optional); a translation
+  naming a clause that does not exist is rejected the same way `root_cause`
+  already is (`TestATranslationForANonexistentClauseIsRejected`); a built
+  incident's `Chain[].Clause` names the real matched clause, checked against
+  a two-clause rule specifically so an off-by-one would show up as the
+  wrong name, not just *a* non-empty one
+  (`TestChainLinksNameTheClauseThatMatchedThem`).
+- `internal/api/v1/server_test.go`'s `TestRulesIncludesTranslationsWhenTheRuleHasThem`:
+  the `i18n` block survives the HTTP/JSON round trip, and is omitted
+  entirely (not an empty object) for a rule with none.
+- `TestAnUnknownKeyInARuleIsRefused` still passes unmodified - the strict
+  decoder's behaviour on a genuine typo is untouched by this addition.
+- All 19 shipped rules translated (title, advice, every clause's `why`) and
+  reverified with the real validator: `go run ./cmd/netrewind rules --dir
+  rules` - 19 rules loaded. Read back literally, not merely checked for
+  Unicode, per this execution order's own §1 rule 7.
+- `go build ./...`, `CGO_ENABLED=0 go test ./...` (all packages), `gofmt -l`
+  all clean.
+
+**Not started:** the event-kind catalogue (49 kinds); Rust/Go error codes
+for capability `reason` and shell connection failures; the
+`desktop/src/i18n/generated/rules.json` build step; any frontend rendering
+of `i18n.ar` at all (`IncidentCard.tsx`/`Rules.tsx` still render the raw
+English fields - the Go/API side is ready for them to switch, they have
+not yet); the automated scan for untagged Latin sentences, which needs
+that frontend work to exist before it has anything meaningful to scan.

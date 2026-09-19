@@ -14,3 +14,13 @@ match:
     why: >-
       The recorder was not watching, or lost events it could not keep up with.
       An absence of events here does not mean an absence of problems.
+i18n:
+  ar:
+    title: يوجد فراغ في السجل
+    advice: >-
+      لا يمكن استنتاج أي شيء عن هذه الفترة من هذا المُسجِّل. إذا وقع الانقطاع
+      الذي تحقّق فيه ضمن هذه الفترة، ابحث عن مصدر آخر قبل تحديد ما حدث.
+    clauses:
+      gap: >-
+        لم يكن المُسجِّل يراقب، أو فقد أحداثاً لم يستطع مواكبتها. غياب
+        الأحداث هنا لا يعني غياب المشكلات.
