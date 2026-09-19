@@ -6,6 +6,7 @@ import type { Lang } from "../i18n/translations";
 import { labelForKind } from "../i18n/kindCatalogue";
 import { adviceFor, findRule, titleFor, whyFor } from "../i18n/rulesCatalogue";
 import type { RuleSummary } from "../data/types";
+import { Button } from "./Button";
 import { SeverityBadge } from "./SeverityBadge";
 import { TechnicalValue } from "./TechnicalValue";
 
@@ -83,7 +84,24 @@ function EvidenceDisclosure({ evidence }: { evidence?: Record<string, unknown> }
   );
 }
 
-export function IncidentCard({ incident, rules = [] }: { incident: Incident; rules?: RuleSummary[] }) {
+// PRD U5: "مشاركة دليل حادثة مع طرف آخر... حادثة محددة" (sharing an
+// incident's evidence with another party - input: one specific
+// incident). `onExport`, when given, is the parent's own decision about
+// what "export this incident" means (Incidents.tsx navigates to the
+// Evidence page with the incident's window and id in the route context) -
+// IncidentCard itself stays a presentation component with no routing
+// knowledge. Absent (the wizard's SampleInvestigationStep, which has
+// nothing to export to - demo mode has no live recorder) simply omits
+// the button rather than showing one that cannot do anything.
+export function IncidentCard({
+  incident,
+  rules = [],
+  onExport,
+}: {
+  incident: Incident;
+  rules?: RuleSummary[];
+  onExport?: (incident: Incident) => void;
+}) {
   const { t, lang } = useLanguage();
   const rule = findRule(incident.rule_id, rules);
   const title = titleFor(rule, lang, incident.title);
@@ -135,6 +153,14 @@ export function IncidentCard({ incident, rules = [] }: { incident: Incident; rul
       {advice && (
         <div className="advice-box">
           <strong>{t("advice")}:</strong> {advice}
+        </div>
+      )}
+
+      {onExport && (
+        <div className="incident-actions">
+          <Button variant="ghost" onClick={() => onExport(incident)}>
+            {t("incident_export_button")}
+          </Button>
         </div>
       )}
     </div>

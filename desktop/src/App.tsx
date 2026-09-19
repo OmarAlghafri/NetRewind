@@ -139,12 +139,20 @@ function Shell() {
             the wizard's equivalent region - same fix applies here). */}
         <main className="workspace-body" tabIndex={0}>
           {route.page === "overview" && <Overview record={record} settings={settings} />}
-          {route.page === "incidents" && <Incidents incidents={record.incidents} rules={record.rules} />}
+          {route.page === "incidents" && (
+            <Incidents incidents={record.incidents} rules={record.rules} navigate={navigate} />
+          )}
           {route.page === "timeline" && <Timeline events={record.events} />}
           {route.page === "host" && <Host events={record.events} />}
           {route.page === "rules" && <Rules incidents={record.incidents} rules={record.rules} />}
           {route.page === "evidence" && (
-            <Evidence record={record} settings={settings} onOpenBundle={openBundle} onCloseBundle={closeBundle} />
+            <Evidence
+              record={record}
+              settings={settings}
+              context={route.context}
+              onOpenBundle={openBundle}
+              onCloseBundle={closeBundle}
+            />
           )}
           {route.page === "settings" && (
             <Settings

@@ -1,0 +1,122 @@
+GUI modernization, Phase 5 (second slice): incident-scoped evidence
+export with an adjustable padding window - PRD U5 ("مشاركة دليل حادثة مع
+طرف آخر... حادثة محددة", sharing a specific incident's evidence with
+another party) and the execution order's own Phase 5 line ("Evidence
+(incident-scoped 'export this incident' with an adjustable padding
+window)").
+
+## 1. The gap
+
+Evidence.tsx's export was always a fixed recent window (last hour/day/
+week ending now) - there was no way to export evidence for one specific
+incident without guessing a window wide enough to contain it and narrow
+enough not to hand over the rest of the record. `desktop/src/routing/
+useRoute.ts`'s `InvestigationContext` (`from`/`to`/`selection` among
+other fields) has existed since Phase 3 specifically for this kind of
+page-to-page handoff, documented in its own comment as "today, every
+page - none of them read from this yet; that lands with each page's own
+Phase 3/5 rebuild" - this is that rebuild, for Evidence.tsx.
+
+## 2. What was built
+
+`IncidentCard.tsx` gained an optional `onExport?: (incident: Incident)
+=> void` prop and a footer "Export this incident's evidence…" button,
+shown only when the prop is given - the wizard's `SampleInvestigationStep`
+(demo mode, nothing to export to) correctly shows no button since it
+never passes one.
+
+`Incidents.tsx`'s new `contextForIncidentExport(incident)` (exported for
+direct testing) computes the incident's own window: `opened_at` to
+`closed_at`, or to the last chain link's own time for an incident that
+never closed (a better proxy for "when this was actually observed" than
+the export moment, which could be hours later), falling back to
+`opened_at` itself only if the chain is empty too. Wires `onExport` to
+`navigate("evidence", {from, to, selection: incident_id})`.
+
+`Evidence.tsx` gained a `context: InvestigationContext` prop (from
+`App.tsx`'s `route.context`, threaded the same way `record`/`settings`
+already were). When `context.from`/`context.to` are both present it
+shows an "Exporting evidence for this incident" card instead of the
+generic one: the incident's own translated title (looked up in
+`record.incidents` by `context.selection`, via the same `findRule`/
+`titleFor` used everywhere else this session - falls back to showing
+just the raw window if the incident is not in the current record) and
+its window, a padding-in-minutes input (default 5, the
+`DEFAULT_PADDING_MINUTES` constant) in place of the generic 1h/24h/7d
+selector, and an export button now labelled to match ("Export this
+incident's evidence…" instead of the generic "Export an evidence
+bundle…" - a real inconsistency the tests below caught before this log
+was written, see §4). `doExport` computes `since`/`until` as the
+incident's own from/to padded by the minutes value in incident-scoped
+mode, or the existing generic window math otherwise - one function, two
+branches, not a second copy of the export call.
+
+`docs/desktop.md`'s Evidence bundles section documents the new button
+and its default padding.
+
+## 3. Full regression
+
+    $ npx tsc --noEmit                             clean
+    $ npm test                                     12 files, 71 tests passed
+    $ npm run build                                clean
+    $ npx playwright test                          35 passed (0 failed) -
+        the Latin-scanner found zero new violations from any of the new
+        strings (all real translation keys, both languages)
+
+## 4. A real bug the new tests caught before this ever reached a browser
+
+Writing `Evidence.test.tsx`'s export-trigger test first (click the
+button, assert the padded since/until reached `agentExportBundle`)
+failed: the actual export button still said "Export an evidence
+bundle…" in incident-scoped mode, because the button's own label was
+never switched when the surrounding card was - an oversight in the
+first pass at this feature, not a pre-existing bug. Fixed the component
+(the button now reads "Export this incident's evidence…" specifically
+in scoped mode) rather than the test, and the padding-math tests
+(exact `since`/`until` for the default 5-minute padding and for an
+adjusted 10-minute value, both against a fixed incident window so the
+expected timestamps are exact literals, not "approximately right")
+then passed against the real component. This is exactly why the
+padding math got a real interaction test instead of only a rendering
+check - a bug here would otherwise have shipped invisibly (the page
+would still "look right" with the wrong button reachable).
+
+## 5. Actually looked at it
+
+Fresh browser tab, demo recording, Arabic then a sidebar-navigated check
+in the same session:
+- Clicked "تصدير أدلة هذه الحادثة…" (Export this incident's evidence…)
+  on the first incident on the Incidents page - landed on the Evidence
+  page showing "تصدير أدلة هذه الحادثة" (the scoped title), the
+  incident's own translated title with its id in `TechnicalValue`
+  ("تعطّلت وصلة وسحبت معها أجهزة أخرى (01M2E02JGAFE9JP3A3D49T45P5)"),
+  and its computed window ("٢٢:٢١:٢٥ → ٢٢:٢٢:٠٥"). Demo mode correctly
+  shows "التصدير متاح عند الاتصال بالراصد الحي" (export needs a live
+  recorder) instead of padding/export controls that could not do
+  anything - the same honest gating the generic export path already
+  had, applied consistently to the new one.
+- Navigated back to Evidence via the sidebar (no routing context):
+  confirmed the original generic mode is completely unchanged - "تصدير
+  هذا التسجيل" (Export this recording), the 44-event/16-incident counts,
+  the 1h/24h/7d selector all still there exactly as before this slice.
+- Console clean throughout.
+
+## 6. Not verifiable in this environment
+
+The actual bundle export call (`agentExportBundle`) only runs against a
+live recorder connection, which this sandbox has none of - covered
+instead by the mocked `Evidence.test.tsx` tests, which capture the exact
+query string a real export would send and assert the since/until values
+precisely (not merely that some value was sent). This is the same
+honestly-scoped verification pattern used for the Rust/Go structured
+error codes in evidence 39.
+
+## 7. What remains in Phase 5
+
+Incidents master/detail with search/sort/filter; Rules bilingual
+catalogue improvements; Settings regrouped into six sections with a
+sticky save/discard bar and unsaved-changes guard; Diagnostics'
+secret-free support-summary copy button with a preview. No new ADR here
+either - this extends the existing bundle/API contract with a client-
+side computation over the same `/v1/bundle?since&until` parameters that
+already existed, not a new field or endpoint.

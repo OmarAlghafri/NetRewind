@@ -73,6 +73,13 @@ application's own Export button, which asks the live recorder for a window
 (last hour, day or week) and saves the result where you choose. DNS names are
 left out unless you tick *include DNS names*.
 
+"Export this incident's evidence" on an incident (Incidents page) opens the
+Evidence page scoped to that one incident instead of a fixed recent window —
+its own start and end, with an adjustable padding (five minutes either side
+by default) so the exported window has a little surrounding context. Meant
+for sharing one incident with another team or vendor without handing over
+the rest of the record.
+
 Opening a bundle checks every member against the checksum file before
 anything is parsed. If a public key is configured in Settings, a bundle
 without a signature, or with a signature made by another key, is refused. A

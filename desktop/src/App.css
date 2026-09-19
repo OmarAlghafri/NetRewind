@@ -548,6 +548,12 @@ body {
   margin-top: 10px;
 }
 
+.incident-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .timeline-row {
   display: flex;
   gap: 14px;

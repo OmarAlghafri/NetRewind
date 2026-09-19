@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { LanguageProvider } from "../i18n/LanguageContext";
 import { IncidentCard } from "./IncidentCard";
 import type { Incident } from "../types";
@@ -87,5 +87,22 @@ describe("IncidentCard evidence disclosure", () => {
     });
     english(<IncidentCard incident={incident} />);
     expect(screen.queryByText("Raw evidence")).not.toBeInTheDocument();
+  });
+});
+
+// PRD U5: the export trigger lives on the incident itself.
+describe("IncidentCard export action", () => {
+  it("calls onExport with this incident when given", () => {
+    const onExport = vi.fn();
+    const incident = baseIncident();
+    english(<IncidentCard incident={incident} onExport={onExport} />);
+    fireEvent.click(screen.getByText("Export this incident's evidence…"));
+    expect(onExport).toHaveBeenCalledTimes(1);
+    expect(onExport).toHaveBeenCalledWith(incident);
+  });
+
+  it("shows no export button at all when onExport is not given", () => {
+    english(<IncidentCard incident={baseIncident()} />);
+    expect(screen.queryByText("Export this incident's evidence…")).not.toBeInTheDocument();
   });
 });
