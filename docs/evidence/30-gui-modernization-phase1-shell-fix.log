@@ -1,0 +1,92 @@
+GUI modernization, Phase 1: the app-shell/sidebar scroll fix (ADR 0003),
+closing P0-01, P1-03, P1-04, P1-10.
+
+## 1. The fix
+
+`.app-shell` (renamed `.app-frame`) now bounds itself to `block-size: 100dvh`
+with `overflow: hidden` instead of only `min-height: 100vh`. `.sidebar`
+became its own three-row grid (header / scrollable nav / footer) instead of
+one flex column with `margin-top: auto` pushing the language toggle down -
+a technique that only worked while the sidebar's height matched the
+viewport, which stopped being true the moment page content grew past it.
+`.main` became `.workspace-header` (sticky) + `.workspace-body` (the one
+normal scroll region). `Sidebar.tsx`'s nav items became native `<button>`s
+inside a labelled `<nav>`, replacing `<div role="button" tabIndex={0}>` and
+its hand-rolled Enter/Space handling.
+
+## 2. Automated regression
+
+    $ npx tsc --noEmit
+    (clean)
+
+    $ npm test
+     Test Files  3 passed (3)
+          Tests  15 passed (15)
+
+    $ npm run build
+    dist/assets/index-*.css     8.12 kB │ gzip:  2.22 kB
+    dist/assets/index-*.js    330.99 kB │ gzip: 94.59 kB
+
+    $ npx playwright test --project=chromium --reporter=list
+    Running 25 tests using 4 workers
+    ... (22 shell-layout + 2 accessibility + 1 wizard-layout)
+    25 passed (24.3s)
+
+    $ cargo test --lib --manifest-path desktop/src-tauri/Cargo.toml
+    test result: ok. 8 passed; 0 failed
+
+Bundle size essentially unchanged (94.59KB vs. the 94.47KB gzip JS baseline;
+CSS grew from 1.96KB to 2.22KB gzip for the new shell rules) - well inside
+the <=150KB gzip initial-JS budget.
+
+## 3. Manual visual verification (Browser pane, real rendering, not just
+assertions)
+
+Timeline page, 900x600, English, dark mode (this machine's OS theme):
+scrolled to the bottom of 44 unvirtualized events (event timestamps
+22:21:2x, well past the 22:20:17 start) - the sidebar, all eight nav
+buttons, and "NetRewind" stayed exactly in place throughout, confirmed by
+reading `.lang-toggle`'s live `getBoundingClientRect()` in the browser
+console after scrolling: `{top: 559.33, bottom: 588.00}` inside a 600px
+viewport - independent confirmation of what the Playwright suite already
+asserts, from a second code path (manual DevTools-style inspection, not the
+test harness).
+
+Wizard privacy step (the longest of the six), 720x480, Arabic: full title,
+subtitle, and body paragraph rendered with no clipping, and all three
+actions (تخطّ الآن / السابق / التالي) visible without scrolling - compared
+directly against the same step before the fix, which needed to scroll past
+the fold to reach any action button.
+
+## 4. A defect found outside the original scope, fixed along the way
+
+`.wizard-overlay`/`.wizard-card` had the identical defect class
+(`min-height: 100vh`, no bound, no internal scroll region) - not called out
+by name in the execution order's phase list, but the same root cause and
+the same fix pattern this phase was already building. Measured before the
+fix: the privacy step overflowed a 720x480 window by 15px
+(`document.documentElement.scrollHeight = 495` vs. `clientHeight = 480`) -
+small, but real, and the product release plan explicitly asks for the
+wizard's action buttons to stay reachable without scrolling at a short
+window. Fixed with the same containment technique (`Wizard.tsx` gained a
+`.wizard-step-body` wrapper so `.wizard-card` can pin its progress dots and
+action bar while only the step content scrolls). Regression test:
+`desktop/tests/visual/wizard-layout.spec.ts`.
+
+## 5. Deliberately deferred, and why
+
+- Icon-based sidebar rail collapse at 720-899px width (per the execution
+  order's §4.1) needs an icon system that does not exist until Phase 2's
+  component library. For now, the sidebar narrows its text column
+  (`--nav-width: 180px` under 900px) instead - verified in the matrix down
+  to 720px wide with no label clipping or overflow, so nothing is broken
+  while the icon-rail treatment waits for the right phase.
+- A fully separated `WorkspaceHeader` component (with a time-range picker,
+  filters, etc.) is not built yet - today's `.workspace-header` holds only
+  `SourceBanner`, because page title/subtitle markup still lives inside
+  each page component rather than a shared header. That extraction belongs
+  with Phase 3's `InvestigationContext` work, where a real shared header
+  first has something besides the banner to hold.
+- Manual theme (high-contrast, reduced-transparency) is Phase 2 scope; only
+  OS-level light/dark (`prefers-color-scheme`, already implemented) was
+  tested this phase.
