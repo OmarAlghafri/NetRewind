@@ -1,0 +1,86 @@
+GUI modernization, Phase 0: baseline measurements and the P0-01 reproduction
+test, before any shell change.
+
+## 1. Baseline test/build state
+
+    $ cd desktop && npm test
+
+     RUN  v5.0.0
+     Test Files  3 passed (3)
+          Tests  15 passed (15)
+
+    $ npm run build
+
+    dist/index.html                    0.45 kB │ gzip:  0.29 kB
+    dist/assets/index-BXGgCOs3.css     7.13 kB │ gzip:  1.96 kB
+    dist/assets/dist-js-XYVpmchF.js    0.32 kB │ gzip:  0.19 kB
+    dist/assets/index-Du1JJlY2.js    330.15 kB │ gzip: 94.47 kB
+
+Matches the sizes already on record from the surgical review. Unchanged
+before Phase 1 starts.
+
+## 2. Visual reproduction of P0-01 (sidebar controls unreachable)
+
+Manually, in a real browser against `npm run dev`, demo data loaded, wizard
+skipped, Timeline page (the demo recording's full 44 events, unvirtualized):
+
+    document.documentElement.scrollHeight  = 1692
+    document.documentElement.clientHeight  = 600   (viewport height)
+    document.body.scrollHeight             = 1692
+    getComputedStyle('.app-shell').overflow = "visible"
+
+1092 of 1692 document pixels (65%) are below the fold. Scrolling to the
+bottom of the timeline scrolls the sidebar's own content (which ends at
+~320px) completely out of view first - the nav column is blank for most of
+the scroll, and every nav item, including the language toggle, is
+unreachable without scrolling back to the top. Screenshots:
+`docs/evidence/gui-modernization/1.1.0/visual-matrix/phase0-baseline-p0-01-*.png`.
+
+This only reproduces once page content exceeds the viewport - the Overview
+page alone (short content) does not trigger it, which is why earlier casual
+testing missed it and why the automated test below specifically uses
+Timeline, not Overview.
+
+## 3. Automated reproduction (`desktop/tests/visual/shell-layout.spec.ts`)
+
+Playwright, configured to drive the system-installed Chrome
+(`channel: "chrome"` in `playwright.config.ts`) rather than a
+Playwright-managed download - this build machine's outbound network does not
+reach `cdn.playwright.dev` (two attempts, both timed out after 30s), but
+Chrome and Edge are both already installed, and Playwright supports driving
+either directly. This is recorded as the answer for any future CI runner in
+the same position: install `google-chrome-stable` (Linux) or rely on the
+OS-bundled Edge (Windows) instead of `playwright install`.
+
+    $ npx playwright test tests/visual/shell-layout.spec.ts --project=chromium --reporter=list
+
+    Running 4 tests using 4 workers
+      1) ... sidebar footer stays reachable without scrolling - ar @ min-supported (720x480)
+         Expected: <= 480   Received: 1663
+      2) ... sidebar footer stays reachable without scrolling - ar @ small (900x600)
+         Expected: <= 600   Received: 1663
+      3) ... sidebar footer stays reachable without scrolling - en @ min-supported (720x480)
+         Expected: <= 480   Received: 1694
+      4) ... sidebar footer stays reachable without scrolling - en @ small (900x600)
+         Expected: <= 600   Received: 1663
+      4 failed
+
+All four fail for the intended reason (the language toggle's bottom edge is
+computed at ~1663-1694px regardless of the 480-600px viewport requested),
+confirmed by first asserting the reproduction precondition itself
+(`document.documentElement.scrollHeight > clientHeight`) is true - a version
+of this test that failed because the precondition never held would be a
+tautology, not a reproduction, and this run rules that out.
+
+This suite is the Phase 1 acceptance gate: it must pass, unmodified in its
+assertions, once ADR 0003 lands.
+
+## 4. Work opened this phase
+
+- ADRs (status Proposed): `docs/product/adr/0003-app-shell-layout-and-scroll-model.md`,
+  `0004-rule-and-event-localization-contract.md`,
+  `0005-events-incidents-cursor-pagination.md`,
+  `0006-local-ai-runtime-and-model-selection.md`.
+- `desktop/playwright.config.ts`, `desktop/tests/visual/{helpers,shell-layout.spec}.ts`.
+- `@playwright/test` and `@axe-core/playwright` added as devDependencies;
+  `npm run test:visual` / `test:visual:update` scripts added.
