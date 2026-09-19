@@ -52,6 +52,9 @@ CREATE INDEX IF NOT EXISTS idx_events_fam_ts  ON events(family, ts_wall);
 CREATE INDEX IF NOT EXISTS idx_events_subj_ts ON events(subject_id, ts_wall);
 CREATE INDEX IF NOT EXISTS idx_events_labl_ts ON events(subject_label, ts_wall);
 CREATE INDEX IF NOT EXISTS idx_events_dedup   ON events(dedup_key, ts_last);
+-- Serves the cursor's fold-detection clause (ts_last > ?) across every row,
+-- not scoped to one dedup_key the way idx_events_dedup above is.
+CREATE INDEX IF NOT EXISTS idx_events_ts_last ON events(ts_last);
 
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
@@ -247,7 +250,15 @@ func (s *SQLite) Query(ctx context.Context, f Filter) ([]*event.Event, error) {
 	var where []string
 	var args []any
 
-	if !f.Since.IsZero() {
+	if f.Cursor != nil {
+		// Three ways a row can be "new" since the cursor was issued: its
+		// ts_wall moved past the cursor (an ordinary new event); it ties on
+		// ts_wall but sorts after by event_id (the routine same-timestamp
+		// case); or its ts_last moved past the cursor's After watermark
+		// without ts_wall changing at all (a fold - see Cursor's doc).
+		where = append(where, "((ts_wall > ?) OR (ts_wall = ? AND event_id > ?) OR (ts_last > ?))")
+		args = append(args, f.Cursor.TSWall, f.Cursor.TSWall, f.Cursor.EventID, f.Cursor.After)
+	} else if !f.Since.IsZero() {
 		where = append(where, "ts_wall >= ?")
 		args = append(args, f.Since.UnixNano())
 	}

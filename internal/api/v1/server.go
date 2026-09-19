@@ -12,10 +12,12 @@
 package v1
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/OmarAlghafri/netrewind/internal/bundle"
@@ -68,6 +70,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/incidents", s.handleIncidents)
 	mux.HandleFunc("GET /v1/rules", s.handleRules)
 	mux.HandleFunc("GET /v1/bundle", s.handleBundle)
+	mux.HandleFunc("GET /v1/what-happened", s.handleWhatHappened)
 	return mux
 }
 
@@ -133,6 +136,126 @@ type paramError struct{ param, reason string }
 
 func (e paramError) Error() string           { return e.param + ": " + e.reason }
 func errBadParam(param, reason string) error { return paramError{param, reason} }
+
+// parseOrder reads the order=asc|desc query parameter, defaulting to false
+// (ascending) - the existing, undocumented-until-now behaviour
+// (docs/api.md used to claim "newest first"; it did not, and this makes the
+// actual default explicit and choosable rather than silently fixing the doc
+// out from under an existing caller who may have come to depend on it).
+func parseOrder(r *http.Request) (descending bool, err error) {
+	switch v := r.URL.Query().Get("order"); v {
+	case "", "asc":
+		return false, nil
+	case "desc":
+		return true, nil
+	default:
+		return false, errBadParam("order", "must be asc or desc")
+	}
+}
+
+// clampLimit enforces store.MaxLimit on the interactive list endpoints
+// (events, incidents) - not shared with parseWindow itself because
+// handleBundle also calls parseWindow and legitimately allows a much
+// larger default (bundle.DefaultExportLimit, 50000) for what is, by
+// design, a bulk export rather than a paginated interactive query.
+func clampLimit(limit int) int {
+	if limit > store.MaxLimit {
+		return store.MaxLimit
+	}
+	return limit
+}
+
+// eventCursor is the wire form of store.Cursor - opaque to the client,
+// versioned by field count so a future addition fails closed (extra field
+// on decode) rather than silently misreading. ULIDs are base32 Crockford
+// (letters and digits only), so "|" is a safe delimiter.
+func encodeEventCursor(c store.Cursor) string {
+	raw := fmt.Sprintf("v1|%d|%s|%d", c.TSWall, c.EventID, c.After)
+	return base64.RawURLEncoding.EncodeToString([]byte(raw))
+}
+
+func decodeEventCursor(s string) (store.Cursor, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return store.Cursor{}, errBadParam("cursor", "not valid")
+	}
+	parts := strings.Split(string(raw), "|")
+	if len(parts) != 4 || parts[0] != "v1" {
+		return store.Cursor{}, errBadParam("cursor", "not valid")
+	}
+	tsWall, err1 := strconv.ParseInt(parts[1], 10, 64)
+	after, err2 := strconv.ParseInt(parts[3], 10, 64)
+	if err1 != nil || err2 != nil || parts[2] == "" {
+		return store.Cursor{}, errBadParam("cursor", "not valid")
+	}
+	return store.Cursor{TSWall: tsWall, EventID: parts[2], After: after}, nil
+}
+
+// nextEventCursor computes the cursor a client should present on its next
+// poll to receive only what is new since this response - the maximum
+// (ts_wall, event_id) among the rows just returned (regardless of the
+// order they were returned in: for a delta poll's purposes, "new" means
+// "past what was already seen", not "past what was displayed last"), and
+// the server's own clock at query time as the fold-detection watermark
+// (never the client's clock - see store.Cursor's doc on why).
+//
+// When no rows are returned, the keyset half of a previous cursor carries
+// forward unchanged (nothing new at the row level) but the watermark still
+// advances to queriedAt, so an empty poll does not force the next one to
+// re-scan the gap - and the very first call (no previous cursor) has
+// nothing to carry forward, so its keyset starts at the window's own lower
+// bound.
+func nextEventCursor(events []*event.Event, descending bool, prev *store.Cursor, since time.Time, queriedAt time.Time) store.Cursor {
+	next := store.Cursor{TSWall: since.UnixNano(), After: queriedAt.UnixNano()}
+	if prev != nil {
+		next.TSWall, next.EventID = prev.TSWall, prev.EventID
+	}
+	if len(events) == 0 {
+		return next
+	}
+	max := events[0]
+	if !descending {
+		max = events[len(events)-1]
+	}
+	if max.TSWall > next.TSWall || (max.TSWall == next.TSWall && max.ID > next.EventID) {
+		next.TSWall, next.EventID = max.TSWall, max.ID
+	}
+	return next
+}
+
+func encodeIncidentCursor(c store.IncidentCursor) string {
+	raw := fmt.Sprintf("v1|%d|%s", c.OpenedAt, c.ID)
+	return base64.RawURLEncoding.EncodeToString([]byte(raw))
+}
+
+func decodeIncidentCursor(s string) (store.IncidentCursor, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return store.IncidentCursor{}, errBadParam("cursor", "not valid")
+	}
+	parts := strings.Split(string(raw), "|")
+	if len(parts) != 3 || parts[0] != "v1" || parts[2] == "" {
+		return store.IncidentCursor{}, errBadParam("cursor", "not valid")
+	}
+	openedAt, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		return store.IncidentCursor{}, errBadParam("cursor", "not valid")
+	}
+	return store.IncidentCursor{OpenedAt: openedAt, ID: parts[2]}, nil
+}
+
+func nextIncidentCursor(incidents []*incident.Incident, prev *store.IncidentCursor, since time.Time) store.IncidentCursor {
+	next := store.IncidentCursor{OpenedAt: since.UnixNano()}
+	if prev != nil {
+		next = *prev
+	}
+	for _, inc := range incidents {
+		if inc.OpenedAt > next.OpenedAt || (inc.OpenedAt == next.OpenedAt && inc.ID > next.ID) {
+			next.OpenedAt, next.ID = inc.OpenedAt, inc.ID
+		}
+	}
+	return next
+}
 
 // healthResponse is what a client shows on its overview page: who is
 // serving, since when, and how much record there is. "status" stays "ok"
@@ -294,8 +417,14 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, capabilitiesResponse{Capabilities: s.Registry.Snapshot()})
 }
 
+// NextCursor/HasMore are always present, whether or not the request itself
+// used a cursor: a client's very first (Since-based) call still needs a
+// cursor to present on its second call, or every poll would re-scan the
+// whole window forever instead of ever switching to a delta (ADR 0005).
 type eventsResponse struct {
-	Events []*event.Event `json:"events"`
+	Events     []*event.Event `json:"events"`
+	NextCursor string         `json:"next_cursor"`
+	HasMore    bool           `json:"has_more"`
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
@@ -304,7 +433,23 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_param", err.Error())
 		return
 	}
-	f := store.Filter{Since: since, Until: until, Limit: limit}
+	limit = clampLimit(limit)
+	descending, err := parseOrder(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_param", err.Error())
+		return
+	}
+	f := store.Filter{Since: since, Until: until, Limit: limit, Descending: descending}
+	var prevCursor *store.Cursor
+	if v := r.URL.Query().Get("cursor"); v != "" {
+		c, err := decodeEventCursor(v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "bad_param", err.Error())
+			return
+		}
+		f.Cursor = &c
+		prevCursor = &c
+	}
 	if kind := r.URL.Query().Get("kind"); kind != "" {
 		f.Kinds = []event.Kind{event.Kind(kind)}
 	}
@@ -314,6 +459,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	if subject := r.URL.Query().Get("subject"); subject != "" {
 		f.SubjectLabel = subject
 	}
+	queriedAt := time.Now()
 	events, err := s.Store.Query(r.Context(), f)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "query_failed", err.Error())
@@ -322,16 +468,22 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	if events == nil {
 		events = []*event.Event{}
 	}
-	writeJSON(w, eventsResponse{Events: events})
+	next := nextEventCursor(events, descending, prevCursor, since, queriedAt)
+	writeJSON(w, eventsResponse{
+		Events:     events,
+		NextCursor: encodeEventCursor(next),
+		HasMore:    len(events) == limit,
+	})
 }
 
 // incidentsResponse wraps the list in an object keyed "incidents" (matching
-// eventsResponse's shape) rather than returning a bare JSON array, so a
-// future top-level field - a cursor, a server-side summary - can be added
-// without an existing client's decoder needing to change from expecting an
-// array to expecting an object.
+// eventsResponse's shape) rather than returning a bare JSON array - the
+// cursor/has_more fields below are exactly the future addition that
+// comment anticipated.
 type incidentsResponse struct {
-	Incidents []*incident.Incident `json:"incidents"`
+	Incidents  []*incident.Incident `json:"incidents"`
+	NextCursor string               `json:"next_cursor"`
+	HasMore    bool                 `json:"has_more"`
 }
 
 func (s *Server) handleIncidents(w http.ResponseWriter, r *http.Request) {
@@ -340,7 +492,18 @@ func (s *Server) handleIncidents(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_param", err.Error())
 		return
 	}
+	limit = clampLimit(limit)
 	f := store.IncidentFilter{Since: since, Until: until, Limit: limit}
+	var prevCursor *store.IncidentCursor
+	if v := r.URL.Query().Get("cursor"); v != "" {
+		c, err := decodeIncidentCursor(v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "bad_param", err.Error())
+			return
+		}
+		f.Cursor = &c
+		prevCursor = &c
+	}
 	if rule := r.URL.Query().Get("rule"); rule != "" {
 		f.RuleID = rule
 	}
@@ -355,5 +518,10 @@ func (s *Server) handleIncidents(w http.ResponseWriter, r *http.Request) {
 	if incidents == nil {
 		incidents = []*incident.Incident{}
 	}
-	writeJSON(w, incidentsResponse{Incidents: incidents})
+	next := nextIncidentCursor(incidents, prevCursor, since)
+	writeJSON(w, incidentsResponse{
+		Incidents:  incidents,
+		NextCursor: encodeIncidentCursor(next),
+		HasMore:    len(incidents) == limit,
+	})
 }

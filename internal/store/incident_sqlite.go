@@ -38,6 +38,20 @@ type IncidentFilter struct {
 	RuleID      string
 	MinSeverity event.Severity
 	Limit       int
+	// Cursor, if set, replaces Since as the lower bound - see
+	// IncidentCursor's doc. Incidents are never folded (unlike events), so
+	// a plain keyset is enough; there is no ts_last-equivalent to also
+	// watch for.
+	Cursor *IncidentCursor
+}
+
+// IncidentCursor resumes an incident query after a previously-seen point,
+// by (opened_at, incident_id) - incident_id is a ULID, so a tie on
+// opened_at (two incidents opened in the same instant) still orders by
+// creation time within it.
+type IncidentCursor struct {
+	OpenedAt int64
+	ID       string
 }
 
 // AppendIncidents stores incidents. Re-storing one is harmless: the identifier
@@ -98,7 +112,10 @@ func (s *SQLite) QueryIncidents(ctx context.Context, f IncidentFilter) ([]*incid
 	var where []string
 	var args []any
 
-	if !f.Since.IsZero() {
+	if f.Cursor != nil {
+		where = append(where, "((opened_at > ?) OR (opened_at = ? AND incident_id > ?))")
+		args = append(args, f.Cursor.OpenedAt, f.Cursor.OpenedAt, f.Cursor.ID)
+	} else if !f.Since.IsZero() {
 		where = append(where, "opened_at >= ?")
 		args = append(args, f.Since.UnixNano())
 	}

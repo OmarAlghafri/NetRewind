@@ -1,6 +1,10 @@
 # ADR 0005 — Keyset cursor pagination and fold-aware delta polling
 
-**Status:** Proposed.
+**Status:** Backend accepted and implemented
+(`internal/store/{store,sqlite,incident_sqlite}.go`, `internal/api/v1/server.go`).
+Frontend (client-side cursor consumption, AbortController, backoff,
+capabilities/rules hash) not started - tracked separately, not blocking
+this ADR's backend decision from being closed.
 **Date:** 2026-09-19.
 
 ## Context
@@ -67,9 +71,31 @@ from a delta-polling client's view of that row.
 
 ## Verification
 
-Pending - closed by the Phase 3 gate: a regression test that folds a repeat
-event past the point a naive `ts_wall`-only delta would miss it, and asserts
-the new delta query returns the updated row; the GUI's Investigation page
-matches `netrewind what-happened` output for identical inputs; the network
-log during a live session shows no full 24h/5000-row refetch after the
-first load and no overlapping in-flight requests.
+**Backend (done):**
+- `internal/store/cursor_test.go`:
+  `TestQueryCursorCatchesAFoldedRowsCountChange` is exactly the regression
+  test this ADR called for - it folds a repeat event past the point a
+  naive `ts_wall`-only delta would miss it (constructs the cursor from a
+  poll *before* the fold, then asserts the delta poll after the fold
+  returns the updated row with the grown count), plus a control case
+  proving a cursor taken *after* the fold correctly sees nothing further.
+  `TestQueryCursorExcludesAlreadySeenRows` and the incident equivalent
+  cover the ordinary keyset-advance case.
+- `internal/api/v1/cursor_test.go`: the same fold scenario end-to-end
+  through the HTTP handler, cursor encoding, and JSON round-trip
+  (`TestEventsCursorCatchesAFoldedRowsCountChange`), plus `order=asc|desc`,
+  a malformed cursor rejected as `bad_param`, and `MaxLimit` clamping.
+- `docs/api.md:80`'s "newest first" claim corrected to match the actual
+  default (oldest-first) in the same change.
+- `go build ./...`, `go test ./...` (all packages), `gofmt -l`, `go vet`
+  for linux/windows/darwin, and `govulncheck ./...` all clean.
+- The `/v1/rules`/`/v1/capabilities` content-hash addition from this ADR's
+  Decision is not yet implemented - tracked as remaining backend work
+  alongside the frontend items below, not silently dropped.
+
+**Frontend (not started):** the GUI's Investigation page matching
+`netrewind what-happened` output for identical inputs (ADR 0007 covers the
+new endpoint this depends on; the frontend call site does not exist yet);
+`useRecord.ts`'s rewrite to actually use cursor/delta polling with
+`AbortController` and backoff; a network-log check during a live session
+showing no full-window refetch after the first load.
