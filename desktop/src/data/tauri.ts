@@ -8,6 +8,27 @@ import type { BundleManifest } from "./types";
 interface AgentResponse {
   status: number;
   body: string;
+  /** Lower-cased header names ("etag", not "ETag") - see agent.rs's Response. */
+  headers: Record<string, string>;
+}
+
+/** The exact string desktop/src-tauri/src/lib.rs's `agent_cancel` uses to
+ *  fail an in-flight `agent_get` it was told to interrupt - matched here so
+ *  a deliberate cancellation is never mistaken for the recorder actually
+ *  being unreachable. */
+const CANCELLED_SENTINEL = "__cancelled__";
+
+/** Thrown by `agentGetRaw`/`agentGet` when the request was interrupted by
+ *  `agentCancel` before it finished - never a real transport failure, and
+ *  callers should treat it as "abandoned," not as an error to show. */
+export class CancelledError extends Error {
+  constructor() {
+    super("request was cancelled");
+  }
+}
+
+function isCancelledRejection(e: unknown): boolean {
+  return e === CANCELLED_SENTINEL || (e instanceof Error && e.message === CANCELLED_SENTINEL);
 }
 
 export interface BundleContents {
@@ -57,9 +78,55 @@ export function agentDefaultEndpoint(): Promise<string> {
   return invoke<string>("agent_default_endpoint");
 }
 
-/** GET a JSON document from the recorder; an API error becomes an ApiError. */
-export async function agentGet<T>(endpoint: string, path: string): Promise<T> {
-  const resp = await invoke<AgentResponse>("agent_get", { endpoint, path });
+export interface AgentGetOptions {
+  /** Extra request headers - `If-None-Match` for a conditional GET against
+   *  /v1/rules or /v1/capabilities (ADR 0005). */
+  headers?: Record<string, string>;
+  /** Registers this call so a later `agentCancel(requestId)` can interrupt
+   *  it - real cancellation of the in-flight IPC read, not just the
+   *  caller choosing to ignore whatever answer eventually arrives. */
+  requestId?: string;
+}
+
+export interface AgentGetResult<T> {
+  status: number;
+  /** `null` only for a 304 (conditional GET, nothing changed) - a real
+   *  answer with no body to parse, not an error. */
+  data: T | null;
+  headers: Record<string, string>;
+}
+
+/** The full answer, including status/headers, for a caller that needs a
+ *  304 or a header (conditional GET) - agentGet below is the simpler
+ *  form for a caller that only ever expects 200. */
+export async function agentGetRaw<T>(
+  endpoint: string,
+  path: string,
+  opts: AgentGetOptions = {},
+): Promise<AgentGetResult<T>> {
+  let resp: AgentResponse;
+  try {
+    resp = await invoke<AgentResponse>("agent_get", {
+      endpoint,
+      path,
+      headers: opts.headers,
+      requestId: opts.requestId,
+    });
+  } catch (e) {
+    if (isCancelledRejection(e)) throw new CancelledError();
+    throw e;
+  }
+  // Normalized here, once, rather than trusting every call site to guard
+  // against a missing `headers` - a real (not hypothetical) gap: nothing
+  // on the Rust side omits it, but a plain-object test fixture standing in
+  // for the shell (this file's own test suite, and useRecord's) has no
+  // reason to know that field exists unless told to include it, and
+  // silently omitting it is exactly what a fixture predating this field
+  // would do.
+  const headers = resp.headers ?? {};
+  if (resp.status === 304) {
+    return { status: 304, data: null, headers };
+  }
   if (resp.status !== 200) {
     let code = "http_" + resp.status;
     let message = resp.body;
@@ -74,7 +141,28 @@ export async function agentGet<T>(endpoint: string, path: string): Promise<T> {
     }
     throw new ApiError(resp.status, code, message);
   }
-  return JSON.parse(resp.body) as T;
+  return { status: 200, data: JSON.parse(resp.body) as T, headers };
+}
+
+/** GET a JSON document from the recorder; an API error becomes an ApiError.
+ *  Never sends a conditional header, so never receives a 304 - always
+ *  returns real data or throws. Use `agentGetRaw` directly for a
+ *  conditional GET or a cancellable request. */
+export async function agentGet<T>(endpoint: string, path: string): Promise<T> {
+  const result = await agentGetRaw<T>(endpoint, path);
+  return result.data as T;
+}
+
+/** Interrupts an in-flight `agentGet`/`agentGetRaw` call that was given
+ *  this same `requestId`. A no-op if it already finished - cancellation
+ *  racing completion is normal, not an error. */
+export async function agentCancel(requestId: string): Promise<void> {
+  try {
+    await invoke<void>("agent_cancel", { requestId });
+  } catch {
+    // Best-effort: if the shell itself is going away there is nothing
+    // more useful to do with this failing than swallow it.
+  }
 }
 
 export function agentExportBundle(endpoint: string, query: string, dest: string): Promise<ExportResult> {
