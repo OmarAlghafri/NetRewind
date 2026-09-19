@@ -965,3 +965,32 @@ body {
   margin-top: 8px;
   margin-bottom: 0;
 }
+
+/* Settings' sticky save/discard bar (execution order §9 Phase 5) - sticks
+   to the bottom of .workspace-body (the shell's one scroll region, ADR
+   0003), not the browser viewport, so it stays reachable next to whatever
+   else is pinned there without covering content outside this page. */
+.settings-save-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.settings-save-bar-label {
+  font-size: 0.9rem;
+}
+
+.settings-save-bar-actions {
+  display: flex;
+  gap: 8px;
+}

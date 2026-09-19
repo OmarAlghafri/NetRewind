@@ -1,0 +1,102 @@
+GUI modernization, Phase 5 (sixth slice): Settings' sticky save/discard
+bar and unsaved-changes guard - execution order §9 Phase 5, the part of
+the Settings line that does not depend on resolving which of the six
+named groups are worth building yet (see the progress log's own note on
+that separate, still-open question).
+
+## 1. What was built
+
+`useUnsavedChangesGuard(dirty, confirmMessage)` (new, in `Settings.tsx`):
+two distinct kinds of "leaving a dirty form" - closing or reloading the
+tab (`beforeunload`, the browser's own native dialog, not reimplemented)
+and in-app navigation via the hash router, which `beforeunload` never
+fires for at all since the document itself never unloads. The second
+gets its own guard: on `hashchange`, if the hash actually changed and the
+form is dirty, ask `window.confirm`; declining reverts the hash back
+(cancelling the navigation), accepting lets it through. A `revertingRef`
+exists only so the programmatic revert does not itself re-trigger the
+guard it is part of.
+
+The sticky bar itself replaces the previous always-rendered (merely
+disabled-when-clean) Save button: now absent entirely until `dirty`,
+then a `position: sticky; bottom: 0` bar inside `.workspace-body` (the
+shell's one scroll region, ADR 0003) with both "حفظ"/Save and the new
+"تجاهل التغييرات"/Discard button, plus a plain-language "you have
+unsaved changes" label.
+
+## 2. A real product gap found while designing the test for this
+
+Testing "does the bar appear when a field changes" turned out to require
+first discovering that, outside the Tauri shell (this session's only
+directly-testable context, and the default state a fresh install lands
+in), Settings has exactly one editable, dirty-able control: demo/live/
+bundle source radios, where live and bundle are both `disabled={!inShell}`
+(bundle also needs a non-empty `bundlePath`), and demo is the default
+selection. Starting from the true default state, there is *nothing a
+user outside the shell can click to dirty the form at all* - confirmed
+by reading `sourceOption`'s enabled conditions directly, not assumed.
+This is not a bug this slice introduces (the same gating existed before
+it), but it is worth recording: the sticky bar and its guard are real and
+correctly built, and this session's own verification of them (both
+automated and live-browser) had to start from a non-default *saved*
+value (e.g. `kind: "live"`) specifically to have anything to dirty and
+revert - the same condition a real user would be in after having
+actually used the live source once, then revisiting Settings.
+
+## 3. Full regression
+
+    $ npx tsc --noEmit                             clean
+    $ npm test                                     13 files, 106 tests passed
+    $ npm run build                                clean
+    $ npx playwright test                          37 passed (0 failed, unchanged)
+
+## 4. Proven, not just passing once
+
+15 tests. The two most load-bearing behaviours were each deliberately
+broken and confirmed to fail before being restored - not just asserted
+and trusted:
+- Commenting out the `window.location.hash = guardedHash` revert line:
+  the "reverts on decline" test failed with the exact wrong hash value
+  (`#/incidents` instead of `#/settings`), confirming the test actually
+  depends on the revert happening, not on some other side effect.
+- The `beforeunload` test dispatches a real, cancelable `Event` and
+  checks `defaultPrevented` directly - proving the handler actually
+  calls `preventDefault()` when dirty and does not when clean, not
+  merely that the component renders without throwing.
+
+The hash-guard tests dispatch a genuine `HashChangeEvent` against
+`window` and read `window.location.hash` back afterward - behavioural
+proof, not an inspection of component internals that could pass while
+the real browser-level behaviour was wrong.
+
+## 5. Actually looked at it - including a real false alarm correctly diagnosed
+
+Live browser check surfaced a moment worth recording rather than
+glossing over: after seeding `localStorage["netrewind.source"]` to
+`{"kind":"live"}` and navigating via the hash router, the save bar did
+not appear even after clicking "Demo recording". Before concluding
+anything was broken, checked directly: the radio *did* change to demo,
+but `settings.kind` (the React state, not the storage value) was still
+whatever it had been since this long-lived tab last actually loaded the
+page - hash-only navigation does not remount the app or re-read
+`readSettings()`, so a `localStorage` edit made after the page was
+already running cannot retroactively change already-initialized React
+state. Forced a real `location.reload()` (not another hash navigation)
+so `readSettings()` ran again from the edited storage; from that point
+the whole flow worked exactly as designed: clicking "Demo recording"
+showed "لديك تغييرات غير محفوظة" with both buttons; clicking "تجاهل
+التغييرات" (Discard) removed the bar and reverted the radio back to
+"live" (the saved value, not left on the discarded draft). Console clean
+throughout. The native `window.confirm` dialog itself was not exercised
+live (unreliable under browser automation in general, and already
+proven deterministically by the vitest suite above) - recorded as not
+attempted, rather than silently skipped without saying so.
+
+## 6. What remains in Phase 5
+
+Rules "match-count in range" (needs the absolute from/to design decided
+in the progress log, not yet implemented); the six-group Settings
+regrouping question itself (still open - the sticky bar/guard built here
+works with any eventual grouping, so it did not need to wait for that
+decision). No new ADR - a pure frontend addition to an existing settings
+form, no contract change.

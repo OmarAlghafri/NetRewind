@@ -1,10 +1,53 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLanguage } from "../i18n/LanguageContext";
 import { Button } from "../components/Button";
 import { TechnicalValue } from "../components/TechnicalValue";
 import type { SourceKind, SourceSettings } from "../data/source";
 import { agentDefaultEndpoint, agentGet, isTauri } from "../data/tauri";
 import type { Health } from "../data/types";
+
+/**
+ * execution order §9 Phase 5: Settings "with a sticky save/discard bar and
+ * an unsaved-changes guard". Two distinct kinds of "leaving": closing or
+ * reloading the tab (native `beforeunload` - the browser's own dialog,
+ * not reimplemented here) and in-app navigation via the hash router,
+ * which `beforeunload` never fires for at all since the document itself
+ * never unloads. The second needs its own guard: revert the hash back
+ * (cancelling the navigation) unless the user confirms losing the draft -
+ * `reverting` exists only so that programmatic revert does not itself
+ * re-trigger the guard it is part of.
+ */
+function useUnsavedChangesGuard(dirty: boolean, confirmMessage: string) {
+  const revertingRef = useRef(false);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const guardedHash = window.location.hash;
+    const onHashChange = () => {
+      if (revertingRef.current) {
+        revertingRef.current = false;
+        return;
+      }
+      if (window.location.hash === guardedHash) return;
+      if (!window.confirm(confirmMessage)) {
+        revertingRef.current = true;
+        window.location.hash = guardedHash;
+      }
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [dirty, confirmMessage]);
+}
 
 export function Settings({
   settings,
@@ -28,12 +71,15 @@ export function Settings({
   }, [inShell]);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(settings);
+  useUnsavedChangesGuard(dirty, t("settings_unsaved_changes_confirm"));
 
   const save = () => {
     onChange(draft);
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2000);
   };
+
+  const discard = () => setDraft(settings);
 
   const testConnection = async () => {
     setTest(null);
@@ -131,16 +177,13 @@ export function Settings({
           </>
         )}
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
-          <Button variant="primary" onClick={save} disabled={!dirty}>
-            {t("settings_save")}
-          </Button>
-          {saved && (
+        {saved && (
+          <div style={{ marginTop: 6 }}>
             <span className="inline-ok" role="status">
               {t("settings_saved")}
             </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -150,6 +193,28 @@ export function Settings({
           {t("settings_wizard_button")}
         </Button>
       </div>
+
+      {/* Sticky save/discard bar (execution order §9 Phase 5) - only ever
+          shown once there is something to save or discard, so it never
+          occupies space or asks a decision of a reader who changed
+          nothing. Sticks to the bottom of .workspace-body (the app's one
+          normal scroll region, ADR 0003), not the browser viewport, so it
+          stays reachable inside the shell exactly like a primary action
+          in WorkspaceHeader is required to (§4.1) - never scrolled away
+          at the bottom of a long settings page. */}
+      {dirty && (
+        <div className="settings-save-bar" role="region" aria-label={t("settings_unsaved_indicator")}>
+          <span className="settings-save-bar-label">{t("settings_unsaved_indicator")}</span>
+          <span className="settings-save-bar-actions">
+            <Button variant="secondary" onClick={discard}>
+              {t("settings_discard")}
+            </Button>
+            <Button variant="primary" onClick={save}>
+              {t("settings_save")}
+            </Button>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

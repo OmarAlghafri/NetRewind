@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { LanguageProvider } from "../i18n/LanguageContext";
 import { CapabilityTable } from "./CapabilityTable";
@@ -142,13 +142,120 @@ describe("SourceBanner", () => {
 });
 
 describe("Settings", () => {
-  it("only offers the demo source outside the desktop shell, and saves changes", () => {
-    const onChange = vi.fn();
-    english(<Settings settings={DEFAULT_SETTINGS} onChange={onChange} onReopenWizard={() => {}} />);
+  it("only offers the demo source outside the desktop shell", () => {
+    english(<Settings settings={DEFAULT_SETTINGS} onChange={() => {}} onReopenWizard={() => {}} />);
     const live = screen.getByLabelText("Live recorder on this machine") as HTMLInputElement;
     expect(live.disabled).toBe(true);
     expect((screen.getByLabelText("Demo recording") as HTMLInputElement).checked).toBe(true);
-    const save = screen.getByText("Save") as HTMLButtonElement;
-    expect(save.disabled).toBe(true); // nothing changed yet
+  });
+
+  // execution order §9 Phase 5: "a sticky save/discard bar" - shown only
+  // once there is something to decide about, not a permanently-visible,
+  // merely-disabled button.
+  it("shows no save/discard bar at all until something actually changes", () => {
+    english(<Settings settings={DEFAULT_SETTINGS} onChange={() => {}} onReopenWizard={() => {}} />);
+    expect(screen.queryByText("Save")).not.toBeInTheDocument();
+    expect(screen.queryByText("Discard changes")).not.toBeInTheDocument();
+  });
+
+  // Outside the shell (this test environment), the live/bundle radios are
+  // disabled, so "demo" is the only kind a click can actually change -
+  // starting from a saved setting of "live" (a real prior state, e.g. from
+  // the desktop app) lets clicking the always-enabled "Demo recording"
+  // radio genuinely dirty the form without needing to fake being in the
+  // shell just to exercise the save bar.
+  const savedAsLive = { ...DEFAULT_SETTINGS, kind: "live" as const };
+
+  it("shows the save bar once a field changes, and saves the new value", () => {
+    const onChange = vi.fn();
+    english(<Settings settings={savedAsLive} onChange={onChange} onReopenWizard={() => {}} />);
+    expect(screen.queryByText("You have unsaved changes")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Demo recording"));
+    expect(screen.getByText("You have unsaved changes")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Save"));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0]).toMatchObject({ kind: "demo" });
+  });
+
+  it("discarding reverts the draft without calling onChange", () => {
+    const onChange = vi.fn();
+    english(<Settings settings={savedAsLive} onChange={onChange} onReopenWizard={() => {}} />);
+
+    fireEvent.click(screen.getByLabelText("Demo recording"));
+    expect(screen.getByText("You have unsaved changes")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Discard changes"));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByText("You have unsaved changes")).not.toBeInTheDocument();
+    // Reverted to the saved value (live), not left on the discarded draft.
+    expect((screen.getByLabelText("Demo recording") as HTMLInputElement).checked).toBe(false);
+  });
+});
+
+// execution order §9 Phase 5: "an unsaved-changes guard". In-app hash
+// navigation never fires `beforeunload` at all (the document never
+// unloads), so it needs its own guard - proven directly by dispatching a
+// real `hashchange` event and checking whether the hash actually reverts,
+// not by inspecting internal state.
+describe("Settings unsaved-changes guard", () => {
+  afterEach(() => {
+    window.location.hash = "";
+  });
+
+  it("reverts an in-app navigation away from a dirty form when the user declines to lose it", () => {
+    window.location.hash = "#/settings";
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    english(<Settings settings={{ ...DEFAULT_SETTINGS, kind: "live" }} onChange={() => {}} onReopenWizard={() => {}} />);
+    fireEvent.click(screen.getByLabelText("Demo recording"));
+    expect(screen.getByText("You have unsaved changes")).toBeInTheDocument();
+
+    window.location.hash = "#/incidents";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(window.location.hash).toBe("#/settings");
+    confirmSpy.mockRestore();
+  });
+
+  it("lets the navigation through when the user confirms losing the draft", () => {
+    window.location.hash = "#/settings";
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    english(<Settings settings={{ ...DEFAULT_SETTINGS, kind: "live" }} onChange={() => {}} onReopenWizard={() => {}} />);
+    fireEvent.click(screen.getByLabelText("Demo recording"));
+
+    window.location.hash = "#/incidents";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(window.location.hash).toBe("#/incidents");
+    confirmSpy.mockRestore();
+  });
+
+  it("does not ask at all when the form is clean", () => {
+    window.location.hash = "#/settings";
+    const confirmSpy = vi.spyOn(window, "confirm");
+    english(<Settings settings={DEFAULT_SETTINGS} onChange={() => {}} onReopenWizard={() => {}} />);
+
+    window.location.hash = "#/incidents";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(window.location.hash).toBe("#/incidents");
+    confirmSpy.mockRestore();
+  });
+
+  it("marks a beforeunload event as needing confirmation while the form is dirty, and not when it is clean", () => {
+    english(<Settings settings={{ ...DEFAULT_SETTINGS, kind: "live" }} onChange={() => {}} onReopenWizard={() => {}} />);
+
+    const cleanEvent = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(cleanEvent);
+    expect(cleanEvent.defaultPrevented).toBe(false);
+
+    fireEvent.click(screen.getByLabelText("Demo recording"));
+    const dirtyEvent = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(dirtyEvent);
+    expect(dirtyEvent.defaultPrevented).toBe(true);
   });
 });
