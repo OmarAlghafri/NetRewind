@@ -1,10 +1,9 @@
 # ADR 0005 — Keyset cursor pagination and fold-aware delta polling
 
-**Status:** Backend accepted and implemented
-(`internal/store/{store,sqlite,incident_sqlite}.go`, `internal/api/v1/server.go`).
-Frontend (client-side cursor consumption, AbortController, backoff,
-capabilities/rules hash) not started - tracked separately, not blocking
-this ADR's backend decision from being closed.
+**Status:** Accepted and implemented, backend and frontend
+(`internal/store/{store,sqlite,incident_sqlite}.go`,
+`internal/api/v1/server.go`, `desktop/src/data/{useRecord,tauri}.ts`,
+`desktop/src-tauri/src/{agent,lib}.rs`).
 **Date:** 2026-09-19.
 
 ## Context
@@ -50,12 +49,25 @@ from a delta-polling client's view of that row.
   changes server-side.
 - `/v1/rules` and `/v1/capabilities` gain a content `hash` (SHA-256 of the
   canonical JSON); the client refetches either only when its hash changes,
-  not on a timer.
+  not on a timer. **Superseded during implementation**: built as standard
+  HTTP conditional GET (`ETag`/`If-None-Match`/304) instead - a real
+  bandwidth/decode saving on a match, not a same-body field the client
+  still has to download to read. See this ADR's own Verification section.
 - Client rewrite: first load fetches the selected range; every subsequent
   poll fetches only the delta via cursor; every request carries an
   `AbortController` wired to the existing `generation` ref so a superseded
   request is actually canceled; exponential backoff with jitter on failure;
   a persistent stale-data notice instead of silently going quiet.
+  **Superseded during implementation**: the live path goes through Tauri's
+  `invoke()` to a Rust command, never `fetch()` - there is no in-browser
+  request for a Web `AbortController` to abort. A working equivalent needed
+  a real Rust-side mechanism instead: `agent_get` takes an optional
+  `request_id`, registers a `tokio::sync::Notify` for it, and races the
+  actual named-pipe/socket read against that notification
+  (`desktop/src-tauri/src/lib.rs`'s `race_cancellable`); `agent_cancel`
+  wakes the notification for a superseded poll's ids. Achieves the same
+  intent (interrupting the real in-flight I/O, not just discarding the
+  eventual answer) through the primitive this architecture actually has.
 
 ## Consequences
 
@@ -97,9 +109,44 @@ from a delta-polling client's view of that row.
   (`internal/api/v1/etag_test.go`): a matching `If-None-Match` gets 304
   with an empty body; a stale one gets the real body back.
 
-**Frontend (not started):** the GUI's Investigation page matching
-`netrewind what-happened` output for identical inputs (ADR 0007 covers the
-new endpoint this depends on; the frontend call site does not exist yet);
-`useRecord.ts`'s rewrite to actually use cursor/delta polling with
-`AbortController` and backoff; a network-log check during a live session
-showing no full-window refetch after the first load.
+**Frontend (done):**
+- `desktop/src-tauri/src/agent.rs`/`lib.rs`: `agent_get` threads request
+  headers (`If-None-Match`) and returns response headers (`ETag`) neither
+  direction previously existed for at all; `race_cancellable` (unit tested
+  directly against a `std::future::pending()` future, ruling out a false
+  pass - `desktop/src-tauri/src/lib.rs`'s test module) plus `agent_cancel`
+  give real, working cancellation.
+- `desktop/src/data/tauri.ts`: `agentGetRaw` (headers in, 304-aware,
+  cancellation-aware) alongside the existing simple `agentGet`.
+- `desktop/src/data/useRecord.ts`: `fetchLivePoll` replaces the old
+  `fetchLive` internally - `since=` on the first load, `cursor=` after;
+  `mergeById` updates a folded event/incident in place instead of
+  duplicating or dropping it; `If-None-Match` sent for rules/capabilities
+  once an ETag is known, with a 304 keeping the existing list rather than
+  clearing it; a previous, now-superseded poll's five sub-requests are
+  actually cancelled (`cancelPoll`) before a new one starts; exponential
+  backoff (`consecutiveFailures`, a ref - a real stale-closure bug was
+  found and fixed reading this from `state.status` instead, which a
+  `setTimeout` closure never saw update) replaces the fixed interval once
+  polls start failing.
+- Proven end-to-end at the frontend level, not just assumed from the
+  backend tests passing (`desktop/src/data/useRecord.cursor.test.tsx`,
+  new): a fake recorder that behaves like the real API (changing
+  `next_cursor` each call, a real 304 on a matching `If-None-Match`)
+  confirms the first call uses `since=`, the second uses the exact
+  `cursor=` value the first returned, a folded event's grown count
+  replaces the old entry instead of appending a duplicate, rules/
+  capabilities survive a 304 unchanged, and `agent_cancel` is actually
+  invoked when settings change mid-poll.
+- Regression: `npm test` 26/26 (7 existing useRecord + 3 existing
+  component + 3 new cursor + 8 routing + 5 formatter... see evidence 34
+  for the exact breakdown), `npx playwright test` 32/32, `cargo test --lib`
+  10/10, `tsc --noEmit` clean, `cargo clippy --lib` 0 warnings.
+- Not verifiable in this environment: a live session against a real
+  netrewindd through the actual compiled Tauri window (this sandbox has no
+  way to drive a native OS window, only browser tabs) - deferred to
+  Phase 7's live-hardware testing, which already covers exactly this.
+
+Investigation page calling `/v1/what-happened` is separate work (ADR 0007
+covers the endpoint; no page consumes it yet - Phase 3/5's remaining page
+rebuilds).

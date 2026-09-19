@@ -1,0 +1,134 @@
+GUI modernization, Phase 3: useRecord.ts rewritten to actually consume
+cursor pagination and conditional GET (ADR 0005), closing P1-01 - the
+Tauri bridge needed real changes first, since headers and cancellation
+did not exist in either direction before this.
+
+## 1. The Tauri bridge had no header passthrough or cancellation at all
+
+Checked before writing any TypeScript: `agent::get(endpoint, path)`
+(`desktop/src-tauri/src/agent.rs`) sent only two hard-coded headers and
+returned status+body, nothing else - no way for the frontend to read an
+`ETag` or send `If-None-Match`, and no way to interrupt an in-flight
+named-pipe/socket read once started. `useRecord.ts`'s own `generation`
+counter already stopped a stale answer from being *applied*, but the
+underlying IPC call itself always ran to completion regardless - "ignored
+on arrival," not "actually cancelled," which the execution order's own
+wording specifically distinguishes.
+
+Fixed properly, not worked around:
+
+- `agent.rs`: `get()` takes `extra_headers` and returns lower-cased
+  response `headers` alongside status/body.
+- `lib.rs`: `agent_get` takes optional `headers` (request) and returns
+  `headers` (response); takes an optional `request_id` that registers a
+  `tokio::sync::Notify` in a new `AgentState` (managed via `.manage()`);
+  a new `agent_cancel(request_id)` command wakes it. The actual race is
+  `race_cancellable`, pulled out as its own function specifically so it
+  could be unit tested without spinning up a Tauri app:
+
+    $ cargo test --lib --manifest-path desktop/src-tauri/Cargo.toml
+    test tests::race_cancellable_returns_the_futures_own_result_when_never_cancelled ... ok
+    test tests::race_cancellable_returns_the_cancelled_sentinel_when_notified_first ... ok
+
+  The second test races `std::future::pending()` (a future that
+  mathematically never resolves on its own) against a pre-triggered
+  notification - if the test returns anything at all, the cancellation
+  path is what returned it, ruling out a false pass from the "real" work
+  coincidentally finishing first.
+
+  `cargo build`/`cargo test --lib` (10/10, up from 8) both clean;
+  `cargo clippy --lib`: 0 warnings.
+
+## 2. TypeScript bridge (`desktop/src/data/tauri.ts`)
+
+`agentGetRaw<T>` alongside the existing `agentGet`: takes `{headers,
+requestId}`, returns `{status, data, headers}` with `data: null` on a 304
+(a real answer with nothing to parse, not an error). A Rust
+`Err("__cancelled__")` (Tauri's rejection for a cancelled command) is
+caught and re-thrown as a `CancelledError` the caller can distinguish from
+a genuine transport failure.
+
+**A real bug found while writing this, before any test ran**: the fake
+recorder fixture in the existing `useRecord.test.tsx` (predates this work)
+returns `{status, body}` with no `headers` field at all. `agentGetRaw`
+read `resp.headers.etag` unconditionally, which is a `TypeError` on
+`undefined`, not a missing value - confirmed by running the existing
+suite and watching a passing test start failing. Fixed by normalizing
+`resp.headers ?? {}` once, at the point the Rust response is received,
+rather than trusting every call site to guard against a header map that
+happens to be absent.
+
+## 3. `useRecord.ts` rewrite
+
+`fetchLivePoll(endpoint, prev: LiveState, generation)` replaces the old
+`fetchLive` internally: `since=` for the very first call or whenever a
+cursor was never obtained; `cursor=<prev's next_cursor>` otherwise.
+`mergeById` folds a repeat's grown count into the existing array position
+instead of duplicating it (matching the backend's own fold semantics) or
+simply appending everything blindly. `capabilities`/`rules` send
+`If-None-Match` once an `ETag` is known; a 304 keeps what was already held
+rather than being treated as an empty answer. `cancelPoll(prevGeneration)`
+is called before every new poll starts, issuing real `agent_cancel` calls
+for whichever of the previous poll's five sub-requests are still running.
+
+**A second real bug found while writing this**, not by a test failing but
+by re-reading my own code before running anything: the scheduling
+`useEffect`'s `scheduleNext` closure read `state.status` to decide whether
+to use the normal interval or the backoff delay - but `state` is
+deliberately not in that effect's dependency array (re-running the whole
+effect on every state change would tear down and restart the polling
+timer constantly), so `scheduleNext` would only ever see the `status` from
+the render that created it, never a later poll's actual outcome. Replaced
+with `consecutiveFailures`, a ref (always current, immune to this class of
+staleness by construction), incremented on failure and reset on success.
+
+## 4. Verified end-to-end at the frontend level
+
+`desktop/src/data/useRecord.cursor.test.tsx` (new) - a fake recorder that
+actually behaves like the real API, not a fixed canned response:
+
+    $ npx vitest run src/data/useRecord.cursor.test.tsx --reporter=verbose
+    ✓ uses since= on the first load and cursor= on the next poll, merging
+      a folded event's new count instead of duplicating it
+    ✓ sends If-None-Match on the second poll and keeps the existing
+      rules/capabilities on a 304 instead of clearing them
+    ✓ cancels the previous poll's in-flight requests when settings change
+      before it resolves
+
+The first test asserts the exact second-call path string
+(`/v1/events?cursor=CURSOR-1&limit=5000`) rather than merely "a request
+was made," and asserts the merged array's *order and contents*
+(event 01A's count grown in place at index 0, new event 01B appended after
+it) - the specific claim this whole rewrite exists to make true, not an
+approximation of it.
+
+## 5. Full regression
+
+    $ npx tsc --noEmit                          clean
+    $ npm test                                   26/26 (was 23; +3 new)
+    $ npm run build                              95.88KB gzip JS (was
+                                                  95.06KB - the bridge/
+                                                  merge logic; still well
+                                                  under the 150KB budget)
+    $ npx playwright test --project=chromium      32/32 (unchanged from
+                                                  before this rewrite -
+                                                  none of it touches the
+                                                  shell/layout/routing
+                                                  surfaces those cover)
+    $ cargo test --lib (Tauri shell)             10/10
+    $ cargo clippy --lib                          0 warnings
+
+## 6. Not verifiable in this environment
+
+A live session against a real `netrewindd`, through the actual compiled
+Tauri window: this sandbox can drive browser tabs (used throughout this
+work for visual verification) but has no way to launch or interact with a
+native OS window, which is what a real Tauri app is - `npm run dev`
+serves the same web content a plain browser tab can load, but that tab
+never gets Tauri's `__TAURI_INTERNALS__` bridge injected, only the actual
+native webview does. What's verified instead: Rust-side logic in
+isolation (`cargo test`), and the TypeScript side against a fake `invoke`
+matching the real command's exact shape (request/response fields,
+cancellation sentinel) byte for byte. The real end-to-end pass - a live
+recorder, the compiled installer, real named-pipe/socket traffic - is
+Phase 7's job, which already plans exactly this.
