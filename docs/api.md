@@ -68,6 +68,12 @@ about, whether it is watching, and — when it is not — why.
 ] }
 ```
 
+Supports conditional GET: the response carries an `ETag`. A poll that
+sends it back as `If-None-Match` gets `304 Not Modified` with no body when
+nothing changed - this rarely does, unlike events, so a client polling it
+on a timer should do this rather than re-fetching and re-parsing the same
+list every time.
+
 `status` is one of `up`, `down` (started and failed; `reason` is the failure
 in the collector's own words, the same text as its `system.collector_down`
 event), `unsupported` (this platform cannot run it) or `unknown` (registered,
@@ -107,7 +113,8 @@ Always ordered oldest first; there is no `order` parameter here.
 
 The correlation catalogue the recorder loaded: id, title, severity,
 confidence, window, root cause kind and advice for every rule. Match clauses
-are not exposed; they are the engine's business.
+are not exposed; they are the engine's business. Supports conditional GET
+the same way `/v1/capabilities` does (see above).
 
 ### `GET /v1/bundle`
 

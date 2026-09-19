@@ -89,9 +89,13 @@ from a delta-polling client's view of that row.
   default (oldest-first) in the same change.
 - `go build ./...`, `go test ./...` (all packages), `gofmt -l`, `go vet`
   for linux/windows/darwin, and `govulncheck ./...` all clean.
-- The `/v1/rules`/`/v1/capabilities` content-hash addition from this ADR's
-  Decision is not yet implemented - tracked as remaining backend work
-  alongside the frontend items below, not silently dropped.
+- `/v1/rules`/`/v1/capabilities` now support standard HTTP conditional GET
+  (`ETag`/`If-None-Match`/`304 Not Modified`,
+  `internal/api/v1/server.go`'s `writeJSONWithETag`) rather than a
+  same-body hash field - a real bandwidth/decode saving when nothing
+  changed, not merely a hint the client could act on. Tested
+  (`internal/api/v1/etag_test.go`): a matching `If-None-Match` gets 304
+  with an empty body; a stale one gets the real body back.
 
 **Frontend (not started):** the GUI's Investigation page matching
 `netrewind what-happened` output for identical inputs (ADR 0007 covers the

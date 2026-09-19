@@ -12,7 +12,9 @@
 package v1
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -101,6 +103,33 @@ func writeJSON(w http.ResponseWriter, v any) {
 		// client except by closing the connection, which returning does.
 		return
 	}
+}
+
+// writeJSONWithETag serves /v1/rules and /v1/capabilities: content that
+// rarely changes between polls, unlike /v1/events - a client that already
+// has the current catalogue should not need to re-download and re-parse
+// it every few seconds just to confirm nothing moved.
+//
+// Standard HTTP conditional GET, not a same-body hash field: the ETag is
+// SHA-256 of the exact bytes about to be sent, quoted per RFC 9110. A
+// matching If-None-Match gets 304 with no body at all - a real bandwidth
+// and JSON-decode saving on the client, not merely a hint it could choose
+// to act on.
+func writeJSONWithETag(w http.ResponseWriter, r *http.Request, v any) {
+	body, err := json.Marshal(v)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "encode_failed", err.Error())
+		return
+	}
+	sum := sha256.Sum256(body)
+	etag := `"` + hex.EncodeToString(sum[:]) + `"`
+	w.Header().Set("ETag", etag)
+	if inm := r.Header.Get("If-None-Match"); inm != "" && inm == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(body)
 }
 
 // parseWindow reads since/until/limit query parameters shared by every
@@ -351,7 +380,7 @@ func (s *Server) handleRules(w http.ResponseWriter, r *http.Request) {
 			Advice:     rule.Advice,
 		})
 	}
-	writeJSON(w, rulesResponse{Rules: out})
+	writeJSONWithETag(w, r, rulesResponse{Rules: out})
 }
 
 // handleBundle streams an evidence bundle (bundle.Export's tar.gz) for the
@@ -411,10 +440,10 @@ type capabilitiesResponse struct {
 
 func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	if s.Registry == nil {
-		writeJSON(w, capabilitiesResponse{Capabilities: []registry.Snapshot{}})
+		writeJSONWithETag(w, r, capabilitiesResponse{Capabilities: []registry.Snapshot{}})
 		return
 	}
-	writeJSON(w, capabilitiesResponse{Capabilities: s.Registry.Snapshot()})
+	writeJSONWithETag(w, r, capabilitiesResponse{Capabilities: s.Registry.Snapshot()})
 }
 
 // NextCursor/HasMore are always present, whether or not the request itself
