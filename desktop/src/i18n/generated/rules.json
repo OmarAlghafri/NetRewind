@@ -1,0 +1,366 @@
+{
+  "rules": [
+    {
+      "id": "address-changed-hands",
+      "title": "An address moved to a different machine",
+      "severity": "warn",
+      "confidence": 75,
+      "window": "1m0s",
+      "root_cause": "handover",
+      "advice": "Normal after a DHCP lease expires. Worth a look if the address is a server, is statically assigned, or moved without a lease renewal near it.",
+      "i18n": {
+        "ar": {
+          "title": "انتقل عنوان إلى جهاز آخر",
+          "advice": "أمر طبيعي بعد انتهاء صلاحية عقد DHCP. يستحق الفحص إذا كان العنوان لخادم، أو مُعيَّناً يدوياً (ثابتاً)، أو انتقل دون تجديد عقد قريب منه.",
+          "clauses": {
+            "handover": "أصبح هذا العنوان يُجاب من عتاد (بطاقة شبكة) لم يكن مرتبطاً به سابقاً، أي أن الجهاز الذي خلفه جهاز مختلف."
+          }
+        }
+      }
+    },
+    {
+      "id": "change-broke-a-path",
+      "title": "A path that was working stopped working",
+      "severity": "error",
+      "confidence": 88,
+      "window": "5m0s",
+      "root_cause": "change",
+      "advice": "The change named here is the nearest one in time, not a proven cause. Confirm it against your change record before acting: if it was intended, the breakage is a side effect nobody planned; if it was not, something changed the network without going through you.",
+      "i18n": {
+        "ar": {
+          "title": "مسار كان يعمل توقف عن العمل",
+          "advice": "التغيير المذكور هنا هو الأقرب زمنياً، وليس سبباً مؤكداً. تحقق منه في سجل التغييرات قبل اتخاذ أي إجراء: إن كان مقصوداً، فالعطل أثر جانبي لم يخطط له أحد؛ وإن لم يكن كذلك، فقد تغيّرت الشبكة دون علمك.",
+          "clauses": {
+            "breakage": "جهازان كانا يتصلان بنجاح لم يعودا قادرين على إكمال المصافحة (handshake). أياً كان السبب، فقد تغيّر شيء بينهما.",
+            "change": "هذا آخر شيء تغيّر على المسار قبل أن يتعطل.",
+            "spread": "بدأت اتصالات أخرى بالفشل ضمن النافذة الزمنية نفسها."
+          }
+        }
+      }
+    },
+    {
+      "id": "collector-not-watching",
+      "title": "The recorder is running but one of its senses is not",
+      "severity": "error",
+      "confidence": 100,
+      "window": "1m0s",
+      "root_cause": "down",
+      "advice": "The recorder is still recording everything else, so the timeline looks healthy. It is not: nothing this source watches has been seen since, and an absence of those events proves nothing. Read the reason on the event. The usual causes are a kernel without BTF, which stops the connection collector loading, and missing capabilities, which stops the packet and netlink sources opening their sockets. Fix it or note the limitation before drawing conclusions from a quiet timeline.",
+      "i18n": {
+        "ar": {
+          "title": "المُسجِّل يعمل، لكن أحد حواسّه لا يعمل",
+          "advice": "لا يزال المُسجِّل يسجّل كل شيء آخر، لذا يبدو الخط الزمني سليماً. لكنه ليس كذلك: لم يُرصد أي شيء مما تراقبه هذه الوحدة منذ ذلك الحين، وغياب هذه الأحداث لا يثبت شيئاً. اقرأ السبب المذكور في الحدث. الأسباب الشائعة هي نواة (kernel) بلا دعم BTF، ما يمنع تحميل وحدة رصد الاتصالات، أو صلاحيات ناقصة، ما يمنع مصادر الحزم وnetlink من فتح مقابسها (sockets). عالج المشكلة أو دوّن هذا القيد قبل استخلاص أي استنتاج من خط زمني هادئ.",
+          "clauses": {
+            "down": "توقف أحد المصادر عن تغذية السجل بينما استمر المُسجِّل بالعمل. هذا نوع خطر من العمى، لأنه — على عكس فجوة التسجيل — لا يوجد انقطاع واضح يُلاحَظ: يستمر الخط الزمني، بينما تغيب عنه فئة كاملة من الأحداث دون أن يشعر أحد."
+          }
+        }
+      }
+    },
+    {
+      "id": "contested-address",
+      "title": "Two machines are claiming the same address",
+      "severity": "error",
+      "confidence": 85,
+      "window": "2m0s",
+      "root_cause": "conflict",
+      "advice": "Check for a statically configured host inside the DHCP pool, or a second DHCP server. Both produce this, and both keep producing it until one is removed.",
+      "i18n": {
+        "ar": {
+          "title": "جهازان يدّعيان العنوان نفسه",
+          "advice": "تحقق من وجود جهاز بعنوان ثابت داخل نطاق DHCP، أو خادم DHCP ثانٍ. كلاهما ينتج هذا العطل، وكلاهما يستمر بإنتاجه حتى تتم إزالته.",
+          "clauses": {
+            "conflict": "استمر عنوان العتاد (MAC) الذي يُجيب عن هذا العنوان بالتبدّل بين الأجهزة القليلة نفسها، وهذا بالضبط ما يبدو عليه تعارض العناوين من جدول الجيران.",
+            "fallout": "توقف العنوان عن الإجابة بثبات أثناء التنازع عليه."
+          }
+        }
+      }
+    },
+    {
+      "id": "default-route-lost",
+      "title": "The default route disappeared",
+      "severity": "error",
+      "confidence": 95,
+      "window": "2m0s",
+      "root_cause": "loss",
+      "advice": "Look at the timeline immediately before this. A default route rarely leaves on its own; it follows an interface going down, a DHCP lease expiring, or a routing daemon losing its peer. Fix that, not the route.",
+      "i18n": {
+        "ar": {
+          "title": "اختفى مسار التوجيه الافتراضي",
+          "advice": "انظر إلى الخط الزمني قبل هذه اللحظة مباشرة. نادراً ما يختفي المسار الافتراضي من تلقاء نفسه؛ فهو عادة نتيجة توقف واجهة شبكة، أو انتهاء عقد DHCP، أو فقدان خدمة التوجيه لنظيرها. عالج ذلك السبب، لا المسار نفسه.",
+          "clauses": {
+            "fallout": "بدأ الوصول بالفشل بمجرد غياب المسار الافتراضي.",
+            "loss": "سُحب المسار الافتراضي. لم يعد بالإمكان الوصول من هنا إلى أي شيء خارج المقطع المحلي."
+          }
+        }
+      }
+    },
+    {
+      "id": "default-route-moved",
+      "title": "The default route was re-pointed",
+      "severity": "error",
+      "confidence": 85,
+      "window": "2m0s",
+      "root_cause": "change",
+      "advice": "Confirm this was intended. Compare the time against your change record: an unplanned default route change means outbound traffic is leaving through a path nobody chose.",
+      "i18n": {
+        "ar": {
+          "title": "أُعيد توجيه المسار الافتراضي إلى جهة أخرى",
+          "advice": "تأكد أن هذا كان مقصوداً. قارن التوقيت بسجل التغييرات لديك: تغيّر غير مخطط له في المسار الافتراضي يعني أن حركة البيانات الصادرة تسلك مساراً لم يختره أحد.",
+          "clauses": {
+            "change": "المسار الذي تسلكه كل حركة البيانات الصادرة أصبح يشير الآن إلى جهة أخرى.",
+            "fallout": "تغيّر الوصول بمجرد أن بدأت حركة البيانات تسلك المسار الجديد."
+          }
+        }
+      }
+    },
+    {
+      "id": "gateway-hijack",
+      "title": "The default gateway is being answered by a different machine",
+      "severity": "error",
+      "confidence": 90,
+      "window": "3m0s",
+      "root_cause": "hijack",
+      "advice": "Find which switch port the new hardware address is learned on before changing anything. A failover looks identical to an attack from here; the port tells them apart.",
+      "i18n": {
+        "ar": {
+          "title": "أصبحت البوابة الافتراضية تُجاب من جهاز مختلف",
+          "advice": "حدّد منفذ المبدّل (switch port) الذي يُتعلَّم منه عنوان العتاد الجديد قبل تغيير أي شيء. يبدو التحوّل الاحتياطي (failover) مطابقاً تماماً للهجوم من هذه الزاوية؛ المنفذ وحده يميّز بينهما.",
+          "clauses": {
+            "fallout": "انقطع الاتصال أثناء إجابة البوابة من جهة أخرى.",
+            "hijack": "تغيّر عنوان العتاد الذي يُجيب عن البوابة الافتراضية. أصبح كل جهاز في هذا المقطع يرسل حركته الصادرة إلى جهاز مختلف.",
+            "reroute": "تبع التوجيه هذا التغيّر، فأصبحت حركة البيانات تخرج عبر مسار لم يختره أحد."
+          }
+        }
+      }
+    },
+    {
+      "id": "gateway-returned-different",
+      "title": "The gateway came back, but as a different machine",
+      "severity": "error",
+      "confidence": 85,
+      "window": "10m0s",
+      "root_cause": "returned",
+      "advice": "Reachability was restored, so monitoring has gone quiet and the incident looks closed. It is not: the address is the same and the machine behind it is not, so every host on this segment is now sending its outbound traffic somewhere it was not sending it before. Find the switch port the new hardware address is learned on. If a router was rebooted or a failover ran, this is that, and it can be closed. If nothing was scheduled, something took the address while the real gateway was unreachable, and the outage was the cover rather than the fault.",
+      "i18n": {
+        "ar": {
+          "title": "عادت البوابة، لكن كجهاز مختلف",
+          "advice": "عاد الوصول، فصمتت أدوات المراقبة وبدت الحادثة منتهية. لكنها ليست كذلك: العنوان هو نفسه، لكن الجهاز خلفه ليس نفسه، فأصبح كل جهاز في هذا المقطع يرسل حركته الصادرة إلى مكان لم يكن يرسلها إليه سابقاً. حدّد منفذ المبدّل الذي يُتعلَّم منه عنوان العتاد الجديد. إن كان هناك إعادة تشغيل لموجّه أو تحوّل احتياطي مجدوَل، فهذا هو التفسير، ويمكن إغلاق الحادثة. أما إن لم يكن هناك أي شيء مجدوَل، فقد استولى شيء آخر على العنوان بينما كانت البوابة الحقيقية غير قابلة للوصول، وكان الانقطاع غطاءً لا عطلاً.",
+          "clauses": {
+            "gap": "توقفت البوابة عن الإجابة أولاً. هذا ما سمح باستبدال الارتباط بدلاً من تغييره، ولهذا يسهل إغفال الاستبدال: يستحوذ الانقطاع على كل الانتباه، ويصل الجهاز الجديد مع عملية التعافي.",
+            "returned": "أصبحت البوابة الافتراضية تُجيب مجدداً، من عتاد لم يحمل هذا العنوان من قبل. سُجّلت كأول ظهور لا كتغيير، لأن الارتباط القديم فشل قبل وصول الجديد — وهذا بالضبط ما يبدو عليه فقدان موجّه لعنوان والتقاط موجّه آخر له، من منظور المقطع."
+          }
+        }
+      }
+    },
+    {
+      "id": "host-moved-ports",
+      "title": "A machine appeared behind a different interface",
+      "severity": "warn",
+      "confidence": 70,
+      "window": "1m0s",
+      "root_cause": "move",
+      "advice": "Ordinary if someone re-patched a cable or a wireless client roamed. Suspicious if the machine is a server, or if the same hardware address appears in two places at once rather than moving between them.",
+      "i18n": {
+        "ar": {
+          "title": "ظهر جهاز خلف واجهة مختلفة",
+          "advice": "أمر عادي إذا أعاد أحدهم توصيل كبل أو تجوّل جهاز لاسلكي. لكنه مثير للشك إذا كان الجهاز خادماً، أو إذا ظهر عنوان العتاد نفسه في مكانين في الوقت نفسه بدلاً من الانتقال بينهما.",
+          "clauses": {
+            "move": "أصبح الوصول إلى عنوان العتاد نفسه عبر واجهة مختلفة عمّا كانت عليه."
+          }
+        }
+      }
+    },
+    {
+      "id": "link-degrading",
+      "title": "A link is failing rather than having failed",
+      "severity": "error",
+      "confidence": 90,
+      "window": "10m0s",
+      "root_cause": "symptom",
+      "advice": "Replace the transceiver or the cable before touching anything else, and check for a duplex mismatch on the far end. Restarting the interface will clear the counters and hide it for another week; it will not fix a marginal link.",
+      "i18n": {
+        "ar": {
+          "title": "وصلة آخذة في التدهور، لا مُتعطّلة تماماً",
+          "advice": "استبدل المُرسِل المُستقبِل (transceiver) أو الكبل قبل التعامل مع أي شيء آخر، وتحقق من عدم تطابق نمط الإرسال (duplex) في الطرف الآخر. إعادة تشغيل الواجهة ستصفّر العدّادات وتُخفي المشكلة لأسبوع آخر؛ لن تُصلح وصلة ضعيفة.",
+          "clauses": {
+            "fallout": "بدأت الاتصالات العابرة لها بالفشل أو التباطؤ.",
+            "symptom": "هذه الواجهة ليست متعطّلة. إنها تعمل، وتمرّر حركة البيانات، لكنها تُتلف أو تُسقط جزءاً منها بصمت — ولهذا لم يُطلق أي تنبيه، ولهذا أمضى فريق التطبيقات أسبوعين يلوم شيئاً آخر."
+          }
+        }
+      }
+    },
+    {
+      "id": "link-down-isolated-hosts",
+      "title": "A link went down and took hosts with it",
+      "severity": "warn",
+      "confidence": 80,
+      "window": "1m30s",
+      "root_cause": "link",
+      "advice": "The hosts did not fail. Restore the link and they will return; investigating them individually wastes the outage.",
+      "i18n": {
+        "ar": {
+          "title": "تعطّلت وصلة وسحبت معها أجهزة أخرى",
+          "advice": "الأجهزة لم تتعطّل. أعِد الوصلة وستعود من تلقاء نفسها؛ التحقيق في كل جهاز على حدة يُهدر وقت معالجة الانقطاع.",
+          "clauses": {
+            "isolation": "توقفت أجهزة عن الإجابة على مستوى الطبقة الثانية (L2) فور ذلك، وهذا ظهور تعطّل الوصلة بمظهر تعطّل أجهزة.",
+            "link": "توقفت واجهة شبكة عن العمل."
+          }
+        }
+      }
+    },
+    {
+      "id": "path-mtu-blackhole",
+      "title": "A path is silently dropping large packets",
+      "severity": "error",
+      "confidence": 90,
+      "window": "10m0s",
+      "root_cause": "blackhole",
+      "advice": "Ping will keep working and every small request will succeed, which is why this survives for weeks. Check for a tunnel, a VPN or a PPPoE link on the path, and whether something is filtering the ICMP that would otherwise have told the sender to send smaller packets.",
+      "i18n": {
+        "ar": {
+          "title": "مسار يُسقط الحزم الكبيرة بصمت",
+          "advice": "سيستمر أمر ping بالعمل، وستنجح كل الطلبات الصغيرة، ولهذا يستمر هذا العطل لأسابيع. تحقق من وجود نفق (tunnel) أو VPN أو وصلة PPPoE على المسار، ومن احتمال ترشيح حزم ICMP التي كانت ستُخبر المُرسِل بإرسال حزم أصغر.",
+          "clauses": {
+            "blackhole": "أبلغ جهاز على المسار أن الحزم أكبر من اللازم للقفزة التالية. تنجح الطلبات الصغيرة بينما تتعلّق عمليات النقل الكبيرة.",
+            "fallout": "بدأت الاتصالات العابرة لذلك المسار بالفشل أو التوقف."
+          }
+        }
+      }
+    },
+    {
+      "id": "port-flapping",
+      "title": "A port is flapping",
+      "severity": "warn",
+      "confidence": 88,
+      "window": "5m0s",
+      "root_cause": "flap",
+      "advice": "A port that flaps repeatedly is usually a failing transceiver, a marginal cable, or a duplex mismatch. Restarting the interface will not fix any of those, and hides the evidence.",
+      "i18n": {
+        "ar": {
+          "title": "منفذ يتذبذب بين التشغيل والإيقاف",
+          "advice": "المنفذ الذي يتذبذب مراراً غالباً ما يكون بسبب مُرسِل مُستقبِل متعطّل، أو كبل ضعيف، أو عدم تطابق في نمط الإرسال. إعادة تشغيل الواجهة لن تُصلح أياً من ذلك، وستُخفي الدليل عليه.",
+          "clauses": {
+            "flap": "توقفت الواجهة نفسها عن العمل مراراً خلال دقائق قليلة. انقطاع واحد هو حدث؛ وتكرره عطل في الوصلة نفسها.",
+            "recovery": "عادت في كل مرة، ولهذا لم يلاحظ أحد أنها كانت تتعطّل."
+          }
+        }
+      }
+    },
+    {
+      "id": "reachability-lost",
+      "title": "A measured path stopped answering",
+      "severity": "error",
+      "confidence": 90,
+      "window": "5m0s",
+      "root_cause": "cause",
+      "advice": "This is measured, not reported: the recorder sent probes and they did not come back. If the change named above was intended, the loss is a side effect nobody planned. If there is no change above it, the fault is beyond what this recorder can see from where it sits.",
+      "i18n": {
+        "ar": {
+          "title": "توقف مسار مقيس عن الإجابة",
+          "advice": "هذا قياس فعلي، لا تقرير: أرسل المُسجِّل مسبارات فحص (probes) ولم تعد. إن كان التغيير المذكور أعلاه مقصوداً، فالانقطاع أثر جانبي لم يخطط له أحد. وإن لم يوجد تغيير مذكور، فالعطل يقع خارج ما يستطيع هذا المُسجِّل رؤيته من موقعه.",
+          "clauses": {
+            "cause": "هذا آخر شيء تغيّر قبل أن يتوقف المسار عن الإجابة.",
+            "loss": "بدأت مسبارات الفحص الموجَّهة لهذا العنوان تذهب دون إجابة. فقدان الحزم لا يُعلن عن نفسه لأحد؛ يجب قياسه، وقد قِيس.",
+            "recovery": "عاد للإجابة لاحقاً، ما يحدد المدة التي استغرقها الانقطاع."
+          }
+        }
+      }
+    },
+    {
+      "id": "recorder-was-blind",
+      "title": "The record has a hole in it",
+      "severity": "warn",
+      "confidence": 100,
+      "window": "1m0s",
+      "root_cause": "gap",
+      "advice": "Nothing can be concluded about this period from this recorder. If the outage being investigated falls inside it, look for another source before deciding what happened.",
+      "i18n": {
+        "ar": {
+          "title": "يوجد فراغ في السجل",
+          "advice": "لا يمكن استنتاج أي شيء عن هذه الفترة من هذا المُسجِّل. إذا وقع الانقطاع الذي تحقّق فيه ضمن هذه الفترة، ابحث عن مصدر آخر قبل تحديد ما حدث.",
+          "clauses": {
+            "gap": "لم يكن المُسجِّل يراقب، أو فقد أحداثاً لم يستطع مواكبتها. غياب الأحداث هنا لا يعني غياب المشكلات."
+          }
+        }
+      }
+    },
+    {
+      "id": "resolver-hijacked",
+      "title": "A machine's resolver changed under it",
+      "severity": "warn",
+      "confidence": 80,
+      "window": "5m0s",
+      "root_cause": "change",
+      "advice": "Compare against your DHCP scope. A client that changed resolver without a lease renewal near it did not choose to; something told it to. Check for a second DHCP server and for the gateway's hardware address changing at about the same time.",
+      "i18n": {
+        "ar": {
+          "title": "تغيّر مُحلِّل DNS لجهاز دون علمه",
+          "advice": "قارن ذلك بنطاق DHCP لديك. الجهاز الذي تغيّر مُحلِّل DNS لديه دون تجديد عقد قريب لم يختر ذلك بنفسه؛ شيء ما أخبره بذلك. تحقق من وجود خادم DHCP ثانٍ، ومن تغيّر عنوان عتاد البوابة في التوقيت نفسه تقريباً.",
+          "clauses": {
+            "cause": "هذا ما تغيّر على المسار قبل تغيّر المُحلِّل مباشرة.",
+            "change": "بدأ هذا الجهاز بإرسال استعلاماته إلى جهة أخرى. كل اسم يُحلَّل من الآن فصاعداً تُجيب عنه جهة مختلفة.",
+            "fallout": "بدأت الاستعلامات بالفشل أو التباطؤ ضمن النافذة الزمنية نفسها."
+          }
+        }
+      }
+    },
+    {
+      "id": "rogue-dhcp-server",
+      "title": "A second DHCP server is answering on this segment",
+      "severity": "error",
+      "confidence": 92,
+      "window": "5m0s",
+      "root_cause": "rogue",
+      "advice": "Find the switch port the new server's hardware address is learned on and shut it. Almost always a consumer router plugged in the wrong way round, with its LAN side facing the network. Until it is off, clients will keep taking its addresses and its gateway at random.",
+      "i18n": {
+        "ar": {
+          "title": "خادم DHCP ثانٍ يُجيب على هذا المقطع",
+          "advice": "حدّد منفذ المبدّل الذي يُتعلَّم منه عنوان عتاد الخادم الجديد وأغلقه. غالباً ما يكون السبب موجّهاً منزلياً وُصِّل بشكل معكوس، بحيث يواجه طرفه الداخلي (LAN) الشبكة. وإلى أن يُطفأ، ستستمر الأجهزة بأخذ عناوينه وبوابته عشوائياً.",
+          "clauses": {
+            "breakage": "وتوقفت اتصالات كانت تعمل.",
+            "fallout": "بدأت الأجهزة بأخذ عناوين أو بوابات أو مُحلِّلات مختلفة، وهذا وصول إعدادات الخادم الثاني.",
+            "rogue": "أجاب خادم DHCP على مقطع كان لديه خادم بالفعل. كل جهاز يجدّد عقده من الآن يحصل على إجابة أيهما يردّ أولاً."
+          }
+        }
+      }
+    },
+    {
+      "id": "route-flapping",
+      "title": "A route is flapping",
+      "severity": "error",
+      "confidence": 85,
+      "window": "5m0s",
+      "root_cause": "flap",
+      "advice": "Repeated reconvergence usually means an unstable adjacency rather than a routing misconfiguration. Find the link underneath the neighbour that keeps being lost before touching the routing configuration.",
+      "i18n": {
+        "ar": {
+          "title": "مسار توجيه يتذبذب",
+          "advice": "إعادة التقارب (reconvergence) المتكررة تعني غالباً عدم استقرار الجوار (adjacency) لا خطأ في إعداد التوجيه. حدّد الوصلة الأساسية للجار الذي يُفقد باستمرار قبل التعامل مع إعدادات التوجيه.",
+          "clauses": {
+            "cause": "كانت وصلة أو جار يتعطّل تحت عملية إعادة التقارب.",
+            "flap": "تغيّر المسار الفائز لهذه الوجهة مراراً خلال دقائق قليلة. كانت حركة البيانات تُنقل ذهاباً وإياباً أسرع مما يمكن للجلسات تحمّله."
+          }
+        }
+      }
+    },
+    {
+      "id": "service-unreachable",
+      "title": "A service stopped answering",
+      "severity": "warn",
+      "confidence": 80,
+      "window": "2m0s",
+      "root_cause": "failures",
+      "advice": "Check whether the service is listening before blaming the network. If it is, look at the timeline for a filtering change or a route change just before the first failure - both look identical from the client.",
+      "i18n": {
+        "ar": {
+          "title": "توقفت خدمة عن الإجابة",
+          "advice": "تحقق من أن الخدمة ما زالت تستمع (listening) قبل إلقاء اللوم على الشبكة. إن كانت كذلك، ابحث في الخط الزمني عن تغيّر في الترشيح أو في مسار التوجيه قبيل أول فشل مباشرة — فكلاهما يبدو متطابقاً من جهة العميل.",
+          "clauses": {
+            "context": "تغيّر المسار إليها في التوقيت نفسه تقريباً، وهذا بالضبط ما ينتج عنه هذا العرض من جهة العميل.",
+            "failures": "انتقلت محاولات اتصال متكررة بهذه الخدمة من حزمة SYN الأولى مباشرة إلى الإغلاق دون أي إجابة. شيء ما رفضها، أو أسقطها، أو لم يكن يستمع أصلاً."
+          }
+        }
+      }
+    }
+  ]
+}

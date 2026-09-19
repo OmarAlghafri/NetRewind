@@ -3,14 +3,14 @@
 **Status:** Rule i18n contract accepted and implemented, all 19 shipped
 rules translated (`internal/correlate/rule.go`, `internal/incident/incident.go`,
 `internal/correlate/engine.go`, `internal/api/v1/server.go`, `rules/*.yaml`).
-The 49-kind event catalogue is also implemented and rendering in the GUI
+The 49-kind event catalogue is implemented and rendering in the GUI
 (`internal/event/gen`, `desktop/src/i18n/kindCatalogue.ts`,
-`IncidentCard.tsx`, `Diagnostics.tsx`). Rust/Go error codes, the generated
-`desktop/src/i18n/generated/rules.json` build step, and
-`IncidentCard.tsx`'s/`Rules.tsx`'s remaining raw-English fields
-(`title`/`why`/`advice`) plus the untagged-Latin scanner are separate,
-not-yet-started pieces of this same ADR - tracked below, not silently
-folded into "done".
+`IncidentCard.tsx`, `Diagnostics.tsx`). `desktop/src/i18n/generated/rules.json`
+is also implemented and rendering: `IncidentCard.tsx`'s title/advice/
+per-clause-why and `Rules.tsx`'s title now use `i18n.ar` instead of the
+raw English rule fields, in live, demo and bundle modes alike. Rust/Go
+error codes and the untagged-Latin scanner remain not-yet-started -
+tracked below, not silently folded into "done".
 **Date:** 2026-09-19.
 
 ## Context
@@ -129,11 +129,37 @@ the Go struct, or every one of the 19 shipped rules fails to load.
   the app against the demo recording in both languages and reading the
   rendered text, not merely by the test suite passing.
 
+**Rules.json + frontend rendering (done):**
+- `internal/correlate/gen/main.go` (`go run ./internal/correlate/gen`)
+  loads `rules/*.yaml` through `correlate.LoadRules` - the same function
+  the recorder itself uses - and writes
+  `desktop/src/i18n/generated/rules.json` in the same shape as `/v1/rules`'
+  `ruleSummary`. `internal/correlate/rules_catalogue_test.go`'s
+  `TestTheGeneratedRulesCatalogueIsUpToDate` re-loads the real rules
+  directory and fails on drift - proven by corrupting the checked-in file
+  and watching it fail before restoring (`docs/evidence/37-...log`).
+- `desktop/src/i18n/rulesCatalogue.ts`: `findRule` prefers a live
+  `/v1/rules` entry over the static snapshot; `titleFor`/`adviceFor`/
+  `whyFor` take the incident's own already-known English text as an
+  explicit fallback and never substitute the rule's current field for
+  it - an old bundle's incident keeps saying what it actually said, even
+  if the rule file has since been reworded. 11 tests in
+  `rulesCatalogue.test.ts`, including a deliberately-broken-then-restored
+  regression guard for that specific fallback rule.
+- `IncidentCard.tsx` (title, advice, every chain link's `why` via its new
+  `rules` prop) and `Rules.tsx` (both branches - the live catalogue's
+  title, and the demo/bundle "fired rules" list, which previously showed
+  a bare rule id with no title in either language and now shows one from
+  the static snapshot) switched from the raw English fields. Verified
+  against the demo recording in both languages: all 16 incidents' titles
+  and advice render correctly in Arabic; per-clause `why` correctly falls
+  back to English for all of them because the demo fixture predates
+  `Link.Clause` (0 of 16 incidents have a `clause` on any link, checked
+  directly) - a data-freshness gap, not a code defect, tracked as a
+  follow-up rather than silently left unmentioned.
+
 **Not started:** Rust/Go error codes for capability `reason` and shell
-connection failures; the `desktop/src/i18n/generated/rules.json` build
-step; `IncidentCard.tsx`'s `title`/`link.why`/`incident.advice` and all of
-`Rules.tsx` still render the raw English rule fields - confirmed still
-true by this session's own screenshots, where kind labels are Arabic but
-incident titles and advice are still English; the automated scan for
-untagged Latin sentences, which needs that remaining frontend work to
-exist before it has anything meaningful to scan.
+connection failures; the automated scan for untagged Latin sentences
+(now has real frontend content worth scanning); regenerating
+`demo-incidents.json` against the current engine so the per-clause `why`
+translation path has real data to render against.

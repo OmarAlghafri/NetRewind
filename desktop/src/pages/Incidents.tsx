@@ -1,8 +1,9 @@
 import { useLanguage } from "../i18n/LanguageContext";
 import type { Incident } from "../types";
+import type { RuleSummary } from "../data/types";
 import { IncidentCard } from "../components/IncidentCard";
 
-export function Incidents({ incidents }: { incidents: Incident[] }) {
+export function Incidents({ incidents, rules }: { incidents: Incident[]; rules: RuleSummary[] }) {
   const { t } = useLanguage();
   const sorted = [...incidents].sort((a, b) => b.opened_at - a.opened_at);
 
@@ -13,7 +14,7 @@ export function Incidents({ incidents }: { incidents: Incident[] }) {
       {sorted.length === 0 ? (
         <div className="empty-state">{t("incidents_empty")}</div>
       ) : (
-        sorted.map((inc) => <IncidentCard key={inc.incident_id} incident={inc} />)
+        sorted.map((inc) => <IncidentCard key={inc.incident_id} incident={inc} rules={rules} />)
       )}
     </div>
   );

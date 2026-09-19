@@ -3,6 +3,8 @@ import { nsToDate } from "../types";
 import { useLanguage } from "../i18n/LanguageContext";
 import type { Lang } from "../i18n/translations";
 import { labelForKind } from "../i18n/kindCatalogue";
+import { adviceFor, findRule, titleFor, whyFor } from "../i18n/rulesCatalogue";
+import type { RuleSummary } from "../data/types";
 import { SeverityBadge } from "./SeverityBadge";
 import { TechnicalValue } from "./TechnicalValue";
 
@@ -40,11 +42,15 @@ function KindName({ kind, lang }: { kind: string; lang: Lang }) {
   );
 }
 
-export function IncidentCard({ incident }: { incident: Incident }) {
+export function IncidentCard({ incident, rules = [] }: { incident: Incident; rules?: RuleSummary[] }) {
   const { t, lang } = useLanguage();
+  const rule = findRule(incident.rule_id, rules);
+  const title = titleFor(rule, lang, incident.title);
+  const advice = incident.advice ? adviceFor(rule, lang, incident.advice) : undefined;
+
   return (
     <div className="card">
-      <div className="incident-title">{incident.title}</div>
+      <div className="incident-title">{title}</div>
       <div className="incident-meta">
         <span className="ltr-field">{formatTime(incident.opened_at, lang)}</span>
         {"  ·  "}
@@ -63,7 +69,9 @@ export function IncidentCard({ incident }: { incident: Incident }) {
               <KindName kind={link.kind} lang={lang} />{"  "}
               <span className="ltr-field">{link.subject}</span>
             </div>
-            <div style={{ fontSize: "0.88rem", color: "var(--text-muted)" }}>{link.why}</div>
+            <div style={{ fontSize: "0.88rem", color: "var(--text-muted)" }}>
+              {whyFor(rule, link.clause, lang, link.why)}
+            </div>
             {i < incident.chain.length - 1 && (
               <div>
                 <hr className={`relation-line ${relationLine(incident.chain[i + 1]?.relation)}`} />
@@ -82,9 +90,9 @@ export function IncidentCard({ incident }: { incident: Incident }) {
         <span className="ltr-field">{incident.root_cause.confidence}%</span>)
       </div>
 
-      {incident.advice && (
+      {advice && (
         <div className="advice-box">
-          <strong>{t("advice")}:</strong> {incident.advice}
+          <strong>{t("advice")}:</strong> {advice}
         </div>
       )}
     </div>

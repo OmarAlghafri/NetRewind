@@ -2,15 +2,18 @@ import { useMemo } from "react";
 import { useLanguage } from "../i18n/LanguageContext";
 import type { Incident } from "../types";
 import type { RuleSummary } from "../data/types";
+import { getStaticRule, titleFor } from "../i18n/rulesCatalogue";
 import { SeverityBadge } from "../components/SeverityBadge";
 
 // With a live recorder the full catalogue it loaded is listed (from
 // /v1/rules), with how often each rule concluded an incident in the loaded
 // window. Without one (demo, bundle) only the rules that actually fired can
-// be known, and the page says so rather than presenting a partial list as
-// the catalogue.
+// be known, so this list can only ever be a count against a bare rule ID -
+// except for a title, which the build-time rules.json snapshot can supply
+// even with no live catalogue (ADR 0004), so a known rule at least reads as
+// itself rather than an opaque id.
 export function Rules({ incidents, rules }: { incidents: Incident[]; rules: RuleSummary[] }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
 
   const fired = useMemo(() => {
     const counts = new Map<string, number>();
@@ -50,7 +53,7 @@ export function Rules({ incidents, rules }: { incidents: Incident[]; rules: Rule
                     )}
                   </span>
                 </div>
-                <div style={{ marginTop: 4 }}>{r.title}</div>
+                <div style={{ marginTop: 4 }}>{titleFor(r, lang, r.title)}</div>
                 <div className="capability-detail">
                   <span>
                     {t("rules_col_confidence")}: <span className="ltr-field">{r.confidence}%</span>
@@ -82,14 +85,20 @@ export function Rules({ incidents, rules }: { incidents: Incident[]; rules: Rule
         {firedList.length === 0 ? (
           <div className="empty-state">{t("rules_empty")}</div>
         ) : (
-          firedList.map(([ruleId, count]) => (
-            <div className="capability-row" key={ruleId}>
-              <span className="ltr-field">{ruleId}</span>
-              <span>
-                <span className="ltr-field">{count}</span> {t("rules_fired_count")}
-              </span>
-            </div>
-          ))
+          firedList.map(([ruleId, count]) => {
+            const known = getStaticRule(ruleId);
+            return (
+              <div className="capability-row" key={ruleId}>
+                <span>
+                  {known && <>{titleFor(known, lang, known.title)} </>}
+                  <span className="ltr-field">{ruleId}</span>
+                </span>
+                <span>
+                  <span className="ltr-field">{count}</span> {t("rules_fired_count")}
+                </span>
+              </div>
+            );
+          })
         )}
       </div>
     </div>

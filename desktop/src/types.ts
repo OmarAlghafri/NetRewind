@@ -37,6 +37,10 @@ export interface IncidentLink {
   subject: string;
   relation: Relation;
   why: string;
+  // The matched clause's own `as` name (internal/incident/incident.go's
+  // Link.Clause) - absent from an incident built before this field
+  // existed. Keys a rule's i18n.ar.clauses translation of `why`.
+  clause?: string;
   evidence?: Record<string, unknown>;
 }
 

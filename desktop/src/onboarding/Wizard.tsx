@@ -61,7 +61,7 @@ export function Wizard({
           {stepId === "agent" && <AgentChoiceStep settings={settings} onChange={onChangeSettings} />}
           {stepId === "permissions" && <PermissionsStep settings={settings} record={record} />}
           {stepId === "capability" && <CapabilityStep record={record} />}
-          {stepId === "sample" && <SampleInvestigationStep incidents={record.incidents} />}
+          {stepId === "sample" && <SampleInvestigationStep incidents={record.incidents} rules={record.rules} />}
         </div>
 
         <div className="wizard-actions">

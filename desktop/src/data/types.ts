@@ -26,6 +26,16 @@ export interface Health {
   collectors: { up: number; down: number; unsupported: number };
 }
 
+// RuleI18n mirrors internal/correlate/rule.go's RuleI18n: one language's
+// translation of a rule's title, advice, and each clause's why (keyed by
+// the clause's own `as` name, matching how a chain link's own `clause`
+// field names it).
+export interface RuleI18n {
+  title?: string;
+  advice?: string;
+  clauses?: Record<string, string>;
+}
+
 export interface RuleSummary {
   id: string;
   title: string;
@@ -34,6 +44,10 @@ export interface RuleSummary {
   window: string;
   root_cause: string;
   advice: string;
+  // Absent entirely for a rule with no translation yet - never an empty
+  // object (ADR 0004: "an unknown or newer localization key falls back to
+  // the English original ... never blank").
+  i18n?: Record<string, RuleI18n>;
 }
 
 export interface BundleManifest {

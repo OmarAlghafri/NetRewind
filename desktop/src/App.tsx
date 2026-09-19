@@ -139,7 +139,7 @@ function Shell() {
             the wizard's equivalent region - same fix applies here). */}
         <main className="workspace-body" tabIndex={0}>
           {route.page === "overview" && <Overview record={record} settings={settings} />}
-          {route.page === "incidents" && <Incidents incidents={record.incidents} />}
+          {route.page === "incidents" && <Incidents incidents={record.incidents} rules={record.rules} />}
           {route.page === "timeline" && <Timeline events={record.events} />}
           {route.page === "host" && <Host events={record.events} />}
           {route.page === "rules" && <Rules incidents={record.incidents} rules={record.rules} />}

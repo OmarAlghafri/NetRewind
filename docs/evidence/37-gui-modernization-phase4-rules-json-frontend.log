@@ -1,0 +1,145 @@
+GUI modernization, Phase 4 (third slice): desktop/src/i18n/generated/rules.json
+(the last item ADR 0004 named as "not started" besides Rust/Go error codes
+and the untagged-Latin scanner) plus the actual frontend wiring the first
+Phase 4 slice built the Go/API side for but never used -
+IncidentCard.tsx's title/advice/per-clause-why and Rules.tsx's title now
+render `i18n.ar` instead of the raw English rule fields.
+
+## 1. Why this needed a real Go program, not a second YAML parser
+
+`internal/correlate/gen/main.go` (new, `go run ./internal/correlate/gen`)
+loads `rules/*.yaml` through `correlate.LoadRules` - the exact function
+`netrewindd` and `netrewind rules` themselves call, strict decoder and
+`Validate()` included - rather than a second, looser YAML read. A rule
+that would fail to load for the recorder cannot end up looking fine in
+the generated GUI catalogue; the generator and the engine agree by
+construction, not by two implementations staying in sync by hand.
+Mirrors internal/event/gen's own reasoning for kinds.json exactly.
+
+Output shape matches `internal/api/v1/server.go`'s `ruleSummary` field
+for field (confirmed by reading it directly before writing the
+generator), so a live-fetched rule and a generated one are the same
+TypeScript type (`RuleSummary`, `desktop/src/data/types.ts`, which
+gained the `i18n` field this slice added - it did not exist on the
+frontend type at all before this, confirmed by grep before assuming).
+
+    $ go run ./internal/correlate/gen
+    wrote 19 rules to .../desktop/src/i18n/generated/rules.json
+
+`internal/correlate/rules_catalogue_test.go`'s
+`TestTheGeneratedRulesCatalogueIsUpToDate` re-loads the real rules
+directory through the same `LoadRules` call and fails on any drift -
+proven by corrupting one field in the checked-in JSON and watching it
+fail with the exact diff, then restoring and watching it pass again.
+
+## 2. The frontend lookup module - and the one design decision worth recording
+
+`desktop/src/i18n/rulesCatalogue.ts`: `findRule(ruleId, liveRules)` prefers
+a live `/v1/rules` entry over the static snapshot (a live recorder can be
+pointed at a customised rules directory the frontend was never built
+against); `titleFor`/`adviceFor`/`whyFor` each take the incident's own
+already-known English text as an explicit `fallback` parameter and
+**never** substitute the rule's own current field when no translation
+exists - only ever that fallback. This matters for an old bundle: an
+incident's `title`/`advice`/`why` were copied into it verbatim at the
+moment it was built (`engine.go`'s `build()`) and are the authoritative
+record of what actually fired; the rule file today could have since been
+reworded, and silently swapping in "what the rule currently says" in
+place of "what this incident actually said" would misrepresent history
+for the sake of an English string that did not even need translating.
+`whyFor` specifically keys by `rule_id + clause` (the clause's own `as`,
+ADR 0004's design from the first Phase 4 slice) and falls back to the
+existing `link.why` whenever `clause` is absent or unrecognised - which
+current demo data always is (§4 below).
+
+`desktop/src/i18n/rulesCatalogue.test.ts`: 11 tests against a rule that
+really shipped (`address-changed-hands`), not a synthetic fixture -
+proves the static snapshot returns real translated content, proves live
+beats static when both know a rule, proves every one of the three
+functions falls through to the caller's fallback (not the rule's own
+field) when undefined/untranslated/unmatched. The "never returns the
+rule's current field" guard was deliberately broken
+(`titleFor` changed to `?? rule?.title ?? fallback`) and watched fail
+with the exact wrong value before being reverted - not merely asserted
+and trusted.
+
+## 3. Frontend wiring
+
+- `desktop/src/types.ts`: `IncidentLink` gained `clause?: string`
+  (`internal/incident/incident.go`'s `Link.Clause`, JSON `clause,omitempty` -
+  added to the Go struct in the first Phase 4 slice, never added to the
+  TS type until now, confirmed by grep before assuming it existed).
+- `IncidentCard.tsx`: takes a new `rules: RuleSummary[]` prop; incident
+  title, advice (when present) and every chain link's `why` now go
+  through `findRule`/`titleFor`/`adviceFor`/`whyFor` instead of rendering
+  the raw incident field. The two real call sites
+  (`pages/Incidents.tsx`, `onboarding/steps/SampleInvestigationStep.tsx`)
+  and their own callers (`App.tsx`, `onboarding/Wizard.tsx`) updated to
+  pass `record.rules` through - four one-line changes, not a redesign.
+- `Rules.tsx`: the live-catalogue branch's title now goes through
+  `titleFor`. The demo/bundle "only fired rules are known" branch
+  previously showed a bare rule ID in every case, in both languages -
+  now looks the id up in the static snapshot and shows its title
+  (translated when Arabic) beside the id when known, unchanged (bare id
+  only) when not. This is a real capability demo mode did not have
+  before, not only a translation of one it already had.
+
+## 4. Full regression
+
+    $ gofmt -l cmd internal                       (empty)
+    $ go vet ./...                                 clean
+    $ go build ./...                               clean
+    $ CGO_ENABLED=0 go test ./...                  all packages ok
+    $ npx tsc --noEmit                             clean
+    $ npm test                                     7 files, 44 tests passed
+    $ npm run build                                clean, 57 modules
+    $ npx playwright test                          32 passed (0 failed)
+
+## 5. Actually looked at it
+
+Ran the dev server against the demo recording (fresh browser tab, learned
+from the previous evidence log's `backoffMs` incident not to trust a
+long-lived one) and read the rendered DOM text of every one of the demo
+recording's 16 incidents, in both languages:
+
+- **Titles**: all 16 incidents now show their real Arabic title -
+  "تعطّلت وصلة وسحبت معها أجهزة أخرى", "خادم DHCP ثانٍ يُجيب على هذا
+  المقطع", "أصبحت البوابة الافتراضية تُجاب من جهاز مختلف" and so on -
+  each one checked against the actual `rules/*.yaml` `i18n.ar.title` it
+  should be showing, not merely "some Arabic text appeared."
+- **Advice**: every incident's "الخطوة التالية المقترحة" is now the real
+  translated advice sentence, e.g. rogue-dhcp-server's full multi-sentence
+  remediation advice, matching the YAML source.
+- **Rules page**: the demo-mode "fired rules" list, which showed only a
+  bare rule id like `address-changed-hands` before this slice, now shows
+  "انتقل عنوان إلى جهاز آخر address-changed-hands" in Arabic and "An
+  address moved to a different machine address-changed-hands" in English
+  - checked in both languages.
+- **Per-clause why (the one honest gap)**: every chain link's `why`
+  sentence is still English for all 16 demo incidents -
+  `node -e "..."` against `demo-events.json`/`demo-incidents.json`
+  confirmed why before trusting the screenshot: 0 of the demo fixture's
+  16 incidents have a `clause` field on any chain link at all, because
+  that fixture was exported before `Link.Clause` existed
+  (first Phase 4 slice). `whyFor` correctly falls back to the existing
+  English `why` whenever `clause` is absent - proven directly by
+  `rulesCatalogue.test.ts`'s "clause is absent" test - so this is the
+  designed fallback behaving correctly against real data, not a bug, but
+  it does mean the per-clause translation path is not visually verifiable
+  against current demo data. Flagged as a follow-up (regenerate
+  `demo-incidents.json` by replaying `demo-events.json` through the
+  current engine) rather than silently left unmentioned or worked around
+  with a throwaway store-replay tool built under this same slice.
+- Console clean (`read_console_messages`, both pages, both languages) in
+  a freshly opened tab.
+
+## 6. What this slice does not touch (still open in ADR 0004)
+
+Rust/Go structured error codes for capability `reason` and shell
+connection failures; the automated "no untagged Latin sentence" scanner
+(now has real frontend content to scan against - the next natural step);
+regenerating `demo-incidents.json` so the per-clause `why` translation
+path is visually checkable against real data (spawned as a separate,
+self-contained follow-up rather than done here, since it needs its own
+event-replay tooling with its own correctness risk, not a one-line
+addition to this slice).
