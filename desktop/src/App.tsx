@@ -3,6 +3,7 @@ import "./assets/fonts/fonts.css";
 import "./App.css";
 import { LanguageProvider, useLanguage } from "./i18n/LanguageContext";
 import { Sidebar, type Page } from "./components/Sidebar";
+import { useRoute } from "./routing/useRoute";
 import { SourceBanner } from "./components/SourceBanner";
 import { Overview } from "./pages/Overview";
 import { Incidents } from "./pages/Incidents";
@@ -22,7 +23,12 @@ const PAGES: Page[] = ["overview", "incidents", "timeline", "host", "rules", "ev
 
 function Shell() {
   const { dir, setLang, t } = useLanguage();
-  const [page, setPage] = useState<Page>("overview");
+  // ADR (routing): #/<page>?<InvestigationContext fields>, real browser
+  // history and deep links instead of local component state - the router
+  // itself (desktop/src/routing/useRoute.ts) predates any page actually
+  // reading InvestigationContext fields, which lands with each page's own
+  // Phase 3/5 rebuild; today it carries page navigation only.
+  const { route, navigate } = useRoute();
   const [onboardingComplete, setOnboardingComplete] = useState<boolean>(readOnboardingComplete);
   const [settings, setSettingsState] = useState<SourceSettings>(readSettings);
   const [launched, setLaunched] = useState(false);
@@ -42,7 +48,7 @@ function Shell() {
           bundlePath: o.bundle ?? s.bundlePath,
         }));
       }
-      if (o.page && (PAGES as string[]).includes(o.page)) setPage(o.page as Page);
+      if (o.page && (PAGES as string[]).includes(o.page)) navigate(o.page as Page);
       if (o.lang) setLang(o.lang);
       if (o.no_wizard) setOnboardingComplete(true);
       setLaunched(true);
@@ -97,7 +103,7 @@ function Shell() {
   const openBundle = (path: string) => {
     if (settings.kind !== "bundle") setPreviousKind(settings.kind);
     setSettings({ ...settings, kind: "bundle", bundlePath: path });
-    setPage("evidence");
+    navigate("evidence");
   };
   const closeBundle = () => setSettings({ ...settings, kind: previousKind === "bundle" ? "demo" : previousKind });
   const switchToDemo = () => setSettings({ ...settings, kind: "demo" });
@@ -123,7 +129,7 @@ function Shell() {
     // vertical scroll region in the main window - the sidebar scrolls
     // independently inside itself (Sidebar.tsx) and never needs to.
     <div className="app-frame">
-      <Sidebar page={page} onNavigate={setPage} />
+      <Sidebar page={route.page} onNavigate={navigate} />
       <div className="workspace">
         <div className="workspace-header">
           <SourceBanner settings={settings} record={record} onSwitchToDemo={switchToDemo} />
@@ -132,15 +138,15 @@ function Shell() {
             region (axe `scrollable-region-focusable`, found while auditing
             the wizard's equivalent region - same fix applies here). */}
         <main className="workspace-body" tabIndex={0}>
-          {page === "overview" && <Overview record={record} settings={settings} />}
-          {page === "incidents" && <Incidents incidents={record.incidents} />}
-          {page === "timeline" && <Timeline events={record.events} />}
-          {page === "host" && <Host events={record.events} />}
-          {page === "rules" && <Rules incidents={record.incidents} rules={record.rules} />}
-          {page === "evidence" && (
+          {route.page === "overview" && <Overview record={record} settings={settings} />}
+          {route.page === "incidents" && <Incidents incidents={record.incidents} />}
+          {route.page === "timeline" && <Timeline events={record.events} />}
+          {route.page === "host" && <Host events={record.events} />}
+          {route.page === "rules" && <Rules incidents={record.incidents} rules={record.rules} />}
+          {route.page === "evidence" && (
             <Evidence record={record} settings={settings} onOpenBundle={openBundle} onCloseBundle={closeBundle} />
           )}
-          {page === "settings" && (
+          {route.page === "settings" && (
             <Settings
               settings={settings}
               onChange={setSettings}
@@ -150,7 +156,7 @@ function Shell() {
               }}
             />
           )}
-          {page === "diagnostics" && (
+          {route.page === "diagnostics" && (
             <Diagnostics events={record.events} incidents={record.incidents} settings={settings} record={record} />
           )}
         </main>

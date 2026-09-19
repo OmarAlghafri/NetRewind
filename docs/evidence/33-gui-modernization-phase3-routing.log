@@ -1,0 +1,66 @@
+GUI modernization, Phase 3 (frontend slice): real URL-based routing
+(#/<page>?<InvestigationContext>), replacing App.tsx's local
+useState<Page>. ADR 0001 originally chose "no router yet ... a dependency
+should earn its place" for the five-page first slice; eight pages and a
+real need for deep links/bookmarks/shareable investigation state later,
+one has.
+
+## 1. What changed
+
+`desktop/src/routing/useRoute.ts`: a small hand-written hash router (no
+dependency) - `parseRoute`/`buildHash` are pure functions,
+`useRoute()` wraps them with `hashchange` listening and a `navigate`
+callback. Defines `InvestigationContext` (`from, to, entity, severities,
+families, query, sort, selection`) per the execution order's §4.2 - the
+contract future page rebuilds (Phase 3's remaining work, Phase 5) write
+against, not yet consumed by any page today (none of them read filter/time
+-range state yet; that lands with each page's own rebuild).
+
+App.tsx: `useState<Page>` → `useRoute()`; every `page === "..."` becomes
+`route.page === "..."`; `Sidebar`'s `onNavigate` and the launch-options
+effect's page-setting both call `navigate` instead of `setPage`.
+
+## 2. Verified, not just typechecked
+
+    $ npx tsc --noEmit                    clean
+    $ npm test                            23/23 (15 existing + 8 new
+                                           parseRoute/buildHash unit tests)
+    $ npm run build                       95.06KB gzip JS (was 94.71KB -
+                                           the router itself, ~0.3KB)
+    $ npx playwright test --project=chromium --reporter=list
+      32 passed (29 existing + 3 new routing tests)
+    $ cargo test --lib ...                8/8 (untouched)
+
+New Playwright tests (`tests/visual/routing.spec.ts`): clicking sidebar
+items updates the URL hash; opening a URL with a hash already set
+(`/#/rules`) lands directly on that page with the correct nav item marked
+active - a real deep link, not the app ignoring the hash and always
+opening Overview; browser back/forward actually moves between previously
+visited pages.
+
+Manually verified in a live browser session (not only Playwright):
+clicking "Rules" produced `location.href ===
+"http://localhost:1420/#/rules"`; navigating directly to
+`http://localhost:1420/#/evidence` (simulating a pasted link or bookmark)
+opened the Evidence bundles page directly, with it correctly marked active
+in the sidebar - screenshot confirms both the correct page content and the
+active nav state.
+
+One test assumption corrected during verification, not a bug: the very
+first load with an empty hash resolves to Overview internally
+(`parseRoute("")`'s default) without ever calling `navigate()` to write
+that default into the visible URL - by design, so opening the app does not
+create a redundant history entry for a page nothing actually navigated to.
+The hash only appears once real navigation happens.
+
+## 3. Not yet done
+
+No page reads `InvestigationContext` fields yet - time range, entity,
+filters, sort, and selection are all defined on the type and carried
+correctly through the URL round-trip, but nothing consumes them. That is
+each page's own Phase 3/5 rebuild (Overview/Incidents/Timeline getting a
+real time-range picker and filters; Investigation/Host reading `entity`;
+incident chain links writing `selection` to deep-link into Timeline).
+`--route` (the launch-option extension mentioned in the execution order)
+is not implemented on the Rust side yet - `--page` continues to work as
+it did.
