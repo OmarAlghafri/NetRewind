@@ -10,6 +10,13 @@ export type AiProfile = "small" | "balanced" | "full";
 export interface AiSettings {
   enabled: boolean;
   profile: AiProfile;
+  /** The file name of a model already downloaded via `netrewind ai model
+   *  download` (see `netrewind ai model list` for what is on disk) -
+   *  empty means "not configured yet". There is no in-app catalogue
+   *  browser/download flow yet (no signed models.json has been published
+   *  to browse - see ADR 0006), so this is filled in by hand for now,
+   *  matching what the operator already downloaded from a terminal. */
+  modelFileName: string;
   /** 0 means "use the runtime's own default" (physical cores, clamped 1-8). */
   threads: number;
   /** Persist follow-up-question threads in the recorder's notes store
@@ -25,6 +32,7 @@ export interface AiSettings {
 export const DEFAULT_AI_SETTINGS: AiSettings = {
   enabled: false,
   profile: "balanced",
+  modelFileName: "",
   threads: 0,
   historyOptIn: false,
   debugSavePrompts: false,
@@ -57,6 +65,7 @@ export function normalizeAiSettings(s: AiSettings): AiSettings {
   return {
     enabled: Boolean(s.enabled),
     profile,
+    modelFileName: typeof s.modelFileName === "string" ? s.modelFileName.trim() : "",
     threads: Number.isFinite(threads) ? Math.min(64, Math.max(0, Math.round(threads))) : DEFAULT_AI_SETTINGS.threads,
     historyOptIn: Boolean(s.historyOptIn),
     debugSavePrompts: Boolean(s.debugSavePrompts),

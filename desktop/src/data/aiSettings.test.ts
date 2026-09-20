@@ -5,8 +5,8 @@ describe("ai settings", () => {
   beforeEach(() => window.localStorage.clear());
 
   it("round-trips through localStorage", () => {
-    writeAiSettings({ enabled: true, profile: "full", threads: 4, historyOptIn: true, debugSavePrompts: false });
-    expect(readAiSettings()).toEqual({ enabled: true, profile: "full", threads: 4, historyOptIn: true, debugSavePrompts: false });
+    writeAiSettings({ enabled: true, profile: "full", modelFileName: " small.gguf ", threads: 4, historyOptIn: true, debugSavePrompts: false });
+    expect(readAiSettings()).toEqual({ enabled: true, profile: "full", modelFileName: "small.gguf", threads: 4, historyOptIn: true, debugSavePrompts: false });
   });
 
   it("falls back to the defaults when nothing or garbage is stored", () => {
