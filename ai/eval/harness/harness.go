@@ -8,36 +8,23 @@
 // with a bad answer is not yet a grader.
 package harness
 
-import "github.com/OmarAlghafri/netrewind/ai/eval/schema"
+import (
+	"github.com/OmarAlghafri/netrewind/ai/eval/schema"
+	"github.com/OmarAlghafri/netrewind/internal/ai"
+)
 
 // Expected is an alias onto the shared schema package - see
 // ai/eval/schema.Expected for field-by-field documentation.
 type Expected = schema.Expected
 
-// ModelOutput is the constrained JSON shape every AI answer must take,
-// starting from PRODUCT_RELEASE_PLAN_AR.md §6.2 point 3: "Output مقيد
-// grammar/JSON schema: summary, ranked_hypotheses[], evidence_event_ids[],
-// counter_evidence[], unknowns[], confidence_ceiling, next_checks[]" -
-// superseded on the evidence field by execution order §4.10's handle
-// contract: EvidenceHandles carries short closed handles ("E1", "E2", ...),
-// never a raw event_id, so there is nothing shaped like a real ULID for the
-// model to fabricate a plausible-but-wrong variant of.
-type ModelOutput struct {
-	Summary           string       `json:"summary"`
-	RankedHypotheses  []Hypothesis `json:"ranked_hypotheses"`
-	EvidenceHandles   []string     `json:"evidence_handles"`
-	CounterEvidence   []string     `json:"counter_evidence"`
-	Unknowns          []string     `json:"unknowns"`
-	ConfidenceCeiling int          `json:"confidence_ceiling"`
-	NextChecks        []string     `json:"next_checks"`
-}
-
-// Hypothesis is one ranked cause the model is proposing.
-type Hypothesis struct {
-	Cause      string `json:"cause"`  // an event kind, e.g. "l2.arp_binding_changed"
-	Entity     string `json:"entity"` // the subject the cause is about
-	Confidence int    `json:"confidence"`
-}
+// ModelOutput and Hypothesis are aliases onto internal/ai - see their own
+// doc comments there. Moved out of this package so Validate
+// (production-time safety checks, internal/ai) and Grade (this package's
+// eval-time accuracy checks against known-correct answers) share one
+// definition of what a model's answer looks like on the wire, rather than
+// two structurally-identical types that could quietly drift apart.
+type ModelOutput = ai.ModelOutput
+type Hypothesis = ai.Hypothesis
 
 // Result is one graded answer. Violations are the hard,
 // release-blocking failures from §6.4's "معايير منع الإصدار" - any one of
