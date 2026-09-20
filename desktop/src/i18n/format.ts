@@ -26,6 +26,22 @@ export function formatCount(n: number, lang: Lang): string {
   return n.toLocaleString(LOCALE[lang]);
 }
 
+/** "2.7 GB", base-1000 (matching cmd/netrewind/ai_model.go's own
+ *  formatBytes - what a model catalogue download size is quoted in
+ *  everywhere else in this project, and how every model host/browser
+ *  already reports a download size, unlike a filesystem's base-1024). */
+export function formatBytes(n: number, lang: Lang): string {
+  const units = ["B", "kB", "MB", "GB", "TB", "PB"];
+  if (n < 1000) return `${formatCount(n, lang)} ${units[0]}`;
+  let div = 1000;
+  let exp = 0;
+  for (let v = n / 1000; v >= 1000; v /= 1000) {
+    div *= 1000;
+    exp++;
+  }
+  return `${(n / div).toLocaleString(LOCALE[lang], { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ${units[exp + 1]}`;
+}
+
 const DURATION_UNITS: Record<Lang, { h: [string, string]; m: [string, string]; s: [string, string] }> = {
   // [compact suffix, detailed word] - detailed word is used bare (no
   // dual/plural inflection beyond this), matching how this project

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCount, formatDateTime, formatDuration, formatTime } from "./format";
+import { formatBytes, formatCount, formatDateTime, formatDuration, formatTime } from "./format";
 
 // execution order §4.6: "one shared module ... instead of the five [in
 // fact ten] independent toLocaleTimeString call sites" - and specifically
@@ -74,5 +74,20 @@ describe("formatDuration", () => {
   it("[deliberate-break proof] a plain-space join is caught by the detailed-Arabic test", () => {
     const wrongJoin = ["4 ساعات", "49 دقيقة"].join(" ");
     expect(wrongJoin).not.toBe("4 ساعات و49 دقيقة");
+  });
+});
+
+describe("formatBytes", () => {
+  it("shows plain bytes under 1000 with no decimal", () => {
+    expect(formatBytes(533, "en")).toBe("533 B");
+  });
+
+  it("shows the model catalogue's own sizes as GB with one decimal", () => {
+    expect(formatBytes(532517120, "en")).toBe("532.5 MB");
+    expect(formatBytes(2740937888, "en")).toBe("2.7 GB");
+  });
+
+  it("always uses Latin digits in Arabic, matching every other number in the app", () => {
+    expect(formatBytes(2740937888, "ar")).toBe("2.7 GB");
   });
 });

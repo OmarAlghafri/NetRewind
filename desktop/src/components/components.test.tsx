@@ -15,6 +15,16 @@ import type { Capability } from "../data/types";
 // real flag in Settings.featureGate.test.tsx.
 vi.mock("../data/aiFeature", () => ({ AI_FEATURE_ENABLED: true }));
 
+type Invoke = (cmd: string, args?: { [key: string]: unknown }) => Promise<unknown>;
+
+function installShell(invoke: Invoke) {
+  (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = { invoke };
+}
+function removeShell() {
+  delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+}
+afterEach(() => removeShell());
+
 function english<T>(ui: React.ReactElement<T>) {
   window.localStorage.setItem("netrewind.lang", "en");
   return render(<LanguageProvider>{ui}</LanguageProvider>);
@@ -306,5 +316,41 @@ describe("Settings unsaved-changes guard", () => {
     const dirtyEvent = new Event("beforeunload", { cancelable: true });
     window.dispatchEvent(dirtyEvent);
     expect(dirtyEvent.defaultPrevented).toBe(true);
+  });
+});
+
+describe("Settings: local AI models card wiring", () => {
+  it("a finished download updates the draft (shows the save bar) without calling onChangeAiSettings until Save is pressed", async () => {
+    installShell(async (cmd) => {
+      if (cmd === "ai_model_list") {
+        return JSON.stringify([{ profile: "small", id: "unsloth/Qwen3.5-0.8B-GGUF", file_name: "Qwen3.5-0.8B-Q4_K_M.gguf", size_bytes: 532517120, gate_passed: false, installed: false }]);
+      }
+      if (cmd === "ai_model_download_start") return undefined;
+      if (cmd === "ai_model_download_status") {
+        return { profile: "small", downloaded: 532517120, total: 532517120, done: true, cancelled: false, error: null };
+      }
+      throw new Error("unexpected command " + cmd);
+    });
+    const onChange = vi.fn();
+    const onChangeAiSettings = vi.fn();
+    english(
+      <Settings
+        settings={DEFAULT_SETTINGS}
+        onChange={onChange}
+        aiSettings={DEFAULT_AI_SETTINGS}
+        onChangeAiSettings={onChangeAiSettings}
+        onReopenWizard={() => {}}
+      />,
+    );
+
+    fireEvent.click(await screen.findByText("Download"));
+    expect(await screen.findByText("You have unsaved changes")).toBeInTheDocument();
+    expect(onChangeAiSettings).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("Save"));
+    expect(onChangeAiSettings).toHaveBeenCalledTimes(1);
+    expect(onChangeAiSettings.mock.calls[0][0]).toMatchObject({ modelFileName: "Qwen3.5-0.8B-Q4_K_M.gguf", profile: "small" });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0]).toEqual(DEFAULT_SETTINGS);
   });
 });

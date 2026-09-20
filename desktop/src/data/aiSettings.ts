@@ -10,12 +10,13 @@ export type AiProfile = "small" | "balanced" | "full";
 export interface AiSettings {
   enabled: boolean;
   profile: AiProfile;
-  /** The file name of a model already downloaded via `netrewind ai model
-   *  download` (see `netrewind ai model list` for what is on disk) -
-   *  empty means "not configured yet". There is no in-app catalogue
-   *  browser/download flow yet (no signed models.json has been published
-   *  to browse - see ADR 0006), so this is filled in by hand for now,
-   *  matching what the operator already downloaded from a terminal. */
+  /** The file name of a downloaded model (see `netrewind ai model list`
+   *  for what is on disk) - empty means "not configured yet". Set
+   *  automatically by Settings' own "Local AI models" card
+   *  (components/ai/LocalAiModelsCard.tsx) once a download finishes;
+   *  still a plain string rather than a stronger type since a build's
+   *  embedded catalogue (internal/aimodel.LoadEmbeddedManifest) could in
+   *  principle change its file names between versions. */
   modelFileName: string;
   /** 0 means "use the runtime's own default" (physical cores, clamped 1-8). */
   threads: number;

@@ -32,7 +32,7 @@ export class AiCommandError extends Error {
  *  not this shape (a JS-level error, e.g. Tauri itself failing to invoke)
  *  is re-thrown unchanged rather than misrepresented as an AI-subsystem
  *  error code. */
-function toAiCommandError(e: unknown): unknown {
+export function toAiCommandError(e: unknown): unknown {
   if (isAgentErrorPayload(e)) return e; // agent_request still uses the AgentError shape
   if (typeof e === "string") {
     const sep = e.indexOf(":");

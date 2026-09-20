@@ -5,6 +5,7 @@ import { TechnicalValue } from "../components/TechnicalValue";
 import type { SourceKind, SourceSettings } from "../data/source";
 import type { AiProfile, AiSettings } from "../data/aiSettings";
 import { AI_FEATURE_ENABLED } from "../data/aiFeature";
+import { LocalAiModelsCard } from "../components/ai/LocalAiModelsCard";
 import { agentDefaultEndpoint, agentGet, isTauri } from "../data/tauri";
 import type { Health } from "../data/types";
 
@@ -197,6 +198,11 @@ export function Settings({
           </div>
         )}
       </div>
+
+      <LocalAiModelsCard
+        selectedFileName={draft.ai.modelFileName}
+        onModelReady={(fileName, profile) => setDraft({ ...draft, ai: { ...draft.ai, modelFileName: fileName, profile } })}
+      />
 
       {AI_FEATURE_ENABLED && (
         <div className="card">
