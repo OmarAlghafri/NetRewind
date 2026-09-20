@@ -1,0 +1,195 @@
+Evidence 54 — three-tier AI eval gate run, real hardware, real numbers
+=======================================================================
+
+Date: 2026-09-20
+Pre-registration: docs/agent-state/AI_EVAL_PRE_REGISTERED_GATE_2026-09-20.md
+(written and committed to disk before any of the three models below
+answered a single case)
+
+Purpose
+-------
+Run the pre-registered gate (ADR 0006 / execution order §4.10) for the
+three models actually shipped in internal/aimodel/models.json (Small =
+Qwen3.5-0.8B, Balanced = Qwen3.5-2B, Full = Qwen3.5-4B, all Q4_K_M),
+now that the second test machine is available again. The existing
+2026-09-19 pre-registration named a different Full-tier candidate
+(Qwen3-4B-Instruct-2507) that is no longer in the catalogue, so a fresh
+pre-registration was written for all three tiers before this run (see
+that file's own "why a new pre-registration" section).
+
+Environment
+-----------
+- Machine: second test machine ("Asus"), Intel Core i5-10300H (4 cores/
+  8 threads, 2.5GHz), 31.8GB RAM (24.3GB free at start), Windows 11
+  Home. Confirmed live via `Get-CimInstance Win32_Processor`/
+  `Win32_OperatingSystem`/`Win32_LogicalDisk` immediately before this
+  run - not assumed from a prior session's notes.
+- Runtime: llama.cpp b10948 (ggml-org/llama.cpp release, 2026-09-13),
+  `llama-b10948-bin-win-cpu-x64.zip`, downloaded fresh on the test
+  machine: 18,426,831 bytes, sha256
+  b6924454c00942f6c97e464fd1cc459e8c88fcc75cbf5b7fdb92ee2d6c7ced79
+  (no upstream SHA256SUMS is published for this release - confirmed via
+  the release page before this run - so this hash is this run's own
+  record, to become runtime.lock.json's pinned value once that file is
+  built).
+- Server flags: --host 127.0.0.1 --port 8811 --ctx-size 8192 --threads 4
+  --no-jinja, matching this project's established convention.
+- Models: downloaded fresh on the test machine, each verified against
+  its size_bytes/sha256 already recorded in models.json (all three
+  matched exactly, no re-download needed after the first fetch):
+    Small:    Qwen3.5-0.8B-Q4_K_M.gguf, 532,517,120 B
+    Balanced: Qwen3.5-2B-Q4_K_M.gguf,   1,280,835,840 B
+    Full:     Qwen3.5-4B-Q4_K_M.gguf,   2,740,937,888 B
+- Split: test, `-lang en`, `go run ./ai/eval/run` unmodified (no new
+  -mode/-guardrail/-spawn-server flags exist yet - those are still
+  planned library-extraction work, not built; this run used the
+  existing "start llama-server yourself, point -server at it" contract,
+  exactly as evidence 20/27 did).
+- The `test` split is 9 cases (of the corpus's 37 total, across
+  dev/train/test) - the number actually printed by every run below,
+  not a partial/aborted run.
+
+Orchestration
+-------------
+One PowerShell script (D:\netrewind-eval\run-eval.ps1 on the test
+machine, launched via a scheduled task with -LogonType Interactive so
+Omar could watch it live, matching his stated preference) downloaded and
+verified the runtime + all three models once, then for each profile in
+turn: started llama-server, waited for /health, sampled the server
+process's WorkingSet64 every 5 seconds into a file, ran the eval harness
+against the test split, then stopped the server before moving to the
+next profile - so no two profiles' servers were ever running
+concurrently, and each profile's RAM figure is that profile's alone.
+
+Results
+-------
+
+### Small (Qwen3.5-0.8B)
+
+    === summary: 9 cases, 3 produced valid schema JSON, 6 invalid/failed ===
+    pass (no hard violations): 1/3
+    top-1 cause hit: 0/3
+    top-3 cause hit: 0/3
+    correct refusals: 1
+    mean citation precision (non-empty citations): 0.00
+
+Peak RAM: 1.16 GB (budget 3 GB - within budget).
+
+**Gate criterion 1 (100% valid JSON) FAILS**: 6 of 9 cases produced no
+parseable JSON object at all. Inspecting the raw output
+(ai/eval/results/20260920T154425Z/results.json) shows a specific,
+reproducible failure mode, not random garbage: the model enters a
+repetition loop restating the same sentence ("The subject of E2 is a
+host named 10.99.0.11. The subject of E3 is a host named 10.99.0.12."
+repeated verbatim many times) and/or emits a runaway `next_checks` array
+that keeps counting up fabricated handles (E5, E6, E7, ... past E128)
+until the 700-token generation budget is exhausted before the JSON
+object can close. This is a genuine capability failure of an 0.8B model
+on this prompt/schema combination, not a harness or prompt bug - the
+same prompt and schema worked for the other two tiers below.
+
+Gate: **NOT MET.**
+
+### Balanced (Qwen3.5-2B)
+
+    === summary: 9 cases, 9 produced valid schema JSON, 0 invalid/failed ===
+    pass (no hard violations): 7/9
+    top-1 cause hit: 5/9
+    top-3 cause hit: 5/9
+    correct refusals: 0
+    mean citation precision (non-empty citations): 0.48
+
+Peak RAM: 2.18 GB (budget 5 GB - within budget).
+
+**Gate criterion 1 met** (100% valid JSON, zero parse errors) and
+**criterion 2 met** (no "handle not in the offered evidence set"
+violation in any case).
+
+**Gate criterion 3 (correct refusal on every gap/collector-down case)
+FAILS**: the test split's two refusal-expected cases both failed -
+`link_flap-negative-en` and `route_change-negative-en` each drew a
+confident hypothesis instead of refusing ("offered a confident
+hypothesis for a case where refusal was the correct answer"). 0 of 2
+correct refusals. This is exactly the failure mode ADR 0006's gate
+exists to catch: a model that looks capable on positive cases (5/9 top-1
+hits, reasonable citation precision) but does not recognize when the
+evidence is genuinely insufficient, which is more dangerous in practice
+than an honest "I don't know."
+
+Gate: **NOT MET** (criterion 3).
+
+### Full (Qwen3.5-4B)
+
+    === summary: 9 cases, 9 produced valid schema JSON, 0 invalid/failed ===
+    pass (no hard violations): 1/9
+    top-1 cause hit: 1/9
+    top-3 cause hit: 1/9
+    correct refusals: 0
+    mean citation precision (non-empty citations): 0.11
+
+Peak RAM: 4.66 GB (budget 8 GB - within budget).
+
+**Gate criterion 1 met** (100% valid JSON). **Gate criterion 3 FAILS**
+for the same reason as Balanced: both refusal-expected cases
+(link_flap, route_change) drew a confident hypothesis instead of
+refusing.
+
+**Unplanned finding, reported rather than hidden**: this tier's overall
+accuracy (1/9 pass, 1/9 top-1, 0.11 mean citation precision) was
+*worse* than Balanced's (7/9 pass, 5/9 top-1, 0.48) on the identical
+nine cases, despite being twice the parameter count. Four of the five
+`positive`-kind cases that Balanced answered correctly
+(default_route_lost ×2, path_broke ×2) came back from Full with "no
+hypothesis offered for a case that has a real, findable cause" - Full
+refused to commit to a hypothesis where one was actually available, the
+mirror-image mistake of the refusal failures above. Not investigated
+further here (a prompt-tuning question, out of scope for a gate run
+whose whole point is to grade the current prompt as shipped, not to
+retune it against the held-out split); recorded honestly as a real,
+reproducible result rather than assumed to be a fluke.
+
+Gate: **NOT MET** (criterion 3; also the weakest overall result of the
+three tiers on this split).
+
+Disposition
+-----------
+All three tiers fail their pre-registered gate. Per ADR 0006 / execution
+order §4.10 ("partial success is not close enough - it is a failing
+run, reported as failing"), none of the three earns `gate.passed: true`.
+`internal/aimodel/models.json` updated: each entry's `gate.evidence`
+field now names this log and its specific failing criterion (previously
+empty placeholders); `gate.passed` stays `false` for all three, which it
+already was. Re-signed with the release key
+(pubkey L3Q7cNQWNu50IjcKdJpCHTZXvwdk+qg3aN8c98UmZn8=, unchanged from
+before - `internal/aimodel/embedded.go`'s `EmbeddedManifestPublicKey`
+needs no update). `AI_FEATURE_ENABLED` stays `false` - no candidate
+justifies flipping it. Model downloading/removal in Settings remains
+available regardless (an explicit, separate product decision from
+before this run - downloading a model file runs no inference and
+produces no analysis).
+
+Full regression after the manifest edit: `gofmt -l internal/aimodel
+cmd/netrewind` clean, `go vet ./...` clean, `CGO_ENABLED=0 go test
+./internal/aimodel/... ./cmd/netrewind/...` both green.
+
+Not done in this run (explicitly out of scope, per the pre-registration)
+- The Small tier's original low-power/arm64 hardware gate - this run
+  used the same x86_64 machine as the other two tiers, so it answers
+  "does this model work correctly and fit its RAM budget on x86_64," not
+  the Small tier's original hardware promise. Still pending real arm64
+  hardware.
+- dev/train splits - not run; they would not change this gate's answer
+  even if they had been.
+- WSL2/Ubuntu timing - not reached in this run (Windows CPU results
+  alone already answered the gate question for all three tiers); left
+  for a future run if a Linux-specific number is ever needed.
+
+Clean-up
+--------
+The scheduled task (`NetRewindAIEval`) used to run this on the test
+machine, with -LogonType Interactive, was removed after this run
+completed. The downloaded runtime/model files under D:\netrewind-eval
+on the test machine were left in place rather than deleted, in case a
+follow-up run wants to reuse them without a second multi-gigabyte
+download; nothing was installed under C:\Users\omarm, %ProgramData%, or
+as a Windows service, and no `apt` packages were touched.

@@ -15,7 +15,7 @@
       "min_ram_available_bytes": 1073741824,
       "recommended_ctx": 8192,
       "runtime_min_build": "b10948",
-      "gate": { "passed": false, "evidence": "" }
+      "gate": { "passed": false, "evidence": "docs/evidence/54-ai-eval-three-tier-gate-run.log: FAILED criterion 1 (100% valid JSON) - 6/9 test-split cases produced no complete JSON object, the model looping on repetitive phrases and a runaway next_checks list until the token budget ran out before the object could close." }
     },
     {
       "profile": "balanced",
@@ -31,7 +31,7 @@
       "min_ram_available_bytes": 2147483648,
       "recommended_ctx": 8192,
       "runtime_min_build": "b10948",
-      "gate": { "passed": false, "evidence": "" }
+      "gate": { "passed": false, "evidence": "docs/evidence/54-ai-eval-three-tier-gate-run.log: FAILED criterion 3 (correct refusal on every gap/collector-down case) - both refusal-expected cases in the test split (link_flap, route_change) got a confident hypothesis instead of a refusal." }
     },
     {
       "profile": "full",
@@ -47,7 +47,7 @@
       "min_ram_available_bytes": 4294967296,
       "recommended_ctx": 8192,
       "runtime_min_build": "b10948",
-      "gate": { "passed": false, "evidence": "" }
+      "gate": { "passed": false, "evidence": "docs/evidence/54-ai-eval-three-tier-gate-run.log: FAILED criterion 3 (correct refusal on every gap/collector-down case) - both refusal-expected cases in the test split (link_flap, route_change) got a confident hypothesis instead of a refusal; also the weakest overall accuracy of the three tiers on this run (1/9 pass, 1/9 top-1) despite being the largest model." }
     }
   ]
 }
