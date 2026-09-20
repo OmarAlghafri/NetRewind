@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/OmarAlghafri/netrewind/internal/ai"
 	"github.com/OmarAlghafri/netrewind/internal/incident"
+	"github.com/OmarAlghafri/netrewind/internal/redact"
 	"github.com/OmarAlghafri/netrewind/internal/registry"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +24,7 @@ func newAICmd() *cobra.Command {
 			"already read the local record over the read-only API. That is what lets\n" +
 			"the same request be replayed byte-for-byte by the evaluation gate.",
 	}
-	cmd.AddCommand(newAIAnalyzeCmd(), newAIModelCmd())
+	cmd.AddCommand(newAIAnalyzeCmd(), newAIModelCmd(), newAIReportCmd())
 	return cmd
 }
 
@@ -172,6 +174,31 @@ func newAIAnalyzeCmd() *cobra.Command {
 		},
 	}
 	return cmd
+}
+
+// newAIReportCmd redacts a report the desktop panel composed client-side
+// (engine facts + operator notes + local-model text, concatenated into one
+// document before it ever reaches this command) - the one place that text
+// leaves the local-inference boundary (a clipboard). A single Redactor
+// over the whole document (not one per section) is what keeps the same
+// address getting the same <HOST_N>/<MAC_N> placeholder everywhere it
+// appears, so relationships between sections stay legible - see
+// internal/redact.Redactor's own doc comment. Plain text in, plain text
+// out: unlike `analyze`, there is no JSON contract and no failure mode
+// beyond a stdin read error, so this never needs aiExitError.
+func newAIReportCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "report",
+		Short: "Redact a locally-composed report before it leaves the device (text on stdin, text on stdout)",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			text, err := io.ReadAll(cmd.InOrStdin())
+			if err != nil {
+				return fmt.Errorf("reading stdin: %w", err)
+			}
+			_, err = safeOut(cmd).Write([]byte(redact.String(string(text))))
+			return err
+		},
+	}
 }
 
 // aiExitError carries a specific process exit code through cobra's error

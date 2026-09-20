@@ -52,6 +52,20 @@ pub async fn spawn_analyze(
     run_with_stdin(cli_path, &["ai", "analyze"], stdin_json, timeout).await
 }
 
+/// Runs `netrewind ai report` - a pure text transform (internal/redact)
+/// with no model call and no sidecar involved, unlike spawn_analyze. Used
+/// to redact a report composed client-side (engine facts + operator notes
+/// + model text) before it ever reaches the clipboard, so this one
+/// redaction implementation is shared with the debug-prompt-log and
+/// persisted-thread paths instead of a second copy living in Rust.
+pub async fn spawn_report(
+    cli_path: &Path,
+    text: &str,
+    timeout: Duration,
+) -> Result<CliOutput, String> {
+    run_with_stdin(cli_path, &["ai", "report"], text, timeout).await
+}
+
 /// The actual spawn/write-stdin/read/timeout/kill-on-drop mechanism,
 /// generic over the command and its arguments so a test can exercise it
 /// against a process built specifically to hang - the "cancel mid-
@@ -257,6 +271,34 @@ mod tests {
         assert!(
             result.stdout.contains("\"verdict\""),
             "stdout does not look like the analyze response: {}",
+            result.stdout
+        );
+        let _ = std::fs::remove_file(&cli);
+    }
+
+    #[tokio::test]
+    async fn spawn_report_runs_the_real_cli_and_redacts_a_private_address() {
+        let Some(cli) = build_real_netrewind_cli().await else {
+            eprintln!("skipping: `go` not available to build the real netrewind CLI for this test");
+            return;
+        };
+
+        let result = spawn_report(
+            &cli,
+            "gateway at 10.99.0.1 changed hands",
+            Duration::from_secs(10),
+        )
+        .await
+        .unwrap();
+        assert_eq!(result.exit_code, 0, "stderr: {}", result.stderr);
+        assert!(
+            !result.stdout.contains("10.99.0.1"),
+            "stdout still contains the real address: {}",
+            result.stdout
+        );
+        assert!(
+            result.stdout.contains("<HOST_1>"),
+            "stdout does not contain the expected placeholder: {}",
             result.stdout
         );
         let _ = std::fs::remove_file(&cli);

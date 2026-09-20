@@ -518,6 +518,32 @@ async fn ai_analyze(
     Ok(output.stdout)
 }
 
+/// Redacts a report the panel composed client-side (engine facts +
+/// operator notes + local-model text, already concatenated into one
+/// document by the caller) before it reaches the clipboard - the one
+/// place this text leaves the device. No sidecar involved: this is a pure
+/// text transform (`netrewind ai report`, internal/redact), so unlike
+/// `ai_analyze` it needs only the staged CLI, never a running model.
+#[tauri::command]
+async fn ai_report_redact(app: tauri::AppHandle, text: String) -> Result<String, String> {
+    use tauri::Manager;
+
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("{}: {e}", ai::codes::CLI_MISSING))?;
+    let cli_path =
+        ai::cli::locate_cli(&resource_dir).ok_or_else(|| ai::codes::CLI_MISSING.to_string())?;
+
+    let output = ai::cli::spawn_report(&cli_path, &text, Duration::from_secs(30))
+        .await
+        .map_err(|e| format!("{}: {e}", ai::codes::CLI_FAILED))?;
+    if output.exit_code != 0 {
+        return Err(format!("{}: {}", ai::codes::CLI_FAILED, output.stderr));
+    }
+    Ok(output.stdout)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -536,7 +562,8 @@ pub fn run() {
             ai_status,
             ai_runtime_start,
             ai_runtime_stop,
-            ai_analyze
+            ai_analyze,
+            ai_report_redact
         ])
         .run(tauri::generate_context!())
         .expect("error while running the NetRewind desktop application");
