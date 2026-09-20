@@ -3,7 +3,7 @@ import { messageFor, type AiErrorPayload } from "./aiStatusCatalogue";
 
 // The exact set of codes desktop/src-tauri/src/ai/codes.rs's ALL currently
 // lists - kept in sync by hand with that file's own count-pinned test
-// (all_codes_have_no_duplicates_and_match_the_expected_count, asserting 26).
+// (all_codes_have_no_duplicates_and_match_the_expected_count, asserting 27).
 // A code added on one side and not the other fails one of these two tests.
 const EXPECTED_CODES = [
   "runtime_missing",
@@ -32,6 +32,7 @@ const EXPECTED_CODES = [
   "analysis_invalid",
   "notes_need_recorder",
   "notes_write_failed",
+  "feature_disabled",
 ];
 
 function errorOf(code: string, message = `<message for ${code}>`): AiErrorPayload {
@@ -39,8 +40,8 @@ function errorOf(code: string, message = `<message for ${code}>`): AiErrorPayloa
 }
 
 describe("aiStatusCatalogue completeness against the codes codes.rs actually produces", () => {
-  it("has exactly 26 expected codes (matching codes.rs's own pinned count)", () => {
-    expect(EXPECTED_CODES.length).toBe(26);
+  it("has exactly 27 expected codes (matching codes.rs's own pinned count)", () => {
+    expect(EXPECTED_CODES.length).toBe(27);
   });
 
   it("has no duplicate expected codes", () => {

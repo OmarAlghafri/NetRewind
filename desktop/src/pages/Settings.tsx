@@ -4,6 +4,7 @@ import { Button } from "../components/Button";
 import { TechnicalValue } from "../components/TechnicalValue";
 import type { SourceKind, SourceSettings } from "../data/source";
 import type { AiProfile, AiSettings } from "../data/aiSettings";
+import { AI_FEATURE_ENABLED } from "../data/aiFeature";
 import { agentDefaultEndpoint, agentGet, isTauri } from "../data/tauri";
 import type { Health } from "../data/types";
 
@@ -197,73 +198,75 @@ export function Settings({
         )}
       </div>
 
-      <div className="card">
-        <strong>{t("settings_ai_title")}</strong>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.88rem" }}>{t("settings_ai_body")}</p>
-        <label className="field-check" style={{ marginTop: 8 }}>
-          <input
-            type="checkbox"
-            checked={draft.ai.enabled}
-            onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, enabled: e.target.checked } })}
-          />
-          {t("settings_ai_enable_label")}
-        </label>
+      {AI_FEATURE_ENABLED && (
+        <div className="card">
+          <strong>{t("settings_ai_title")}</strong>
+          <p style={{ color: "var(--text-muted)", fontSize: "0.88rem" }}>{t("settings_ai_body")}</p>
+          <label className="field-check" style={{ marginTop: 8 }}>
+            <input
+              type="checkbox"
+              checked={draft.ai.enabled}
+              onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, enabled: e.target.checked } })}
+            />
+            {t("settings_ai_enable_label")}
+          </label>
 
-        {draft.ai.enabled && (
-          <>
-            <label className="field-label">
-              {t("settings_ai_profile_label")}
-              <select
-                className="field-input"
-                value={draft.ai.profile}
-                onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, profile: e.target.value as AiProfile } })}
-              >
-                <option value="small">{t("settings_ai_profile_small")}</option>
-                <option value="balanced">{t("settings_ai_profile_balanced")}</option>
-                <option value="full">{t("settings_ai_profile_full")}</option>
-              </select>
-            </label>
-            <label className="field-label">
-              {t("settings_ai_model_file_label")}
-              <input
-                className="field-input ltr-field"
-                dir="ltr"
-                value={draft.ai.modelFileName}
-                onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, modelFileName: e.target.value } })}
-              />
-            </label>
-            <p className="wizard-step-note">{t("settings_ai_model_file_hint")}</p>
-            <label className="field-label">
-              {t("settings_ai_threads_label")}
-              <input
-                className="field-input ltr-field"
-                dir="ltr"
-                type="number"
-                min={0}
-                max={64}
-                value={draft.ai.threads}
-                onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, threads: Number(e.target.value) } })}
-              />
-            </label>
-            <label className="field-check">
-              <input
-                type="checkbox"
-                checked={draft.ai.historyOptIn}
-                onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, historyOptIn: e.target.checked } })}
-              />
-              {t("settings_ai_history_opt_in_label")}
-            </label>
-            <label className="field-check">
-              <input
-                type="checkbox"
-                checked={draft.ai.debugSavePrompts}
-                onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, debugSavePrompts: e.target.checked } })}
-              />
-              {t("settings_ai_debug_prompts_label")}
-            </label>
-          </>
-        )}
-      </div>
+          {draft.ai.enabled && (
+            <>
+              <label className="field-label">
+                {t("settings_ai_profile_label")}
+                <select
+                  className="field-input"
+                  value={draft.ai.profile}
+                  onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, profile: e.target.value as AiProfile } })}
+                >
+                  <option value="small">{t("settings_ai_profile_small")}</option>
+                  <option value="balanced">{t("settings_ai_profile_balanced")}</option>
+                  <option value="full">{t("settings_ai_profile_full")}</option>
+                </select>
+              </label>
+              <label className="field-label">
+                {t("settings_ai_model_file_label")}
+                <input
+                  className="field-input ltr-field"
+                  dir="ltr"
+                  value={draft.ai.modelFileName}
+                  onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, modelFileName: e.target.value } })}
+                />
+              </label>
+              <p className="wizard-step-note">{t("settings_ai_model_file_hint")}</p>
+              <label className="field-label">
+                {t("settings_ai_threads_label")}
+                <input
+                  className="field-input ltr-field"
+                  dir="ltr"
+                  type="number"
+                  min={0}
+                  max={64}
+                  value={draft.ai.threads}
+                  onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, threads: Number(e.target.value) } })}
+                />
+              </label>
+              <label className="field-check">
+                <input
+                  type="checkbox"
+                  checked={draft.ai.historyOptIn}
+                  onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, historyOptIn: e.target.checked } })}
+                />
+                {t("settings_ai_history_opt_in_label")}
+              </label>
+              <label className="field-check">
+                <input
+                  type="checkbox"
+                  checked={draft.ai.debugSavePrompts}
+                  onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, debugSavePrompts: e.target.checked } })}
+                />
+                {t("settings_ai_debug_prompts_label")}
+              </label>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <strong>{t("settings_wizard_title")}</strong>

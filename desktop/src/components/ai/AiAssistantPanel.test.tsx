@@ -7,6 +7,11 @@ import { DEFAULT_SETTINGS } from "../../data/source";
 import { AiAssistantPanel } from "./AiAssistantPanel";
 import type { Incident, NetRewindEvent } from "../../types";
 
+// This whole file exercises the panel once past the compile-time feature
+// gate - see AiAssistantPanel.featureGate.test.tsx for the (unmocked)
+// proof that it renders "not available" while the real flag stays off.
+vi.mock("../../data/aiFeature", () => ({ AI_FEATURE_ENABLED: true }));
+
 type Invoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
 
 function installShell(invoke: Invoke) {

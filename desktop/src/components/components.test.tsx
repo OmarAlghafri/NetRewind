@@ -9,6 +9,12 @@ import { DEFAULT_AI_SETTINGS } from "../data/aiSettings";
 import type { Record } from "../data/useRecord";
 import type { Capability } from "../data/types";
 
+// The "Settings: local AI assistant card" describe block below exercises
+// what the card renders once past the compile-time feature gate - a
+// companion, unmocked test proves the card is hidden entirely against the
+// real flag in Settings.featureGate.test.tsx.
+vi.mock("../data/aiFeature", () => ({ AI_FEATURE_ENABLED: true }));
+
 function english<T>(ui: React.ReactElement<T>) {
   window.localStorage.setItem("netrewind.lang", "en");
   return render(<LanguageProvider>{ui}</LanguageProvider>);

@@ -6,8 +6,10 @@ import type { AiAnalyzeResponse } from "./aiTypes";
 import { AiCommandError, aiAnalyze, aiRuntimeStart } from "./ai";
 import { isTauri } from "./tauri";
 import { useAiSession } from "./aiSession";
+import { AI_FEATURE_ENABLED } from "./aiFeature";
 
 export type AiPanelState =
+  | "not_available"
   | "shell_required"
   | "disabled"
   | "not_configured"
@@ -90,6 +92,13 @@ export function useAiAssistant(
     // analyze() call tried (and failed) to start a second one.
   }, [session, incident, events, history, lang, settings.modelFileName, settings.threads]);
 
+  // Checked before isTauri() and every other state: while the compile-time
+  // gate is off, nothing else about this hook's state matters - not even
+  // whether the shell is reachable, since there would be nothing to reach
+  // for regardless.
+  if (!AI_FEATURE_ENABLED) {
+    return { state: "not_available", analyze };
+  }
   if (!isTauri()) {
     return { state: "shell_required", analyze };
   }

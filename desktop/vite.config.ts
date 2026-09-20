@@ -10,6 +10,11 @@ export default defineConfig(() => ({
   plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? "dev"),
+    // The compile-time gate ADR 0006 describes: `false` until a model
+    // profile actually passes its pre-registered evaluation gate. Not an
+    // env var a build script could accidentally leave on - flipped in
+    // this one literal, same as desktop-tauri's ai::AI_FEATURE_ENABLED.
+    __AI_FEATURE_ENABLED__: JSON.stringify(false),
   },
   test: {
     environment: "jsdom",

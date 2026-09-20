@@ -6,6 +6,12 @@ import { DEFAULT_AI_SETTINGS, writeAiSettings } from "../data/aiSettings";
 import { Incidents, contextForIncidentExport, filterAndSortIncidents, selectAiEvents, selectAiHistory } from "./Incidents";
 import type { Incident, NetRewindEvent } from "../types";
 
+// The local-AI panel tests below exercise Incidents.tsx's own events/
+// selection gating, not the separate compile-time feature gate (that has
+// its own coverage in AiAssistantPanel.featureGate.test.tsx) - mocked on
+// so this file's "shows the panel" test is not incidentally hidden by it.
+vi.mock("../data/aiFeature", () => ({ AI_FEATURE_ENABLED: true }));
+
 // Every page eventually sits under both providers in App.tsx - matched
 // here so a test rendering something that transitively uses
 // useAiSession() (AiAssistantPanel, reached only when `events` is passed

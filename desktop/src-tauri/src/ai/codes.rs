@@ -62,6 +62,8 @@ pub const ANALYSIS_INVALID: &str = "analysis_invalid";
 pub const NOTES_NEED_RECORDER: &str = "notes_need_recorder";
 #[allow(dead_code)]
 pub const NOTES_WRITE_FAILED: &str = "notes_write_failed";
+#[allow(dead_code)]
+pub const FEATURE_DISABLED: &str = "feature_disabled";
 
 #[allow(dead_code)] // read only by this module's own tests until lib.rs wires a use for it
 pub const ALL: &[&str] = &[
@@ -91,6 +93,7 @@ pub const ALL: &[&str] = &[
     ANALYSIS_INVALID,
     NOTES_NEED_RECORDER,
     NOTES_WRITE_FAILED,
+    FEATURE_DISABLED,
 ];
 
 #[cfg(test)]
@@ -113,7 +116,7 @@ mod tests {
         // aiStatusCatalogue.test.ts's own EXPECTED_CODES list too.
         assert_eq!(
             ALL.len(),
-            26,
+            27,
             "a code was added or removed - update aiStatusCatalogue.test.ts too"
         );
     }

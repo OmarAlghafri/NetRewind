@@ -1,10 +1,18 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { AiSessionProvider } from "./aiSession";
 import { DEFAULT_AI_SETTINGS, type AiSettings } from "./aiSettings";
 import { useAiAssistant } from "./useAiAssistant";
 import type { Incident, NetRewindEvent } from "../types";
+
+// This whole suite exercises the states behind the compile-time feature
+// gate (shell_required, disabled, not_configured, the analyze flow) - real
+// states this hook can reach once AI_FEATURE_ENABLED is true, which it
+// is not by default. See useAiAssistant.featureGate.test.tsx for the
+// (unmocked) proof that the real, currently-false flag reports
+// "not_available" before any of these other checks even run.
+vi.mock("./aiFeature", () => ({ AI_FEATURE_ENABLED: true }));
 
 type Invoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
 

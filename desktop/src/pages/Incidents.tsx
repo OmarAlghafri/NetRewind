@@ -8,6 +8,7 @@ import { InspectorPanel } from "../components/InspectorPanel";
 import { SeverityBadge } from "../components/SeverityBadge";
 import { TechnicalValue } from "../components/TechnicalValue";
 import { AiAssistantPanel } from "../components/ai/AiAssistantPanel";
+import { AI_FEATURE_ENABLED } from "../data/aiFeature";
 import { findRule, titleFor } from "../i18n/rulesCatalogue";
 import { formatTime } from "../i18n/format";
 import { labelForFamily } from "../i18n/kindCatalogue";
@@ -296,7 +297,7 @@ export function Incidents({
           </div>
           <InspectorPanel title={titleFor(findRule(selected.rule_id, rules), lang, selected.title)} onClose={() => select(undefined)}>
             <IncidentCard incident={selected} rules={rules} onExport={onExport} />
-            {events.length > 0 && (
+            {AI_FEATURE_ENABLED && events.length > 0 && (
               <AiAssistantPanel
                 incident={selected}
                 events={selectAiEvents(selected, events)}

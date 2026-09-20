@@ -11,6 +11,7 @@ import { dict } from "../i18n/translations";
 import type { SourceSettings } from "../data/source";
 import type { Record } from "../data/useRecord";
 import type { AiSettings } from "../data/aiSettings";
+import { AI_FEATURE_ENABLED } from "../data/aiFeature";
 import { useAiSession } from "../data/aiSession";
 import { isTauri } from "../data/tauri";
 import { getNotesStats, type NotesStats } from "../data/notes";
@@ -106,7 +107,7 @@ export function Diagnostics({
   // same "notes_need_recorder" boundary the plan draws for the assistant
   // panel itself, not a new rule invented for this page.
   useEffect(() => {
-    if (!isTauri() || settings.kind !== "live") {
+    if (!AI_FEATURE_ENABLED || !isTauri() || settings.kind !== "live") {
       setNotesStats("unavailable");
       return;
     }
@@ -258,70 +259,74 @@ export function Diagnostics({
         )}
       </div>
 
-      <div className="card">
-        <strong>{t("diagnostics_ai_title")}</strong>
-        <div className="capability-row">
-          <span>{t("diagnostics_ai_enabled_label")}</span>
-          <span>{t(aiSettings.enabled ? "diagnostics_ai_status_enabled" : "diagnostics_ai_status_disabled")}</span>
-        </div>
-        {aiSettings.enabled && (
-          <>
+      {AI_FEATURE_ENABLED && (
+        <>
+          <div className="card">
+            <strong>{t("diagnostics_ai_title")}</strong>
             <div className="capability-row">
-              <span>{t("diagnostics_ai_profile_label")}</span>
-              <span>
-                {t(
-                  aiSettings.profile === "small"
-                    ? "settings_ai_profile_small"
-                    : aiSettings.profile === "full"
-                      ? "settings_ai_profile_full"
-                      : "settings_ai_profile_balanced",
-                )}
-              </span>
+              <span>{t("diagnostics_ai_enabled_label")}</span>
+              <span>{t(aiSettings.enabled ? "diagnostics_ai_status_enabled" : "diagnostics_ai_status_disabled")}</span>
             </div>
-            <div className="capability-row">
-              <span>{t("diagnostics_ai_model_file_label")}</span>
-              <span className="ltr-field">
-                {aiSettings.modelFileName ? <TechnicalValue>{aiSettings.modelFileName}</TechnicalValue> : t("diagnostics_ai_model_file_not_set")}
-              </span>
-            </div>
-            <div className="capability-row">
-              <span>{t("diagnostics_ai_runtime_label")}</span>
-              <span>{t(aiSession.runtimeStatus?.running ? "diagnostics_ai_runtime_running" : "diagnostics_ai_runtime_stopped")}</span>
-            </div>
-            <div className="capability-row">
-              <span>{t("diagnostics_ai_threads_label")}</span>
-              <span className="ltr-field">{aiSettings.threads > 0 ? aiSettings.threads : t("diagnostics_ai_threads_auto")}</span>
-            </div>
-            <div className="capability-row" style={{ borderBottom: "none" }}>
-              <span>{t("diagnostics_ai_history_opt_in_label")}</span>
-              <span>{t(aiSettings.historyOptIn ? "diagnostics_ai_status_enabled" : "diagnostics_ai_status_disabled")}</span>
-            </div>
-          </>
-        )}
-      </div>
+            {aiSettings.enabled && (
+              <>
+                <div className="capability-row">
+                  <span>{t("diagnostics_ai_profile_label")}</span>
+                  <span>
+                    {t(
+                      aiSettings.profile === "small"
+                        ? "settings_ai_profile_small"
+                        : aiSettings.profile === "full"
+                          ? "settings_ai_profile_full"
+                          : "settings_ai_profile_balanced",
+                    )}
+                  </span>
+                </div>
+                <div className="capability-row">
+                  <span>{t("diagnostics_ai_model_file_label")}</span>
+                  <span className="ltr-field">
+                    {aiSettings.modelFileName ? <TechnicalValue>{aiSettings.modelFileName}</TechnicalValue> : t("diagnostics_ai_model_file_not_set")}
+                  </span>
+                </div>
+                <div className="capability-row">
+                  <span>{t("diagnostics_ai_runtime_label")}</span>
+                  <span>{t(aiSession.runtimeStatus?.running ? "diagnostics_ai_runtime_running" : "diagnostics_ai_runtime_stopped")}</span>
+                </div>
+                <div className="capability-row">
+                  <span>{t("diagnostics_ai_threads_label")}</span>
+                  <span className="ltr-field">{aiSettings.threads > 0 ? aiSettings.threads : t("diagnostics_ai_threads_auto")}</span>
+                </div>
+                <div className="capability-row" style={{ borderBottom: "none" }}>
+                  <span>{t("diagnostics_ai_history_opt_in_label")}</span>
+                  <span>{t(aiSettings.historyOptIn ? "diagnostics_ai_status_enabled" : "diagnostics_ai_status_disabled")}</span>
+                </div>
+              </>
+            )}
+          </div>
 
-      <div className="card">
-        <strong>{t("diagnostics_ai_notes_title")}</strong>
-        {notesStats === null && <div className="empty-state">{t("status_loading")}</div>}
-        {notesStats === "unavailable" && <div className="empty-state">{t("diagnostics_ai_notes_unavailable")}</div>}
-        {notesStats === "error" && <div className="inline-error">{t("diagnostics_ai_notes_error")}</div>}
-        {notesStats !== null && notesStats !== "unavailable" && notesStats !== "error" && (
-          <>
-            <div className="capability-row">
-              <span>{t("diagnostics_ai_notes_annotations_label")}</span>
-              <span className="ltr-field">{formatCount(notesStats.annotations, lang)}</span>
-            </div>
-            <div className="capability-row">
-              <span>{t("diagnostics_ai_notes_feedback_label")}</span>
-              <span className="ltr-field">{formatCount(notesStats.feedback, lang)}</span>
-            </div>
-            <div className="capability-row" style={{ borderBottom: "none" }}>
-              <span>{t("diagnostics_ai_notes_threads_label")}</span>
-              <span className="ltr-field">{formatCount(notesStats.threads, lang)}</span>
-            </div>
-          </>
-        )}
-      </div>
+          <div className="card">
+            <strong>{t("diagnostics_ai_notes_title")}</strong>
+            {notesStats === null && <div className="empty-state">{t("status_loading")}</div>}
+            {notesStats === "unavailable" && <div className="empty-state">{t("diagnostics_ai_notes_unavailable")}</div>}
+            {notesStats === "error" && <div className="inline-error">{t("diagnostics_ai_notes_error")}</div>}
+            {notesStats !== null && notesStats !== "unavailable" && notesStats !== "error" && (
+              <>
+                <div className="capability-row">
+                  <span>{t("diagnostics_ai_notes_annotations_label")}</span>
+                  <span className="ltr-field">{formatCount(notesStats.annotations, lang)}</span>
+                </div>
+                <div className="capability-row">
+                  <span>{t("diagnostics_ai_notes_feedback_label")}</span>
+                  <span className="ltr-field">{formatCount(notesStats.feedback, lang)}</span>
+                </div>
+                <div className="capability-row" style={{ borderBottom: "none" }}>
+                  <span>{t("diagnostics_ai_notes_threads_label")}</span>
+                  <span className="ltr-field">{formatCount(notesStats.threads, lang)}</span>
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
 
       <div className="card">
         <strong>{t("diagnostics_support_summary_title")}</strong>

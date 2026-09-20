@@ -387,6 +387,8 @@ async fn ai_runtime_start(
 ) -> Result<AiStatusResponse, String> {
     use tauri::Manager;
 
+    ai::require_enabled()?;
+
     let resource_dir = app
         .path()
         .resource_dir()
@@ -488,6 +490,8 @@ async fn ai_analyze(
 ) -> Result<String, String> {
     use tauri::Manager;
 
+    ai::require_enabled()?;
+
     let (port, token) = {
         let guard = state.sidecar.lock().await;
         let sidecar = guard
@@ -527,6 +531,8 @@ async fn ai_analyze(
 #[tauri::command]
 async fn ai_report_redact(app: tauri::AppHandle, text: String) -> Result<String, String> {
     use tauri::Manager;
+
+    ai::require_enabled()?;
 
     let resource_dir = app
         .path()

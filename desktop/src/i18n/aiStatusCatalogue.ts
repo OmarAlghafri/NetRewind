@@ -21,7 +21,7 @@ interface Template {
 /**
  * Every code in ai::codes::ALL must have an entry here -
  * aiStatusCatalogue.test.ts checks this list against the same literal set
- * of 26 codes a Rust-side test in codes.rs pins by count, the same
+ * of 27 codes a Rust-side test in codes.rs pins by count, the same
  * hand-kept-in-sync guarantee agentErrorCatalogue.ts already relies on.
  */
 const TEMPLATES: Record<string, Template> = {
@@ -128,6 +128,10 @@ const TEMPLATES: Record<string, Template> = {
   notes_write_failed: {
     en: "Saving this note failed.",
     ar: "فشل حفظ هذه الملاحظة.",
+  },
+  feature_disabled: {
+    en: "This feature is not available yet in this build.",
+    ar: "هذه الميزة غير متاحة بعد في هذا الإصدار.",
   },
 };
 

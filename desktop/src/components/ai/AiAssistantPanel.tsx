@@ -133,6 +133,8 @@ function AiAssistantBody({
   t: TFn;
 }) {
   switch (assistant.state) {
+    case "not_available":
+      return <p className="ai-panel-message">{t("ai_panel_not_available")}</p>;
     case "shell_required":
       return <p className="ai-panel-message">{t("ai_panel_shell_required")}</p>;
     case "disabled":

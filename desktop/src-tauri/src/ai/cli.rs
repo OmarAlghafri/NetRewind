@@ -179,11 +179,20 @@ mod tests {
         let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join("..");
+        // A unique name per call, not a shared "netrewind-cli-test.exe" -
+        // this test suite runs with multiple threads by default, and two
+        // tests building and then spawning/removing the same path at the
+        // same time raced each other (one test's cleanup deleting the
+        // binary a second test was mid-spawn against) until this was
+        // fixed.
         let out = repo_root
             .join("desktop")
             .join("src-tauri")
             .join("target")
-            .join("netrewind-cli-test.exe");
+            .join(format!(
+                "netrewind-cli-test-{}.exe",
+                super::super::runtime::generate_token()
+            ));
         let status = tokio::process::Command::new("go")
             .args(["build", "-o"])
             .arg(&out)
