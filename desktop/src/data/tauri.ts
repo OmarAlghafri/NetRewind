@@ -74,7 +74,10 @@ export function isTauri(): boolean {
   return tauriInternals() !== null;
 }
 
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+/** Exported so other data-layer modules (data/ai.ts) can call an
+ *  arbitrary Tauri command with this same "not running inside the shell"
+ *  guard, instead of duplicating tauriInternals()'s detection logic. */
+export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const internals = tauriInternals();
   if (!internals) throw new Error("not running inside the NetRewind desktop shell");
   return internals.invoke<T>(cmd, args);
