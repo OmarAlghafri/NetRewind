@@ -1,0 +1,20 @@
+{
+  "arp_change": "train",
+  "blind_gap": "train",
+  "collector_down": "dev",
+  "default_route_lost": "test",
+  "default_route_moved": "train",
+  "duplicate_ip": "train",
+  "gateway_hijack": "dev",
+  "link_flap": "test",
+  "malicious_dns_name": "train",
+  "measured_loss": "train",
+  "normal_traffic": "dev",
+  "path_broke": "test",
+  "policy_broke_a_path": "train",
+  "resolver_change": "train",
+  "rogue_dhcp": "dev",
+  "route_change": "test",
+  "service_unreachable": "train",
+  "simultaneous_faults": "train"
+}

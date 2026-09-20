@@ -401,6 +401,18 @@ func write(path string, v any) {
 // cases from the same scenario to different splits - splitting within a
 // scenario would leak its own event IDs (and therefore the answer) between
 // the set used to tune a prompt and the set used to score it honestly.
+//
+// The bucket a scenario lands in is pinned, in the sibling split_pins.json,
+// the first time that scenario is ever seen (execution order §4.10 / the
+// 1.2.0 plan's "split pins before freezing the test split" requirement).
+// Without pinning, adding scenario "aardvark_flap" tomorrow would shift
+// every alphabetically-later scenario's index by one and silently move it
+// to a different bucket - quietly leaking a case that used to be held-out
+// test data into train, or vice versa. Only a genuinely new (never-pinned)
+// scenario gets assigned a bucket, chosen deterministically among just the
+// other new scenarios in this same run - so one addition can reshuffle at
+// most the other scenarios added alongside it, never anything already
+// pinned.
 func writeSplits(path string, scenarioIDs map[string][]string) {
 	var scenarios []string
 	for s := range scenarioIDs {
@@ -408,8 +420,15 @@ func writeSplits(path string, scenarioIDs map[string][]string) {
 	}
 	sort.Strings(scenarios) // deterministic assignment, not random - reproducible across regenerations
 
-	splits := map[string][]string{"train": {}, "dev": {}, "test": {}}
-	for i, s := range scenarios {
+	pinsPath := filepath.Join(filepath.Dir(path), "split_pins.json")
+	pins := loadSplitPins(pinsPath)
+	var unpinned []string
+	for _, s := range scenarios {
+		if _, ok := pins[s]; !ok {
+			unpinned = append(unpinned, s)
+		}
+	}
+	for i, s := range unpinned {
 		bucket := "train"
 		switch i % 4 {
 		case 2:
@@ -417,6 +436,13 @@ func writeSplits(path string, scenarioIDs map[string][]string) {
 		case 3:
 			bucket = "test"
 		}
+		pins[s] = bucket
+	}
+	write(pinsPath, pins)
+
+	splits := map[string][]string{"train": {}, "dev": {}, "test": {}}
+	for _, s := range scenarios {
+		bucket := pins[s]
 		for _, id := range scenarioIDs[s] {
 			if alwaysTestCaseIDs[id] {
 				// Held out regardless of this scenario's own bucket - see
@@ -428,6 +454,21 @@ func writeSplits(path string, scenarioIDs map[string][]string) {
 		}
 	}
 	write(path, splits)
+}
+
+// loadSplitPins reads the checked-in scenario->bucket pin file, or returns
+// an empty map when it does not exist yet (the very first generation run,
+// which then bootstraps it from scratch).
+func loadSplitPins(path string) map[string]string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return map[string]string{}
+	}
+	var pins map[string]string
+	if err := json.Unmarshal(data, &pins); err != nil {
+		fatal(err)
+	}
+	return pins
 }
 
 func repoRoot() string {
