@@ -97,6 +97,19 @@ export async function aiAnalyze(
   }
 }
 
+/** Redacts a report the panel composed client-side (aiReport.ts) before
+ *  it reaches the clipboard - the one place that text leaves the device.
+ *  Spawns `netrewind ai report` (internal/redact) so this is the same
+ *  redaction a debug prompt log or a persisted follow-up thread gets,
+ *  not a second implementation living in the frontend. */
+export async function aiReportRedact(text: string): Promise<string> {
+  try {
+    return await invoke<string>("ai_report_redact", { text });
+  } catch (e) {
+    throw toAiCommandError(e);
+  }
+}
+
 /** PUT/POST/DELETE against `/v1/notes/*` - the one write surface the
  *  record's own read-only API has (internal/api/v1/notes.go). `agentGet`
  *  (tauri.ts) stays the only way to read anything, including notes

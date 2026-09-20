@@ -108,6 +108,7 @@ function installAnsweredShellWithNotes(
       if (method === "PUT") return { status: 200, body: JSON.stringify({ incident_id: "inc-1", outcome: (JSON.parse(args?.body as string)).outcome }), headers: {} };
       return { status: 204, body: "", headers: {} };
     }
+    if (cmd === "ai_report_redact") return `[redacted] ${args?.text as string}`;
     throw new Error("unexpected command " + cmd);
   });
 }
@@ -249,5 +250,55 @@ describe("AiAssistantPanel: notes and feedback", () => {
     expect(body).toMatchObject({ incident_id: "inc-1", profile: "balanced", model_id: "small.gguf", helpful: true });
     expect(typeof body.answer_id).toBe("string");
     expect(body.answer_id.length).toBeGreaterThan(0);
+  });
+});
+
+describe("AiAssistantPanel: copy report", () => {
+  it("copies the redacted report - never the raw pre-redaction text", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf" });
+    const writeText = vi.fn(async (_text: string) => {});
+    Object.assign(navigator, { clipboard: { writeText } });
+    installAnsweredShellWithNotes([], { calls: [] });
+
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} settings={{ ...DEFAULT_SETTINGS, kind: "live" }} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    fireEvent.click(await screen.findByText("Copy report"));
+
+    await waitFor(() => expect(screen.getByText("Report copied")).toBeInTheDocument());
+    expect(writeText).toHaveBeenCalledTimes(1);
+    const copied = writeText.mock.calls[0][0];
+    expect(copied.startsWith("[redacted] ")).toBe(true);
+    expect(copied).toContain("gateway-hijack");
+  });
+
+  it("shows a failure message rather than crashing when the clipboard API rejects", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf" });
+    Object.assign(navigator, { clipboard: { writeText: vi.fn(async () => Promise.reject(new Error("denied"))) } });
+    installAnsweredShell([]);
+
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    fireEvent.click(await screen.findByText("Copy report"));
+
+    expect(await screen.findByText("Could not copy the report")).toBeInTheDocument();
+  });
+
+  it("composes the report without a note when there is no live source, rather than failing", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf" });
+    const writeText = vi.fn(async (_text: string) => {});
+    Object.assign(navigator, { clipboard: { writeText } });
+    installShell(async (cmd, args) => {
+      if (cmd === "ai_status") return { running: true, port: 1234 };
+      if (cmd === "ai_analyze") return analyzeResponseBody([]);
+      if (cmd === "ai_report_redact") return args?.text as string;
+      throw new Error("unexpected command " + cmd);
+    });
+
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    fireEvent.click(await screen.findByText("Copy report"));
+
+    await waitFor(() => expect(screen.getByText("Report copied")).toBeInTheDocument());
+    expect(writeText.mock.calls[0][0]).toContain("(none recorded)");
   });
 });

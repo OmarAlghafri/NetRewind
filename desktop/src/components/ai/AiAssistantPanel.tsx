@@ -5,11 +5,14 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { messageFor } from "../../i18n/aiStatusCatalogue";
 import { useAiAssistant } from "../../data/useAiAssistant";
 import { readAiSettings, type AiSettings } from "../../data/aiSettings";
-import type { AiHandle } from "../../data/aiTypes";
+import type { AiAnalyzeResponse, AiHandle } from "../../data/aiTypes";
 import type { Page } from "../Sidebar";
 import type { InvestigationContext } from "../../routing/useRoute";
 import type { SourceSettings } from "../../data/source";
-import { getNotesAnnotation, postNotesFeedback, putNotesAnnotation, type NotesOutcome } from "../../data/notes";
+import { getNotesAnnotation, postNotesFeedback, putNotesAnnotation, type NotesAnnotation, type NotesOutcome } from "../../data/notes";
+import { aiReportRedact } from "../../data/ai";
+import { buildAiReport } from "./aiReport";
+import type { Lang } from "../../i18n/translations";
 import { Button } from "../Button";
 import { TechnicalValue } from "../TechnicalValue";
 
@@ -229,6 +232,7 @@ function AiAssistantBody({
           navigate={navigate}
           settings={settings}
           aiSettings={aiSettings}
+          lang={lang}
           t={t}
         />
       );
@@ -251,6 +255,7 @@ function AiAnsweredResult({
   navigate,
   settings,
   aiSettings,
+  lang,
   t,
 }: {
   assistant: Assistant;
@@ -260,6 +265,7 @@ function AiAnsweredResult({
   navigate?: NavigateFn;
   settings?: SourceSettings;
   aiSettings: AiSettings;
+  lang: Lang;
   t: TFn;
 }) {
   const output = assistant.response?.output;
@@ -370,7 +376,73 @@ function AiAnsweredResult({
 
       <NotesSection incident={incident} settings={settings} aiSettings={aiSettings} answerId={assistant.answerId} t={t} />
 
+      {assistant.response && (
+        <CopyReportButton incident={incident} response={assistant.response} settings={settings} lang={lang} t={t} />
+      )}
+
       <RetryButton onAnalyze={onAnalyze} t={t} />
+    </div>
+  );
+}
+
+/**
+ * "Copy report" (Part D): composes the three-section report (aiReport.ts),
+ * looks up the operator's own note first when a live source makes that
+ * possible (silently proceeding with none otherwise - a report is still
+ * useful without one), redacts the whole document through the CLI's
+ * shared internal/redact.Redactor (aiReportRedact), and only then writes
+ * it to the clipboard - the same order Diagnostics.tsx's own copy button
+ * follows (build text, then copy), with a redaction step this text
+ * specifically needs and Diagnostics's support summary does not (it is
+ * already secret-free by construction).
+ */
+function CopyReportButton({
+  incident,
+  response,
+  settings,
+  lang,
+  t,
+}: {
+  incident: Incident;
+  response: AiAnalyzeResponse;
+  settings?: SourceSettings;
+  lang: Lang;
+  t: TFn;
+}) {
+  const [status, setStatus] = useState<"idle" | "copying" | "done" | "failed">("idle");
+
+  const copy = async () => {
+    setStatus("copying");
+    try {
+      let note: NotesAnnotation | null = null;
+      if (settings && settings.kind === "live") {
+        note = await getNotesAnnotation(settings.endpoint, incident.incident_id);
+      }
+      const report = buildAiReport({ incident, response, note, lang });
+      const redacted = await aiReportRedact(report);
+      await navigator.clipboard.writeText(redacted);
+      setStatus("done");
+    } catch {
+      setStatus("failed");
+    }
+    window.setTimeout(() => setStatus("idle"), 2500);
+  };
+
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <Button variant="secondary" onClick={() => void copy()} disabled={status === "copying"}>
+        {t("ai_panel_copy_report_button")}
+      </Button>
+      {status === "done" && (
+        <span className="inline-ok" role="status">
+          {t("ai_panel_copy_report_done")}
+        </span>
+      )}
+      {status === "failed" && (
+        <span className="inline-error" role="alert">
+          {t("ai_panel_copy_report_failed")}
+        </span>
+      )}
     </div>
   );
 }
