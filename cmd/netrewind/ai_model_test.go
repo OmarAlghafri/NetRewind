@@ -112,10 +112,41 @@ func TestAIModelListShowsEveryProfileAndGateStatus(t *testing.T) {
 	}
 }
 
-func TestAIModelListRefusesWithoutManifestCoordinates(t *testing.T) {
-	_, err := run(t, "ai", "model", "list")
+// TestAIModelListFallsBackToTheEmbeddedCatalogueWithoutManifestCoordinates
+// pins the interim-source behavior: no --manifest-url/-sig-url/-key means
+// internal/aimodel.LoadEmbeddedManifest, not a refusal - there is nowhere
+// public to fetch a catalogue from yet (no release has been published),
+// but the binary still ships one, signature-verified, of its own.
+func TestAIModelListFallsBackToTheEmbeddedCatalogueWithoutManifestCoordinates(t *testing.T) {
+	out, err := run(t, "ai", "model", "list", "-o", "json")
+	if err != nil {
+		t.Fatalf("ai model list: %v\n%s", err, out)
+	}
+	var rows []struct {
+		Profile  string `json:"profile"`
+		GatePass bool   `json:"gate_passed"`
+	}
+	if err := json.Unmarshal([]byte(out), &rows); err != nil {
+		t.Fatalf("decoding output: %v\n%s", err, out)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("got %d profiles, want the embedded catalogue's 3: %+v", len(rows), rows)
+	}
+	for _, r := range rows {
+		if r.GatePass {
+			t.Errorf("profile %q reports gate_passed=true - none has actually passed an evaluation gate yet", r.Profile)
+		}
+	}
+}
+
+// TestAIModelListRefusesAnIncompleteManifestConfiguration proves that
+// naming only some of the three remote-catalogue flags is a request error,
+// not a silent fall-through to the embedded catalogue - the all-or-nothing
+// check fetchAIManifest itself relies on.
+func TestAIModelListRefusesAnIncompleteManifestConfiguration(t *testing.T) {
+	_, err := run(t, "ai", "model", "list", "--manifest-url", "https://example.com/models.json")
 	if err == nil {
-		t.Fatal("ai model list with no --manifest-url/--manifest-sig-url/--manifest-key was accepted")
+		t.Fatal("ai model list with only --manifest-url set was accepted")
 	}
 }
 

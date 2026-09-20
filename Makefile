@@ -350,3 +350,20 @@ sign:
 	      $(DIST)/SHA256SUMS $(DIST)/SHA256SUMS.sig || exit 1; \
 	  echo "signed $(DIST)/SHA256SUMS -> SHA256SUMS.sig"; \
 	fi
+
+# Re-signs the local-AI model catalogue after internal/aimodel/models.json
+# changes (a new profile, a re-quantized file, a gate result flipping to
+# passed). Same key, same round-trip as `sign` above - the catalogue is
+# embedded into the binary (internal/aimodel.LoadEmbeddedManifest) rather
+# than published anywhere yet, but it is verified exactly like a fetched
+# one would be, so it needs a real signature to mean anything.
+.PHONY: sign-models
+sign-models:
+	@test -f $(SIGNING_KEY) || { echo "no signing key at $(SIGNING_KEY); run 'make signing-key'"; exit 1; }
+	@openssl pkeyutl -sign -inkey $(SIGNING_KEY) -rawin \
+	    -in internal/aimodel/models.json -out internal/aimodel/models.json.sig
+	@go run ./internal/update/cmd/verifysig \
+	    "$$(openssl pkey -in $(SIGNING_KEY) -pubout -outform DER | tail -c 32 | base64 | tr -d '\n')" \
+	    internal/aimodel/models.json internal/aimodel/models.json.sig
+	@echo "signed internal/aimodel/models.json -> models.json.sig"
+	@echo "if this key differs from EmbeddedManifestPublicKey in internal/aimodel/embedded.go, update that constant too"

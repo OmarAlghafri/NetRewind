@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "profile": "small",
+      "id": "unsloth/Qwen3.5-0.8B-GGUF",
+      "revision": "6ab461498e2023f6e3c1baea90a8f0fe38ab64d0",
+      "quantization": "Q4_K_M",
+      "file_name": "Qwen3.5-0.8B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/6ab461498e2023f6e3c1baea90a8f0fe38ab64d0/Qwen3.5-0.8B-Q4_K_M.gguf",
+      "size_bytes": 532517120,
+      "sha256": "bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517",
+      "license": { "spdx": "Apache-2.0", "url": "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF" },
+      "min_ram_bytes": 2147483648,
+      "min_ram_available_bytes": 1073741824,
+      "recommended_ctx": 8192,
+      "runtime_min_build": "b10948",
+      "gate": { "passed": false, "evidence": "" }
+    },
+    {
+      "profile": "balanced",
+      "id": "unsloth/Qwen3.5-2B-GGUF",
+      "revision": "f6d5376be1edb4d416d56da11e5397a961aca8ae",
+      "quantization": "Q4_K_M",
+      "file_name": "Qwen3.5-2B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/f6d5376be1edb4d416d56da11e5397a961aca8ae/Qwen3.5-2B-Q4_K_M.gguf",
+      "size_bytes": 1280835840,
+      "sha256": "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223",
+      "license": { "spdx": "Apache-2.0", "url": "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF" },
+      "min_ram_bytes": 4294967296,
+      "min_ram_available_bytes": 2147483648,
+      "recommended_ctx": 8192,
+      "runtime_min_build": "b10948",
+      "gate": { "passed": false, "evidence": "" }
+    },
+    {
+      "profile": "full",
+      "id": "unsloth/Qwen3.5-4B-GGUF",
+      "revision": "e87f176479d0855a907a41277aca2f8ee7a09523",
+      "quantization": "Q4_K_M",
+      "file_name": "Qwen3.5-4B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf",
+      "size_bytes": 2740937888,
+      "sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+      "license": { "spdx": "Apache-2.0", "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF" },
+      "min_ram_bytes": 8589934592,
+      "min_ram_available_bytes": 4294967296,
+      "recommended_ctx": 8192,
+      "runtime_min_build": "b10948",
+      "gate": { "passed": false, "evidence": "" }
+    }
+  ]
+}

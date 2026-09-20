@@ -10,9 +10,11 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
+use tokio::sync::Notify;
 
 /// The staged CLI's expected file name for this platform.
 fn cli_file_name() -> &'static str {
@@ -64,6 +66,215 @@ pub async fn spawn_report(
     timeout: Duration,
 ) -> Result<CliOutput, String> {
     run_with_stdin(cli_path, &["ai", "report"], text, timeout).await
+}
+
+/// `--models-dir <dir>` appended when given, matching every model-manager
+/// CLI call below - `models_dir` must be `ai::models::models_dir`'s own
+/// answer (lib.rs), the exact directory `ai_runtime_start` later resolves
+/// a downloaded model's file name against. Without this, the Go CLI would
+/// default to its own per-user cache directory, a different path.
+fn with_models_dir(mut args: Vec<String>, models_dir: Option<&Path>) -> Vec<String> {
+    if let Some(dir) = models_dir {
+        args.push("--models-dir".to_string());
+        args.push(dir.to_string_lossy().into_owned());
+    }
+    args
+}
+
+/// Runs `netrewind ai model list -o json` - the embedded-or-configured
+/// catalogue plus which profiles are already downloaded, request/response
+/// like spawn_analyze (fast; no progress to stream).
+pub async fn spawn_model_list(
+    cli_path: &Path,
+    models_dir: Option<&Path>,
+    timeout: Duration,
+) -> Result<CliOutput, String> {
+    let args = with_models_dir(
+        vec![
+            "ai".into(),
+            "model".into(),
+            "list".into(),
+            "-o".into(),
+            "json".into(),
+        ],
+        models_dir,
+    );
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    run_with_stdin(cli_path, &arg_refs, "", timeout).await
+}
+
+/// Runs `netrewind ai model remove <profile>` - request/response, same
+/// reasoning as spawn_model_list.
+pub async fn spawn_model_remove(
+    cli_path: &Path,
+    profile: &str,
+    models_dir: Option<&Path>,
+    timeout: Duration,
+) -> Result<CliOutput, String> {
+    let args = with_models_dir(
+        vec![
+            "ai".into(),
+            "model".into(),
+            "remove".into(),
+            profile.to_string(),
+        ],
+        models_dir,
+    );
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    run_with_stdin(cli_path, &arg_refs, "", timeout).await
+}
+
+/// One model download's live state, polled by `ai_model_download_status`
+/// (lib.rs) the same way the frontend already polls `ai_status` for the
+/// sidecar - a download can take minutes, so there is no single
+/// request/response call that could return it.
+#[derive(Clone, Debug, Default, serde::Serialize)]
+pub struct ModelDownloadStatus {
+    pub profile: String,
+    pub downloaded: u64,
+    pub total: u64,
+    pub done: bool,
+    pub cancelled: bool,
+    pub error: Option<String>,
+}
+
+/// Spawns `netrewind ai model download <profile> --json` and drives it in
+/// the background, updating `progress` as JSON progress lines arrive on
+/// its stdout - unlike every other spawn_* here, this returns immediately
+/// rather than awaiting the child; `lib.rs` stores `progress` and `cancel`
+/// in `AiState` so the status/cancel commands can reach the same download
+/// without needing the `Child` handle itself, which `tokio::process::Child`
+/// has no way to share between two independent Tauri command calls.
+pub fn spawn_model_download(
+    cli_path: PathBuf,
+    profile: String,
+    models_dir: Option<PathBuf>,
+    progress: Arc<Mutex<ModelDownloadStatus>>,
+    cancel: Arc<Notify>,
+) {
+    tokio::spawn(async move {
+        let args = with_models_dir(
+            vec![
+                "ai".into(),
+                "model".into(),
+                "download".into(),
+                profile,
+                "--json".into(),
+            ],
+            models_dir.as_deref(),
+        );
+        let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+
+        let result = run_streaming_with_cancel(&cli_path, &arg_refs, &cancel, |line| {
+            apply_download_progress_line(&progress, line);
+        })
+        .await;
+
+        let Ok(mut p) = progress.lock() else { return };
+        match result {
+            Ok(true) => p.cancelled = true,
+            Ok(false) => p.done = true,
+            Err(e) => p.error = Some(e),
+        }
+    });
+}
+
+/// Spawns `cmd` with `args`, calling `on_line` for every line of stdout as
+/// it arrives - unlike `run_with_stdin`, which only returns once the whole
+/// process has exited, this is what lets `spawn_model_download` report
+/// progress during a download that can take minutes. Watches `cancel`
+/// concurrently with reading: a signal kills the child and returns
+/// `Ok(true)` without waiting to collect stderr (there is nothing useful
+/// to report about a process this call itself asked to die). Otherwise
+/// `Ok(false)` on a clean exit, or `Err` (the process's own stderr) on a
+/// non-zero exit or a spawn/wait failure - the same shape `run_with_stdin`
+/// reports errors in, minus the exit code (a cancelled or successful
+/// caller never needs it).
+///
+/// A free function taking `&Notify` (not a `State`/`AiState` type) for the
+/// same reason `run_with_stdin` is free-standing: a test can drive it
+/// directly against a real hung/echoing process, exactly like
+/// `spawn_analyze_times_out_on_a_hung_process` already does for the
+/// request/response primitive.
+async fn run_streaming_with_cancel<F: FnMut(&str)>(
+    cmd: &Path,
+    args: &[&str],
+    cancel: &Notify,
+    mut on_line: F,
+) -> Result<bool, String> {
+    let mut child = Command::new(cmd)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        .map_err(|e| format!("spawn {cmd:?}: {e}"))?;
+
+    let stdout = child.stdout.take().expect("stdout was piped");
+    let mut stderr = child.stderr.take().expect("stderr was piped");
+    let mut lines = BufReader::new(stdout).lines();
+    let stderr_task = tokio::spawn(async move {
+        let mut buf = Vec::new();
+        let _ = stderr.read_to_end(&mut buf).await;
+        buf
+    });
+
+    loop {
+        tokio::select! {
+            line = lines.next_line() => {
+                match line {
+                    Ok(Some(l)) => on_line(&l),
+                    _ => break,
+                }
+            }
+            _ = cancel.notified() => {
+                let _ = child.start_kill();
+                return Ok(true);
+            }
+        }
+    }
+
+    let status = child
+        .wait()
+        .await
+        .map_err(|e| format!("wait for {cmd:?}: {e}"))?;
+    let stderr_bytes = stderr_task.await.unwrap_or_default();
+    if status.success() {
+        Ok(false)
+    } else {
+        Err(format!(
+            "exit code {}: {}",
+            status.code().unwrap_or(-1),
+            String::from_utf8_lossy(&stderr_bytes)
+        ))
+    }
+}
+
+/// One line of the Go CLI's `--json` progress output is either the literal
+/// text `done` or a `{"downloaded":N,"total":N}` object
+/// (cmd/netrewind/ai_model.go's own progress closure) - anything else
+/// (should not happen) is silently ignored rather than treated as an
+/// error, since a stray blank line is not worth failing a whole download
+/// over.
+fn apply_download_progress_line(progress: &Arc<Mutex<ModelDownloadStatus>>, line: &str) {
+    let line = line.trim();
+    if line.is_empty() {
+        return;
+    }
+    let Ok(mut p) = progress.lock() else { return };
+    if line == "done" {
+        p.done = true;
+        return;
+    }
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+        if let Some(d) = v.get("downloaded").and_then(|x| x.as_u64()) {
+            p.downloaded = d;
+        }
+        if let Some(t) = v.get("total").and_then(|x| x.as_u64()) {
+            p.total = t;
+        }
+    }
 }
 
 /// The actual spawn/write-stdin/read/timeout/kill-on-drop mechanism,
@@ -311,5 +522,118 @@ mod tests {
             result.stdout
         );
         let _ = std::fs::remove_file(&cli);
+    }
+
+    #[tokio::test]
+    async fn spawn_model_list_runs_the_real_cli_against_the_embedded_catalogue() {
+        let Some(cli) = build_real_netrewind_cli().await else {
+            eprintln!("skipping: `go` not available to build the real netrewind CLI for this test");
+            return;
+        };
+
+        let dir = std::env::temp_dir().join(format!(
+            "netrewind-model-list-test-{}",
+            super::super::runtime::generate_token()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let result = spawn_model_list(&cli, Some(&dir), Duration::from_secs(15))
+            .await
+            .unwrap();
+        assert_eq!(result.exit_code, 0, "stderr: {}", result.stderr);
+        let rows: serde_json::Value = serde_json::from_str(&result.stdout)
+            .unwrap_or_else(|e| panic!("stdout is not JSON: {e}\n{}", result.stdout));
+        let profiles: Vec<&str> = rows
+            .as_array()
+            .expect("a JSON array")
+            .iter()
+            .map(|r| r["profile"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            profiles,
+            vec!["small", "balanced", "full"],
+            "the embedded catalogue's own 3 profiles, in order"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_file(&cli);
+    }
+
+    #[test]
+    fn apply_download_progress_line_reads_a_progress_object() {
+        let progress = Arc::new(Mutex::new(ModelDownloadStatus::default()));
+        apply_download_progress_line(&progress, r#"{"downloaded":100,"total":1000}"#);
+        let p = progress.lock().unwrap();
+        assert_eq!(p.downloaded, 100);
+        assert_eq!(p.total, 1000);
+        assert!(!p.done);
+    }
+
+    #[test]
+    fn apply_download_progress_line_recognises_the_done_sentinel() {
+        let progress = Arc::new(Mutex::new(ModelDownloadStatus::default()));
+        apply_download_progress_line(&progress, "done");
+        assert!(progress.lock().unwrap().done);
+    }
+
+    #[test]
+    fn apply_download_progress_line_ignores_garbage_without_panicking() {
+        let progress = Arc::new(Mutex::new(ModelDownloadStatus::default()));
+        apply_download_progress_line(&progress, "not json at all");
+        apply_download_progress_line(&progress, "");
+        let p = progress.lock().unwrap();
+        assert_eq!(p.downloaded, 0);
+        assert!(!p.done);
+    }
+
+    /// Proves `on_line` sees every stdout line as it is produced, using a
+    /// real (short-lived) process rather than a mock - `cmd.exe /C echo`
+    /// on Windows, `printf` elsewhere, matching this file's own convention
+    /// of exercising the real spawn/pipe machinery instead of a stand-in.
+    #[tokio::test]
+    async fn run_streaming_with_cancel_delivers_every_line() {
+        let (cmd, args): (&str, &[&str]) = if cfg!(windows) {
+            ("cmd.exe", &["/C", "echo one&&echo two"])
+        } else {
+            ("/bin/sh", &["-c", "printf 'one\\ntwo\\n'"])
+        };
+        let mut lines = Vec::new();
+        let cancel = Notify::new();
+        let cancelled = run_streaming_with_cancel(Path::new(cmd), args, &cancel, |l| {
+            lines.push(l.trim().to_string())
+        })
+        .await
+        .unwrap();
+        assert!(!cancelled);
+        assert_eq!(lines, vec!["one", "two"]);
+    }
+
+    /// Proves a signal on `cancel` actually kills the child promptly
+    /// instead of waiting for it to finish on its own - the same
+    /// hung-process shape `spawn_analyze_times_out_on_a_hung_process` uses,
+    /// but cancelled explicitly rather than by a timeout.
+    #[tokio::test]
+    async fn run_streaming_with_cancel_kills_a_hung_process_when_signalled() {
+        let (cmd, args): (&str, &[&str]) = if cfg!(windows) {
+            ("ping.exe", &["-n", "31", "127.0.0.1"])
+        } else {
+            ("/bin/sh", &["-c", "sleep 30"])
+        };
+        let cancel = Arc::new(Notify::new());
+        let cancel_for_signal = cancel.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            cancel_for_signal.notify_one();
+        });
+        let start = std::time::Instant::now();
+        let cancelled = run_streaming_with_cancel(Path::new(cmd), args, &cancel, |_| {})
+            .await
+            .unwrap();
+        assert!(cancelled, "expected Ok(true) for a cancelled run");
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "took {:?}, want it to return promptly once cancelled, not wait for the 30s process",
+            start.elapsed()
+        );
     }
 }

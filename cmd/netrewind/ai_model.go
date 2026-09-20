@@ -30,9 +30,10 @@ func newAIModelCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "model",
 		Short: "List, download or remove local-AI model files",
-		Long: "The catalogue (ai/models/models.json) is fetched fresh and signature-verified\n" +
-			"on every call - nothing about which models exist or whether they passed their\n" +
-			"evaluation gate is cached or built into this binary.",
+		Long: "The catalogue (internal/aimodel's embedded models.json, or a remote one when\n" +
+			"--manifest-url/-sig-url/-key are given) is signature-verified before anything\n" +
+			"in it is trusted - a model profile is only ever downloadable when its own\n" +
+			"gate.passed is true.",
 	}
 	cmd.PersistentFlags().String("manifest-url", aiManifestURL, "URL of the signed model catalogue (models.json)")
 	cmd.PersistentFlags().String("manifest-sig-url", aiManifestSignatureURL, "URL of the catalogue's detached signature")
@@ -59,12 +60,22 @@ func aiModelDir(cmd *cobra.Command) (string, error) {
 	return filepath.Join(cacheDir, "netrewind", "ai-models"), nil
 }
 
+// fetchAIManifest prefers an explicitly configured remote catalogue (a
+// future build's --manifest-url/-sig-url/-key or the aiManifestURL build
+// vars above, once ai/models/models.json has somewhere public to be
+// hosted); with none of those set, it falls back to the manifest embedded
+// in this very binary (internal/aimodel.LoadEmbeddedManifest) rather than
+// refusing outright - the interim source for as long as no release has
+// been published to fetch one from.
 func fetchAIManifest(cmd *cobra.Command) (*aimodel.Manifest, error) {
 	url, _ := cmd.Flags().GetString("manifest-url")
 	sigURL, _ := cmd.Flags().GetString("manifest-sig-url")
 	key, _ := cmd.Flags().GetString("manifest-key")
+	if url == "" && sigURL == "" && key == "" {
+		return aimodel.LoadEmbeddedManifest()
+	}
 	if url == "" || sigURL == "" || key == "" {
-		return nil, fmt.Errorf("no model catalogue configured for this build; pass --manifest-url, --manifest-sig-url and --manifest-key")
+		return nil, fmt.Errorf("incomplete model catalogue configuration; pass all of --manifest-url, --manifest-sig-url and --manifest-key, or none to use the embedded catalogue")
 	}
 	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 	defer cancel()

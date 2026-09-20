@@ -321,10 +321,20 @@ struct Sidecar {
 
 /// One local-AI sidecar for the whole app session - never more than one
 /// llama-server at a time, matching there being exactly one model
-/// profile active at once in the plan's own design.
+/// profile active at once in the plan's own design. `download` holds the
+/// same one-at-a-time model for a download in progress: the shared
+/// progress state and the cancel signal `ai::cli::spawn_model_download`'s
+/// background task reads, so a later command can poll or cancel it
+/// without needing the `Child` handle itself.
 #[derive(Default)]
 struct AiState {
     sidecar: tokio::sync::Mutex<Option<Sidecar>>,
+    download: tokio::sync::Mutex<Option<DownloadHandle>>,
+}
+
+struct DownloadHandle {
+    progress: Arc<Mutex<ai::cli::ModelDownloadStatus>>,
+    cancel: Arc<Notify>,
 }
 
 #[derive(Serialize)]
@@ -550,6 +560,140 @@ async fn ai_report_redact(app: tauri::AppHandle, text: String) -> Result<String,
     Ok(output.stdout)
 }
 
+/// Resolves the staged CLI path and the model storage directory the same
+/// way `ai_runtime_start` does - shared by every model-manager command
+/// below so a download always lands exactly where `ai_runtime_start` will
+/// later look for it.
+fn ai_model_paths(
+    app: &tauri::AppHandle,
+) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
+    use tauri::Manager;
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("{}: {e}", ai::codes::CLI_MISSING))?;
+    let cli_path =
+        ai::cli::locate_cli(&resource_dir).ok_or_else(|| ai::codes::CLI_MISSING.to_string())?;
+    let data_dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| format!("{}: {e}", ai::codes::MODEL_MISSING))?;
+    let models_dir = ai::models::models_dir(&data_dir);
+    Ok((cli_path, models_dir))
+}
+
+/// Lists every profile the embedded catalogue offers (see
+/// `internal/aimodel.LoadEmbeddedManifest`) and whether it is already
+/// downloaded - never gated by `ai::require_enabled()`: downloading a
+/// model file to disk runs no model and produces no analysis, unlike
+/// `ai_analyze`/`ai_runtime_start`/`ai_report_redact`, which stay gated.
+#[tauri::command]
+async fn ai_model_list(app: tauri::AppHandle) -> Result<String, String> {
+    let (cli_path, models_dir) = ai_model_paths(&app)?;
+    let output = ai::cli::spawn_model_list(&cli_path, Some(&models_dir), Duration::from_secs(15))
+        .await
+        .map_err(|e| format!("{}: {e}", ai::codes::CLI_FAILED))?;
+    if output.exit_code != 0 {
+        return Err(format!("{}: {}", ai::codes::CLI_FAILED, output.stderr));
+    }
+    Ok(output.stdout)
+}
+
+/// Starts downloading one profile in the background and returns
+/// immediately - refuses if another download is already in flight and not
+/// yet finished/failed/cancelled, since only one model is ever active at a
+/// time. Poll `ai_model_download_status` for progress.
+#[tauri::command]
+async fn ai_model_download_start(
+    app: tauri::AppHandle,
+    profile: String,
+    state: State<'_, AiState>,
+) -> Result<(), String> {
+    let (cli_path, models_dir) = ai_model_paths(&app)?;
+
+    let mut guard = state.download.lock().await;
+    if let Some(existing) = guard.as_ref() {
+        let p = existing
+            .progress
+            .lock()
+            .map_err(|_| ai::codes::DOWNLOAD_FAILED.to_string())?;
+        if !p.done && !p.cancelled && p.error.is_none() {
+            return Err(format!(
+                "{}: a download is already in progress",
+                ai::codes::DOWNLOAD_FAILED
+            ));
+        }
+    }
+
+    let progress = Arc::new(Mutex::new(ai::cli::ModelDownloadStatus {
+        profile: profile.clone(),
+        ..Default::default()
+    }));
+    let cancel = Arc::new(Notify::new());
+    ai::cli::spawn_model_download(
+        cli_path,
+        profile,
+        Some(models_dir),
+        progress.clone(),
+        cancel.clone(),
+    );
+    *guard = Some(DownloadHandle { progress, cancel });
+    Ok(())
+}
+
+/// The in-flight (or just-finished) download's status, or `None` if
+/// nothing has ever been started this session - polled the same way the
+/// frontend already polls `ai_status`.
+#[tauri::command]
+async fn ai_model_download_status(
+    state: State<'_, AiState>,
+) -> Result<Option<ai::cli::ModelDownloadStatus>, String> {
+    let guard = state.download.lock().await;
+    match guard.as_ref() {
+        Some(handle) => {
+            let p = handle
+                .progress
+                .lock()
+                .map_err(|_| ai::codes::DOWNLOAD_FAILED.to_string())?;
+            Ok(Some(p.clone()))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Kills the in-flight download, if any - a no-op if nothing is running
+/// (already finished, or nothing was ever started). The Go side's own
+/// `.partial` resume means a later `ai_model_download_start` for the same
+/// profile picks up where this left off, not from scratch.
+#[tauri::command]
+async fn ai_model_download_cancel(state: State<'_, AiState>) -> Result<(), String> {
+    let guard = state.download.lock().await;
+    if let Some(handle) = guard.as_ref() {
+        handle.cancel.notify_one();
+    }
+    Ok(())
+}
+
+/// Deletes a downloaded profile's file and metadata - request/response,
+/// not gated by `ai::require_enabled()` for the same reason
+/// `ai_model_list`/`ai_model_download_start` are not.
+#[tauri::command]
+async fn ai_model_remove(app: tauri::AppHandle, profile: String) -> Result<(), String> {
+    let (cli_path, models_dir) = ai_model_paths(&app)?;
+    let output = ai::cli::spawn_model_remove(
+        &cli_path,
+        &profile,
+        Some(&models_dir),
+        Duration::from_secs(15),
+    )
+    .await
+    .map_err(|e| format!("{}: {e}", ai::codes::CLI_FAILED))?;
+    if output.exit_code != 0 {
+        return Err(format!("{}: {}", ai::codes::CLI_FAILED, output.stderr));
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -569,7 +713,12 @@ pub fn run() {
             ai_runtime_start,
             ai_runtime_stop,
             ai_analyze,
-            ai_report_redact
+            ai_report_redact,
+            ai_model_list,
+            ai_model_download_start,
+            ai_model_download_status,
+            ai_model_download_cancel,
+            ai_model_remove
         ])
         .run(tauri::generate_context!())
         .expect("error while running the NetRewind desktop application");
