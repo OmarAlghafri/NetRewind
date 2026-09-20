@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Incident, NetRewindEvent } from "../types";
-import type { Capability, Health, RuleSummary, BundleManifest } from "./types";
+import type { BundleAnnotation, Capability, Health, RuleSummary, BundleManifest } from "./types";
 import type { SourceSettings } from "./source";
 import type { AgentErrorPayload } from "../i18n/agentErrorCatalogue";
 import { loadDemoEvents, loadDemoIncidents } from "../demo/loadDemoData";
@@ -45,6 +45,12 @@ export interface Record {
   manifest: BundleManifest | null;
   bundleSigned: boolean;
   bundleHasSignature: boolean;
+  /** Bundle source only; `null` when the opened bundle carries no
+   *  notes.json at all (an older bundle, or one exported with notes
+   *  disabled) - distinct from an empty array, which means the sender's
+   *  own notes.Store was queried and genuinely had none. Read-only,
+   *  labelled "from this bundle" wherever shown - ADR 0008. */
+  bundleNotes: BundleAnnotation[] | null;
   /** When the current data was fetched. */
   refreshedAt: Date | null;
   /** True on an error that still has previous data on screen - "showing
@@ -64,6 +70,7 @@ const EMPTY: Omit<Record, "refresh"> = {
   manifest: null,
   bundleSigned: false,
   bundleHasSignature: false,
+  bundleNotes: null,
   refreshedAt: null,
   stale: false,
 };
@@ -240,6 +247,7 @@ export async function fetchLivePoll(endpoint: string, prev: LiveState, generatio
       manifest: null,
       bundleSigned: false,
       bundleHasSignature: false,
+      bundleNotes: null,
       refreshedAt: new Date(),
     },
     next,
@@ -345,6 +353,7 @@ export function useRecord(settings: SourceSettings): Record {
         manifest: c.manifest,
         bundleSigned: c.signed,
         bundleHasSignature: c.has_signature,
+        bundleNotes: c.notes ?? null,
         refreshedAt: new Date(),
       });
     } catch (e) {

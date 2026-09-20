@@ -152,6 +152,34 @@ export function Evidence({
         </div>
       )}
 
+      {settings.kind === "bundle" && record.bundleNotes !== null && (
+        <div className="card">
+          <strong>{t("evidence_bundle_notes_title")}</strong>
+          <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginTop: 6 }}>{t("evidence_bundle_notes_body")}</p>
+          {record.bundleNotes.length === 0 ? (
+            <div className="empty-state">{t("evidence_bundle_notes_empty")}</div>
+          ) : (
+            record.bundleNotes.map((note) => (
+              <div className="capability-row" key={note.incident_id} style={{ flexDirection: "column", alignItems: "stretch", gap: 4 }}>
+                <span>
+                  <TechnicalValue>{note.rule_id}</TechnicalValue> — <TechnicalValue>{note.root_cause_kind}</TechnicalValue>
+                  {": "}
+                  {t(
+                    note.outcome === "confirmed"
+                      ? "ai_panel_notes_outcome_confirmed"
+                      : note.outcome === "false_positive"
+                        ? "ai_panel_notes_outcome_false_positive"
+                        : "ai_panel_notes_outcome_unresolved",
+                  )}
+                </span>
+                {note.cause_note && <p style={{ margin: 0 }} dir="auto">{note.cause_note}</p>}
+                {note.resolution_note && <p style={{ margin: 0 }} dir="auto">{note.resolution_note}</p>}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       <div className="card">
         <strong>{incidentScope ? t("evidence_incident_scope_title") : t("evidence_export_title")}</strong>
 

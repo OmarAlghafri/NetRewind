@@ -3,7 +3,7 @@
 // pages can offer live and bundle sources only when they can actually work.
 
 import type { Incident, NetRewindEvent } from "../types";
-import type { BundleManifest } from "./types";
+import type { BundleAnnotation, BundleManifest } from "./types";
 import type { AgentErrorPayload } from "../i18n/agentErrorCatalogue";
 
 interface AgentResponse {
@@ -51,6 +51,11 @@ export interface BundleContents {
   manifest: BundleManifest;
   events: NetRewindEvent[];
   incidents: Incident[];
+  /** `undefined` when the archive carries no notes.json at all - distinct
+   *  from an empty array, which means the sender's own notes.Store was
+   *  queried and genuinely had none for this window (ADR 0008). Read-only:
+   *  never merged into anything this app already has. */
+  notes?: BundleAnnotation[];
   signed: boolean;
   has_signature: boolean;
 }

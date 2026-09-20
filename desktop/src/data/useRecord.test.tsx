@@ -110,4 +110,33 @@ describe("useRecord", () => {
     await waitFor(() => expect(result.current.status).toBe("error"));
     expect(result.current.error).toBe("no_bundle");
   });
+
+  it("exposes a bundle's notes when the archive carried notes.json", async () => {
+    installShell(async () => ({
+      manifest: { format_version: 1, schema_version: 1, app_version: "1.0.0", observer_id: "obs", created_at: "", window_from: "", window_to: "", event_count: 0, incident_count: 1, truncated: false, redacted: true },
+      events: [],
+      incidents: [],
+      notes: [{ incident_id: "i1", fingerprint: "fp", rule_id: "gateway-hijack", root_cause_kind: "l2.arp_binding_changed", root_cause_entity: "10.0.0.1", opened_at_ns: 0, outcome: "confirmed", created_at_ms: 0, updated_at_ms: 0 }],
+      signed: false,
+      has_signature: false,
+    }));
+    const { result } = renderHook(() => useRecord({ ...DEFAULT_SETTINGS, kind: "bundle", bundlePath: "C:/x/b.tar.gz" }));
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(result.current.bundleNotes).toHaveLength(1);
+    expect(result.current.bundleNotes?.[0].rule_id).toBe("gateway-hijack");
+  });
+
+  it("reports bundleNotes as null (not an empty array) when the bundle carries no notes.json member", async () => {
+    installShell(async () => ({
+      manifest: { format_version: 1, schema_version: 1, app_version: "1.0.0", observer_id: "obs", created_at: "", window_from: "", window_to: "", event_count: 0, incident_count: 0, truncated: false, redacted: true },
+      events: [],
+      incidents: [],
+      // no `notes` field at all - an older or notes-disabled export.
+      signed: false,
+      has_signature: false,
+    }));
+    const { result } = renderHook(() => useRecord({ ...DEFAULT_SETTINGS, kind: "bundle", bundlePath: "C:/x/b.tar.gz" }));
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(result.current.bundleNotes).toBeNull();
+  });
 });

@@ -72,4 +72,28 @@ export interface BundleManifest {
   truncated: boolean;
   redacted: boolean;
   capabilities?: Capability[];
+  /** Absent entirely when notes were never queried for this export (an
+   *  older bundle, or one exported with notes disabled) - present (even
+   *  as 0) whenever they were. Mirrors internal/bundle.Manifest's own
+   *  *int - the two cases are deliberately distinguishable. */
+  notes_count?: number;
+}
+
+/** internal/notes.Annotation's JSON shape, as carried inside notes.json's
+ *  own bundle member (ADR 0008) - duplicated from data/notes.ts's own
+ *  NotesAnnotation rather than imported, since that module imports from
+ *  tauri.ts (via ai.ts's agentRequest) and this file must stay a leaf
+ *  module tauri.ts can import from without a cycle. */
+export interface BundleAnnotation {
+  incident_id: string;
+  fingerprint: string;
+  rule_id: string;
+  root_cause_kind: string;
+  root_cause_entity: string;
+  opened_at_ns: number;
+  outcome: "confirmed" | "false_positive" | "unresolved";
+  cause_note?: string;
+  resolution_note?: string;
+  created_at_ms: number;
+  updated_at_ms: number;
 }

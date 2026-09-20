@@ -34,6 +34,7 @@ function record(over: Partial<Record> = {}): Record {
     manifest: null,
     bundleSigned: false,
     bundleHasSignature: false,
+    bundleNotes: null,
     refreshedAt: null,
     stale: false,
     refresh: () => {},

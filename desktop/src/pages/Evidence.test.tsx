@@ -35,6 +35,7 @@ function record(over: Partial<Record> = {}): Record {
     manifest: null,
     bundleSigned: false,
     bundleHasSignature: false,
+    bundleNotes: null,
     refreshedAt: null,
     stale: false,
     refresh: () => {},
@@ -158,5 +159,82 @@ describe("Evidence incident-scoped export", () => {
       />,
     );
     expect(screen.getByText("Exporting evidence for this incident")).toBeInTheDocument();
+  });
+});
+
+function bundleManifest(over: Partial<Record["manifest"]> = {}): NonNullable<Record["manifest"]> {
+  return {
+    format_version: 1,
+    schema_version: 1,
+    app_version: "1.2.0",
+    observer_id: "obs-1",
+    created_at: "2026-09-19T10:00:00Z",
+    window_from: "2026-09-19T09:00:00Z",
+    window_to: "2026-09-19T10:00:00Z",
+    event_count: 10,
+    incident_count: 2,
+    truncated: false,
+    redacted: true,
+    ...over,
+  };
+}
+
+describe("Evidence: notes from this bundle", () => {
+  it("shows nothing about notes when the bundle carries no notes.json at all", () => {
+    english(
+      <Evidence
+        record={record({ manifest: bundleManifest(), bundleNotes: null })}
+        settings={{ ...DEFAULT_SETTINGS, kind: "bundle", bundlePath: "/tmp/x.tar.gz" }}
+        context={{}}
+        onOpenBundle={() => {}}
+        onCloseBundle={() => {}}
+      />,
+    );
+    expect(screen.queryByText("Notes from this bundle")).not.toBeInTheDocument();
+  });
+
+  it("shows an empty-state message when notes were queried but none exist", () => {
+    english(
+      <Evidence
+        record={record({ manifest: bundleManifest(), bundleNotes: [] })}
+        settings={{ ...DEFAULT_SETTINGS, kind: "bundle", bundlePath: "/tmp/x.tar.gz" }}
+        context={{}}
+        onOpenBundle={() => {}}
+        onCloseBundle={() => {}}
+      />,
+    );
+    expect(screen.getByText("Notes from this bundle")).toBeInTheDocument();
+    expect(screen.getByText("The sender recorded no notes for this window.")).toBeInTheDocument();
+  });
+
+  it("lists the sender's own notes, read-only", () => {
+    english(
+      <Evidence
+        record={record({
+          manifest: bundleManifest(),
+          bundleNotes: [
+            {
+              incident_id: "inc-1",
+              fingerprint: "fp-1",
+              rule_id: "gateway-hijack",
+              root_cause_kind: "l2.arp_binding_changed",
+              root_cause_entity: "10.0.0.1",
+              opened_at_ns: 0,
+              outcome: "confirmed",
+              cause_note: "bad switch port",
+              created_at_ms: 0,
+              updated_at_ms: 0,
+            },
+          ],
+        })}
+        settings={{ ...DEFAULT_SETTINGS, kind: "bundle", bundlePath: "/tmp/x.tar.gz" }}
+        context={{}}
+        onOpenBundle={() => {}}
+        onCloseBundle={() => {}}
+      />,
+    );
+    expect(screen.getByText("gateway-hijack")).toBeInTheDocument();
+    expect(screen.getByText("Confirmed cause", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("bad switch port")).toBeInTheDocument();
   });
 });

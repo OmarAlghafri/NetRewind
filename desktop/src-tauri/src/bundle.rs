@@ -20,6 +20,11 @@ use std::io::Read;
 const MANIFEST: &str = "manifest.json";
 const EVENTS: &str = "events.json";
 const INCIDENTS: &str = "incidents.json";
+/// Optional (ADR 0008): the sender's own operator notes for the incidents
+/// in this bundle's window, present only when the exporting recorder had
+/// notes enabled. Absent from the required-member checks below by design -
+/// an older bundle, or one exported with notes disabled, simply lacks it.
+const NOTES: &str = "notes.json";
 const CHECKSUMS: &str = "SHA256SUMS";
 const SIGNATURE: &str = "SHA256SUMS.sig";
 
@@ -35,6 +40,13 @@ pub struct Contents {
     pub manifest: serde_json::Value,
     pub events: serde_json::Value,
     pub incidents: serde_json::Value,
+    /// `None` when the archive carries no notes.json at all (an older
+    /// bundle, or one exported with notes disabled) - distinct from
+    /// `Some(Value::Array(vec![]))`, which means the sender's own
+    /// notes.Store was queried and genuinely had none for this window.
+    /// Shown read-only, labelled as coming from the bundle - ADR 0008:
+    /// never merged into the viewer's own record or notes store.
+    pub notes: Option<serde_json::Value>,
     /// True when a public key was given and the signature verified.
     pub signed: bool,
     /// True when the archive carried a signature file at all.
@@ -66,20 +78,26 @@ pub fn open(path: &str, public_key: Option<&str>) -> Result<Contents, String> {
 
     let manifest: serde_json::Value = serde_json::from_slice(&members[MANIFEST])
         .map_err(|e| format!("manifest.json does not parse: {e}"))?;
-    let format = manifest.get("format_version").and_then(|v| v.as_u64()).unwrap_or(0);
+    let format = manifest
+        .get("format_version")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
     if format > FORMAT_VERSION {
         return Err(format!(
             "bundle format v{format}; this build understands up to v{FORMAT_VERSION} - open it with a newer NetRewind"
         ));
     }
-    let schema = manifest.get("schema_version").and_then(|v| v.as_u64()).unwrap_or(0);
+    let schema = manifest
+        .get("schema_version")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
     if schema > SCHEMA_VERSION {
         return Err(format!(
             "event schema v{schema}; this build understands up to v{SCHEMA_VERSION} - open it with a newer NetRewind"
         ));
     }
-    let mut events: serde_json::Value =
-        serde_json::from_slice(&members[EVENTS]).map_err(|e| format!("events.json does not parse: {e}"))?;
+    let mut events: serde_json::Value = serde_json::from_slice(&members[EVENTS])
+        .map_err(|e| format!("events.json does not parse: {e}"))?;
     let mut incidents: serde_json::Value = serde_json::from_slice(&members[INCIDENTS])
         .map_err(|e| format!("incidents.json does not parse: {e}"))?;
     // Bundles written before 1.0.0 encode an empty list as null.
@@ -91,13 +109,38 @@ pub fn open(path: &str, public_key: Option<&str>) -> Result<Contents, String> {
     if !events.is_array() || !incidents.is_array() {
         return Err("events.json and incidents.json must each be a JSON array".to_string());
     }
-    Ok(Contents { manifest, events, incidents, signed, has_signature })
+
+    let notes = match members.get(NOTES) {
+        None => None,
+        Some(raw) => {
+            let mut v: serde_json::Value = serde_json::from_slice(raw)
+                .map_err(|e| format!("notes.json does not parse: {e}"))?;
+            if v.is_null() {
+                v = serde_json::Value::Array(Vec::new());
+            }
+            if !v.is_array() {
+                return Err("notes.json must be a JSON array".to_string());
+            }
+            Some(v)
+        }
+    };
+
+    Ok(Contents {
+        manifest,
+        events,
+        incidents,
+        notes,
+        signed,
+        has_signature,
+    })
 }
 
 fn read_tar_gz<R: Read>(r: R) -> Result<HashMap<String, Vec<u8>>, String> {
     let mut archive = tar::Archive::new(GzDecoder::new(r));
     let mut members = HashMap::new();
-    let entries = archive.entries().map_err(|e| format!("corrupt archive: {e}"))?;
+    let entries = archive
+        .entries()
+        .map_err(|e| format!("corrupt archive: {e}"))?;
     for entry in entries {
         let mut entry = entry.map_err(|e| format!("corrupt archive: {e}"))?;
         let name = entry
@@ -108,14 +151,22 @@ fn read_tar_gz<R: Read>(r: R) -> Result<HashMap<String, Vec<u8>>, String> {
             .to_string();
         // Only the flat, known member names are read; anything else (a path
         // with a directory, an unknown file) is ignored rather than trusted.
-        if !matches!(name.as_str(), MANIFEST | EVENTS | INCIDENTS | CHECKSUMS | SIGNATURE) {
+        if !matches!(
+            name.as_str(),
+            MANIFEST | EVENTS | INCIDENTS | NOTES | CHECKSUMS | SIGNATURE
+        ) {
             continue;
         }
         if entry.size() > MAX_MEMBER {
-            return Err(format!("{name} is larger than {} MiB; refusing", MAX_MEMBER >> 20));
+            return Err(format!(
+                "{name} is larger than {} MiB; refusing",
+                MAX_MEMBER >> 20
+            ));
         }
         let mut data = Vec::with_capacity(entry.size() as usize);
-        entry.read_to_end(&mut data).map_err(|e| format!("corrupt archive: {e}"))?;
+        entry
+            .read_to_end(&mut data)
+            .map_err(|e| format!("corrupt archive: {e}"))?;
         members.insert(name, data);
     }
     Ok(members)
@@ -123,11 +174,24 @@ fn read_tar_gz<R: Read>(r: R) -> Result<HashMap<String, Vec<u8>>, String> {
 
 fn verify_checksums(members: &HashMap<String, Vec<u8>>) -> Result<(), String> {
     let sums = parse_checksums(&members[CHECKSUMS])?;
-    for name in [MANIFEST, EVENTS, INCIDENTS] {
-        let want = sums.get(name).ok_or_else(|| format!("{name} is not listed in SHA256SUMS"))?;
+    // NOTES is required-if-present: a bundle without it is fine (older, or
+    // notes disabled at export time), but one that DOES carry notes.json
+    // must have it listed and matching, the same as every other member -
+    // an unverified-but-parsed notes.json would be exactly the tampering
+    // gap this whole check exists to close.
+    let mut required = vec![MANIFEST, EVENTS, INCIDENTS];
+    if members.contains_key(NOTES) {
+        required.push(NOTES);
+    }
+    for name in required {
+        let want = sums
+            .get(name)
+            .ok_or_else(|| format!("{name} is not listed in SHA256SUMS"))?;
         let got = Sha256::digest(&members[name]);
         if got.as_slice() != want.as_slice() {
-            return Err(format!("{name} does not match SHA256SUMS - the bundle is corrupt or was tampered with"));
+            return Err(format!(
+                "{name} does not match SHA256SUMS - the bundle is corrupt or was tampered with"
+            ));
         }
     }
     Ok(())
@@ -143,7 +207,9 @@ fn parse_checksums(data: &[u8]) -> Result<HashMap<String, Vec<u8>>, String> {
         }
         let mut fields = line.split_whitespace();
         let (Some(hexsum), Some(name), None) = (fields.next(), fields.next(), fields.next()) else {
-            return Err(format!("SHA256SUMS line {line:?} is not '<sha256>  <name>'"));
+            return Err(format!(
+                "SHA256SUMS line {line:?} is not '<sha256>  <name>'"
+            ));
         };
         let sum = hex::decode(hexsum).map_err(|_| format!("SHA256SUMS: {hexsum:?} is not hex"))?;
         if sum.len() != 32 {
@@ -165,7 +231,8 @@ fn verify_signature(public_key: &str, checksums: &[u8], signature: &[u8]) -> Res
     let key: [u8; 32] = raw
         .try_into()
         .map_err(|_| "the configured public key is not a 32-byte ed25519 key".to_string())?;
-    let key = VerifyingKey::from_bytes(&key).map_err(|e| format!("the configured public key is invalid: {e}"))?;
+    let key = VerifyingKey::from_bytes(&key)
+        .map_err(|e| format!("the configured public key is invalid: {e}"))?;
     // The signature travels raw or base64-armoured, same as internal/update accepts.
     let sig_bytes: Vec<u8> = match engine.decode(String::from_utf8_lossy(signature).trim()) {
         Ok(decoded) if decoded.len() == 64 => decoded,
@@ -175,7 +242,10 @@ fn verify_signature(public_key: &str, checksums: &[u8], signature: &[u8]) -> Res
         .try_into()
         .map_err(|_| "SHA256SUMS.sig is not a 64-byte ed25519 signature".to_string())?;
     key.verify(checksums, &Signature::from_bytes(&sig_bytes))
-        .map_err(|_| "signature does not verify: the checksum file is not signed by the configured key".to_string())
+        .map_err(|_| {
+            "signature does not verify: the checksum file is not signed by the configured key"
+                .to_string()
+        })
 }
 
 #[cfg(test)]
@@ -212,8 +282,14 @@ mod tests {
     }
 
     fn write_temp(name: &str, data: &[u8]) -> String {
-        let path = std::env::temp_dir().join(format!("netrewind-desktop-test-{}-{name}", std::process::id()));
-        std::fs::File::create(&path).unwrap().write_all(data).unwrap();
+        let path = std::env::temp_dir().join(format!(
+            "netrewind-desktop-test-{}-{name}",
+            std::process::id()
+        ));
+        std::fs::File::create(&path)
+            .unwrap()
+            .write_all(data)
+            .unwrap();
         path.to_string_lossy().to_string()
     }
 
@@ -221,8 +297,17 @@ mod tests {
         let manifest = br#"{"format_version":1,"schema_version":1,"app_version":"t","observer_id":"o","event_count":1,"incident_count":0}"#.to_vec();
         let events = br#"[{"event_id":"01TEST","kind":"link.down"}]"#.to_vec();
         let incidents = b"[]".to_vec();
-        let sums = checksums(&[(MANIFEST, &manifest), (EVENTS, &events), (INCIDENTS, &incidents)]);
-        vec![(MANIFEST, manifest), (EVENTS, events), (INCIDENTS, incidents), (CHECKSUMS, sums)]
+        let sums = checksums(&[
+            (MANIFEST, &manifest),
+            (EVENTS, &events),
+            (INCIDENTS, &incidents),
+        ]);
+        vec![
+            (MANIFEST, manifest),
+            (EVENTS, events),
+            (INCIDENTS, incidents),
+            (CHECKSUMS, sums),
+        ]
     }
 
     fn as_refs<'a>(m: &'a [(&'static str, Vec<u8>)]) -> Vec<(&'static str, &'a [u8])> {
@@ -237,6 +322,62 @@ mod tests {
         assert_eq!(c.events.as_array().unwrap().len(), 1);
         assert_eq!(c.manifest["observer_id"], "o");
         assert!(!c.signed && !c.has_signature);
+        assert!(
+            c.notes.is_none(),
+            "no notes.json member was given - c.notes must be None, not an empty array"
+        );
+    }
+
+    #[test]
+    fn opens_a_bundle_with_notes_and_returns_them() {
+        let mut members = good_members();
+        let notes =
+            br#"[{"incident_id":"i1","rule_id":"gateway-hijack","outcome":"confirmed"}]"#.to_vec();
+        members.push((NOTES, notes));
+        // Rebuild SHA256SUMS over every real member now that notes.json is
+        // one of them - good_members()'s own sums do not know about it.
+        let checksums_index = members.iter().position(|(n, _)| *n == CHECKSUMS).unwrap();
+        let full = members.clone();
+        members[checksums_index].1 = checksums(&as_refs(&full));
+
+        let path = write_temp("with-notes.tar.gz", &tarball(&as_refs(&members)));
+        let c = open(&path, None).unwrap();
+        let notes_arr = c
+            .notes
+            .expect("notes.json was in the archive - c.notes must be Some");
+        assert_eq!(notes_arr.as_array().unwrap().len(), 1);
+        assert_eq!(notes_arr[0]["rule_id"], "gateway-hijack");
+    }
+
+    #[test]
+    fn treats_null_notes_as_an_empty_array() {
+        let mut members = good_members();
+        let notes = b"null".to_vec();
+        members.push((NOTES, notes.clone()));
+        let checksums_index = members.iter().position(|(n, _)| *n == CHECKSUMS).unwrap();
+        let full: Vec<(&str, Vec<u8>)> = members.clone();
+        members[checksums_index].1 = checksums(&as_refs(&full));
+
+        let path = write_temp("null-notes.tar.gz", &tarball(&as_refs(&members)));
+        let c = open(&path, None).unwrap();
+        assert_eq!(c.notes.unwrap().as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn refuses_a_tampered_notes_member() {
+        let mut members = good_members();
+        let notes = br#"[{"incident_id":"i1"}]"#.to_vec();
+        members.push((NOTES, notes));
+        let checksums_index = members.iter().position(|(n, _)| *n == CHECKSUMS).unwrap();
+        let full: Vec<(&str, Vec<u8>)> = members.clone();
+        members[checksums_index].1 = checksums(&as_refs(&full));
+        // Tamper with notes.json AFTER computing sums over the honest version.
+        let notes_index = members.iter().position(|(n, _)| *n == NOTES).unwrap();
+        members[notes_index].1 = br#"[{"incident_id":"tampered"}]"#.to_vec();
+
+        let path = write_temp("tampered-notes.tar.gz", &tarball(&as_refs(&members)));
+        let err = open(&path, None).unwrap_err();
+        assert!(err.contains("does not match SHA256SUMS"), "{err}");
     }
 
     #[test]
@@ -244,8 +385,17 @@ mod tests {
         let manifest = br#"{"format_version":1,"schema_version":1}"#.to_vec();
         let events = b"null".to_vec();
         let incidents = b"null".to_vec();
-        let sums = checksums(&[(MANIFEST, &manifest), (EVENTS, &events), (INCIDENTS, &incidents)]);
-        let members = vec![(MANIFEST, manifest), (EVENTS, events), (INCIDENTS, incidents), (CHECKSUMS, sums)];
+        let sums = checksums(&[
+            (MANIFEST, &manifest),
+            (EVENTS, &events),
+            (INCIDENTS, &incidents),
+        ]);
+        let members = vec![
+            (MANIFEST, manifest),
+            (EVENTS, events),
+            (INCIDENTS, incidents),
+            (CHECKSUMS, sums),
+        ];
         let path = write_temp("nulls.tar.gz", &tarball(&as_refs(&members)));
         let c = open(&path, None).unwrap();
         assert_eq!(c.events.as_array().unwrap().len(), 0);
@@ -265,7 +415,9 @@ mod tests {
     fn refuses_a_missing_member_and_garbage() {
         let members = good_members();
         let path = write_temp("missing.tar.gz", &tarball(&as_refs(&members[..3])));
-        assert!(open(&path, None).unwrap_err().contains("SHA256SUMS is missing"));
+        assert!(open(&path, None)
+            .unwrap_err()
+            .contains("SHA256SUMS is missing"));
         let path = write_temp("garbage.tar.gz", b"this is not a tarball");
         assert!(open(&path, None).is_err());
     }
@@ -275,7 +427,11 @@ mod tests {
         let mut members = good_members();
         members[0].1 = br#"{"format_version":99,"schema_version":1}"#.to_vec();
         let m = members[0].1.clone();
-        members[3].1 = checksums(&[(MANIFEST, &m), (EVENTS, &members[1].1), (INCIDENTS, &members[2].1)]);
+        members[3].1 = checksums(&[
+            (MANIFEST, &m),
+            (EVENTS, &members[1].1),
+            (INCIDENTS, &members[2].1),
+        ]);
         let path = write_temp("newer.tar.gz", &tarball(&as_refs(&members)));
         assert!(open(&path, None).unwrap_err().contains("newer NetRewind"));
     }
@@ -285,9 +441,12 @@ mod tests {
         use ed25519_dalek::{Signer, SigningKey};
         let members = good_members();
         let key = SigningKey::from_bytes(&[7u8; 32]);
-        let pub_b64 = base64::engine::general_purpose::STANDARD.encode(key.verifying_key().to_bytes());
+        let pub_b64 =
+            base64::engine::general_purpose::STANDARD.encode(key.verifying_key().to_bytes());
         let path = write_temp("unsigned.tar.gz", &tarball(&as_refs(&members)));
-        assert!(open(&path, Some(&pub_b64)).unwrap_err().contains("unsigned bundle is refused"));
+        assert!(open(&path, Some(&pub_b64))
+            .unwrap_err()
+            .contains("unsigned bundle is refused"));
 
         let sig = key.sign(&members[3].1).to_bytes().to_vec();
         let mut signed = members.clone();
@@ -297,7 +456,10 @@ mod tests {
         assert!(c.signed && c.has_signature);
 
         let other = SigningKey::from_bytes(&[9u8; 32]);
-        let other_b64 = base64::engine::general_purpose::STANDARD.encode(other.verifying_key().to_bytes());
-        assert!(open(&path, Some(&other_b64)).unwrap_err().contains("not signed by the configured key"));
+        let other_b64 =
+            base64::engine::general_purpose::STANDARD.encode(other.verifying_key().to_bytes());
+        assert!(open(&path, Some(&other_b64))
+            .unwrap_err()
+            .contains("not signed by the configured key"));
     }
 }
