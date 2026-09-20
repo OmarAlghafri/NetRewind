@@ -57,12 +57,13 @@ const events: NetRewindEvent[] = [
   },
 ];
 
-function analyzeResponseBody(handles: { handle: string; kind: string; ref: string }[]) {
+function analyzeResponseBody(handles: { handle: string; kind: string; ref: string }[], retrieval: Record<string, unknown>[] = []) {
   return JSON.stringify({
     version: 1,
     verdict: "answered",
     guardrail: { refuse: false, ceiling: 75 },
     handles,
+    retrieval,
     output: {
       summary: "ARP binding changed on the gateway.",
       ranked_hypotheses: [{ cause: "l2.arp_binding_changed", entity: "10.0.0.1", confidence: 75 }],
@@ -77,10 +78,10 @@ function analyzeResponseBody(handles: { handle: string; kind: string; ref: strin
   });
 }
 
-function installAnsweredShell(handles: { handle: string; kind: string; ref: string }[]) {
+function installAnsweredShell(handles: { handle: string; kind: string; ref: string }[], retrieval: Record<string, unknown>[] = []) {
   installShell(async (cmd) => {
     if (cmd === "ai_status") return { running: true, port: 1234 };
-    if (cmd === "ai_analyze") return analyzeResponseBody(handles);
+    if (cmd === "ai_analyze") return analyzeResponseBody(handles, retrieval);
     throw new Error("unexpected command " + cmd);
   });
 }
@@ -152,6 +153,32 @@ describe("AiAssistantPanel: evidence handle navigation", () => {
     fireEvent.click(await screen.findByText("Analyze this incident locally"));
     await waitFor(() => expect(screen.getByText("E1")).toBeInTheDocument());
     expect(screen.getByText("E1").closest("button")).toBeNull();
+  });
+});
+
+describe("AiAssistantPanel: previously-on-this-network retrieval", () => {
+  const retrieval = [{ handle: "H1", incident_id: "inc-prior", rule_id: "gateway-hijack", root_cause_kind: "l2.arp_binding_changed", root_cause_entity: "10.0.0.1" }];
+
+  it("lists a retrieved prior incident and jumps to it on click", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf" });
+    installAnsweredShell([], retrieval);
+    const navigate = vi.fn();
+
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} navigate={navigate} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    const heading = await screen.findByText("Previously on this network", { exact: false });
+    fireEvent.click(heading.parentElement!.querySelector("button")!);
+
+    expect(navigate).toHaveBeenCalledWith("incidents", { selection: "inc-prior" });
+  });
+
+  it("omits the section entirely when there is nothing retrieved", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf" });
+    installAnsweredShell([]);
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    await waitFor(() => expect(screen.getByText("ARP binding changed on the gateway.")).toBeInTheDocument());
+    expect(screen.queryByText("Previously on this network", { exact: false })).not.toBeInTheDocument();
   });
 });
 

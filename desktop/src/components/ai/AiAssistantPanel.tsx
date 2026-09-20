@@ -336,6 +336,38 @@ function AiAnsweredResult({
         </div>
       )}
 
+      {assistant.response && assistant.response.retrieval && assistant.response.retrieval.length > 0 && (
+        <div>
+          <strong>{t("ai_panel_retrieval_label")}:</strong>
+          <ul className="ai-panel-list">
+            {assistant.response.retrieval.map((r) =>
+              navigate ? (
+                <li key={r.handle}>
+                  <button
+                    type="button"
+                    className="ai-panel-handle-button"
+                    onClick={() => navigate("incidents", { selection: r.incident_id })}
+                    title={t("ai_panel_retrieval_jump_hint")}
+                  >
+                    <TechnicalValue>{r.rule_id}</TechnicalValue> — <TechnicalValue>{r.root_cause_kind}</TechnicalValue>
+                    {r.root_cause_entity ? (
+                      <>
+                        {" "}
+                        (<TechnicalValue>{r.root_cause_entity}</TechnicalValue>)
+                      </>
+                    ) : null}
+                  </button>
+                </li>
+              ) : (
+                <li key={r.handle}>
+                  <TechnicalValue>{r.rule_id}</TechnicalValue> — <TechnicalValue>{r.root_cause_kind}</TechnicalValue>
+                </li>
+              ),
+            )}
+          </ul>
+        </div>
+      )}
+
       <NotesSection incident={incident} settings={settings} aiSettings={aiSettings} answerId={assistant.answerId} t={t} />
 
       <RetryButton onAnalyze={onAnalyze} t={t} />
