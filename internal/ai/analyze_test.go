@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -153,6 +154,13 @@ func TestAnalyzeRejectsARequestMissingChainEvidenceBeforeCallingTheModel(t *test
 	_, err := Analyze(context.Background(), NewHTTPClient(5*time.Second), srv.URL, req, nil, "what happened?", "en", Policy{})
 	if err == nil {
 		t.Fatal("a request missing its own chain event was accepted")
+	}
+	var invalid *InvalidRequestError
+	if !errors.As(err, &invalid) {
+		t.Fatalf("err = %v (%T), want an *InvalidRequestError a caller can distinguish from a network failure", err, err)
+	}
+	if len(invalid.MissingEventIDs) != 1 || invalid.MissingEventIDs[0] != "e-root" {
+		t.Errorf("MissingEventIDs = %v, want [e-root]", invalid.MissingEventIDs)
 	}
 }
 

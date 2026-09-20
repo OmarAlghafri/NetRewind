@@ -9,6 +9,21 @@ import (
 	"github.com/OmarAlghafri/netrewind/internal/incident"
 )
 
+// InvalidRequestError is what Analyze returns when the caller's own
+// request is malformed - specifically, when the incident's root cause or
+// chain names an event id that Events does not actually contain
+// (MissingEvidence). This is never the network's fault and never the
+// model's fault, so it is a distinct Go type a caller can recognise with
+// errors.As instead of matching on error text (see cmd/netrewind/ai.go's
+// exit-code mapping for why that distinction matters to a script).
+type InvalidRequestError struct {
+	MissingEventIDs []string
+}
+
+func (e *InvalidRequestError) Error() string {
+	return fmt.Sprintf("ai: request references events not offered as evidence: %v", e.MissingEventIDs)
+}
+
 // AnnotationRef is one operator note offered to the model as an A-handle -
 // already resolved to its own identity and rendered text by the caller
 // (internal/notes.Annotation on the daemon side, or the CLI's own decode
@@ -106,12 +121,13 @@ const repairInstruction = "Your previous answer did not satisfy the required rul
 // RankSimilar's top history and req.Annotations, sent once, validated, and
 // - only if every violation present is retry-eligible - resent once with a
 // repair turn at a higher token budget. It never panics on a malformed
-// request: MissingEvidence is checked first and reported as a plain error
-// (a caller integration bug, exit code 3 in the CLI contract), distinct
-// from every other outcome, which is a Result with no error.
+// request: MissingEvidence is checked first and reported as an
+// *InvalidRequestError (a caller integration bug, exit code 3 in the CLI
+// contract - see errors.As), distinct from every other outcome, which is a
+// Result with no error.
 func Analyze(ctx context.Context, client *http.Client, serverURL string, req Request, annotations []AnnotationRef, question, lang string, policy Policy) (Result, error) {
 	if missing := MissingEvidence(req); len(missing) > 0 {
-		return Result{}, fmt.Errorf("ai: request references events not offered as evidence: %v", missing)
+		return Result{}, &InvalidRequestError{MissingEventIDs: missing}
 	}
 	policy = policy.withDefaults()
 

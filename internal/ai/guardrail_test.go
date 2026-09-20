@@ -187,6 +187,20 @@ func TestMissingEvidenceReportsRootCauseAndChainGaps(t *testing.T) {
 	}
 }
 
+// TestMissingEvidenceDoesNotReportTheSameMissingIDTwice covers the very
+// common shape where a single-event incident's root cause and its one
+// chain link name the same event id: a missing id must be reported once,
+// not once per field that happens to name it (a real bug caught by
+// TestAnalyzeRejectsARequestMissingChainEvidenceBeforeCallingTheModel
+// asserting an exact []string{"e-root"} rather than just "non-empty").
+func TestMissingEvidenceDoesNotReportTheSameMissingIDTwice(t *testing.T) {
+	inc := testIncident("r", "k", "e", "e-root", 80, []incident.Link{{EventID: "e-root", Kind: "k"}})
+	missing := MissingEvidence(Request{Incident: inc, Events: nil})
+	if len(missing) != 1 || missing[0] != "e-root" {
+		t.Errorf("MissingEvidence = %v, want exactly [e-root] once, not once per field naming it", missing)
+	}
+}
+
 func hasReasonCode(reasons []Reason, code string) bool {
 	for _, r := range reasons {
 		if r.Code == code {

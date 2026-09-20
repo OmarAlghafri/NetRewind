@@ -8,6 +8,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -26,8 +27,20 @@ var version = "dev"
 func main() {
 	if err := newRootCmd().Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "netrewind:", err)
-		os.Exit(1)
+		os.Exit(exitCodeFor(err))
 	}
+}
+
+// exitCodeFor is 1 for an ordinary command failure, matching every command
+// here except `ai analyze`, whose stdout contract distinguishes a
+// malformed request, an unreachable server, and an answer that never
+// passed validation from each other - see aiExitError.
+func exitCodeFor(err error) int {
+	var withCode aiExitError
+	if errors.As(err, &withCode) {
+		return withCode.code
+	}
+	return 1
 }
 
 func newRootCmd() *cobra.Command {
@@ -42,7 +55,7 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(
 		newEventsCmd(), newTimelineCmd(), newWhatHappenedCmd(),
 		newIncidentsCmd(), newRulesCmd(), newServeCmd(), newStatusCmd(),
-		newBundleCmd(), newVersionCmd(), newNoteCmd(), newNotesCmd(),
+		newBundleCmd(), newVersionCmd(), newNoteCmd(), newNotesCmd(), newAICmd(),
 	)
 	return root
 }

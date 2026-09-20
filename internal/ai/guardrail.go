@@ -53,24 +53,24 @@ type GuardrailResult struct {
 	// caller reports verdict "insufficient_evidence" using Reasons alone,
 	// with no inference run at all (execution order §4.10: "force
 	// insufficient_evidence before inference on gap/collector-down").
-	Refuse bool
+	Refuse bool `json:"refuse"`
 	// Ceiling bounds every confidence field in the per-request JSON schema
 	// (see JSONSchemaFor). It is computed the same way whether or not
 	// Refuse ends up true: a gap forces a refusal, it does not change what
 	// the deterministic engine itself was confident about, so the two are
 	// reported independently rather than one zeroing the other out.
-	Ceiling int
+	Ceiling int `json:"ceiling"`
 	// Reasons lists every rule that matched, not only the first - a client
 	// showing "why can't I get an answer" should be able to name every
 	// contributing cause, not just whichever was checked first.
-	Reasons []Reason
+	Reasons []Reason `json:"reasons,omitempty"`
 	// BlindFamilies lists event-kind families this recorder currently
 	// cannot see (a collector down or unsupported, but not one covering
 	// this incident's own root-cause/chain kinds - see Reasons for that
 	// stronger case instead), disclosed in the prompt so the model can
 	// name them as a limit on its own answer rather than reasoning as if
 	// they do not exist.
-	BlindFamilies []string
+	BlindFamilies []string `json:"blind_families,omitempty"`
 }
 
 // blindnessRuleIDs are the two correlation rules whose entire conclusion is
@@ -182,14 +182,21 @@ func MissingEvidence(req Request) []string {
 			have[id] = true
 		}
 	}
+	// A single-event incident's chain link is very often the same event as
+	// its own root cause; reported flags a real missing id once, not once
+	// per field that happens to name it.
 	var missing []string
-	if id := req.Incident.RootCause.EventID; id != "" && !have[id] {
+	reported := map[string]bool{}
+	report := func(id string) {
+		if id == "" || have[id] || reported[id] {
+			return
+		}
+		reported[id] = true
 		missing = append(missing, id)
 	}
+	report(req.Incident.RootCause.EventID)
 	for _, link := range req.Incident.Chain {
-		if link.EventID != "" && !have[link.EventID] {
-			missing = append(missing, link.EventID)
-		}
+		report(link.EventID)
 	}
 	return missing
 }
