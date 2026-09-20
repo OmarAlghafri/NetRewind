@@ -27,6 +27,10 @@ type Request struct {
 	// reaches these rules anyway) - rules 6/7 below only apply when this
 	// is non-nil.
 	Capabilities []registry.Snapshot
+	// History is the pool of candidate prior incidents Analyze ranks with
+	// RankSimilar to decide what "previously on this network" offers -
+	// unused by Guardrail itself.
+	History []*incident.Incident
 }
 
 // windowPadSeconds is how far outside an incident's own [opened, end]

@@ -11,6 +11,13 @@ import (
 type ViolationCode string
 
 const (
+	// ViolationSchemaInvalid (S): the raw text could not be parsed as the
+	// required JSON shape at all (ExtractModelOutput failed) - the server
+	// not actually enforcing the per-request schema is a real risk
+	// (harness.Grade's own doc comment), not merely a model failure.
+	// Retry-eligible: plausibly a truncated or malformed sample rather
+	// than a deliberate content problem.
+	ViolationSchemaInvalid ViolationCode = "schema_invalid"
 	// ViolationUnknownHandle (H): a cited handle was never offered for
 	// this request - the single most dangerous failure mode this whole
 	// design exists to prevent (execution order §4.10: "any handle
@@ -72,7 +79,7 @@ const (
 // aiGuardrailCatalogue.ts) is caught immediately rather than silently
 // shipping untranslated.
 var AllViolationCodes = []ViolationCode{
-	ViolationUnknownHandle, ViolationConfidenceAboveCeiling, ViolationCauseNotOffered,
+	ViolationSchemaInvalid, ViolationUnknownHandle, ViolationConfidenceAboveCeiling, ViolationCauseNotOffered,
 	ViolationCauseInBlindFamily, ViolationWrongLanguage, ViolationFabricatedURLOrDomain,
 	ViolationCommandSyntax, ViolationActionClaim, ViolationActiveMarkup,
 	ViolationPhantomHandle, ViolationRawIDInText, ViolationRefusalShape,
@@ -81,10 +88,11 @@ var AllViolationCodes = []ViolationCode{
 // retryEligibleCodes are exactly S(chema)/H/C from the plan's checklist -
 // the only failures worth one resend at a slightly higher token budget,
 // because they are plausibly a truncated or malformed sample rather than a
-// deliberate content problem a retry could not fix anyway. Schema failures
-// never reach Validate as a ViolationCode (ExtractModelOutput fails first,
-// see Analyze) - only H and C are retry-eligible violations here.
+// deliberate content problem a retry could not fix anyway. ViolationSchemaInvalid
+// is produced by Analyze itself (when ExtractModelOutput fails, there is no
+// ModelOutput yet for this function to inspect) rather than by Validate.
 var retryEligibleCodes = map[ViolationCode]bool{
+	ViolationSchemaInvalid:          true,
 	ViolationUnknownHandle:          true,
 	ViolationConfidenceAboveCeiling: true,
 }

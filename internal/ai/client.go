@@ -2,6 +2,7 @@ package ai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -82,22 +83,33 @@ type ChatResult struct {
 // runtime starts llama-server with (ADR 0006); empty for the evaluation
 // runner's operator-started, tokenless server.
 func ChatComplete(client *http.Client, serverURL, token, sysPrompt, userPrompt string, maxTokens int, schema map[string]any) (ChatResult, error) {
+	return Chat(context.Background(), client, serverURL, token, []ChatMessage{
+		{Role: "system", Content: sysPrompt},
+		{Role: "user", Content: userPrompt},
+	}, maxTokens, schema)
+}
+
+// Chat is ChatComplete with the full message list exposed and a context
+// threaded through to the request, for Analyze's one allowed retry (a
+// retry resends the original system/user turns plus the malformed
+// assistant reply and a fixed repair instruction, rather than starting
+// over, so the model sees exactly what it got wrong) and for a caller that
+// needs to cancel an in-flight analysis (the plan's "cancel mid-analysis
+// kills the sidecar").
+func Chat(ctx context.Context, client *http.Client, serverURL, token string, messages []ChatMessage, maxTokens int, schema map[string]any) (ChatResult, error) {
 	reqBody := ChatCompletionRequest{
 		Temperature:    0,
 		MaxTokens:      maxTokens,
 		CachePrompt:    false,
 		ResponseFormat: &ResponseFormat{Type: "json_object", Schema: schema},
-		Messages: []ChatMessage{
-			{Role: "system", Content: sysPrompt},
-			{Role: "user", Content: userPrompt},
-		},
+		Messages:       messages,
 	}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
 		return ChatResult{}, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, strings.TrimRight(serverURL, "/")+"/v1/chat/completions", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(serverURL, "/")+"/v1/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return ChatResult{}, err
 	}
