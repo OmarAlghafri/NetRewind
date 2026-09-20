@@ -22,7 +22,7 @@ func newAICmd() *cobra.Command {
 			"already read the local record over the read-only API. That is what lets\n" +
 			"the same request be replayed byte-for-byte by the evaluation gate.",
 	}
-	cmd.AddCommand(newAIAnalyzeCmd())
+	cmd.AddCommand(newAIAnalyzeCmd(), newAIModelCmd())
 	return cmd
 }
 
