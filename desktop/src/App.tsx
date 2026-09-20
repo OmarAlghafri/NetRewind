@@ -153,6 +153,7 @@ function Shell() {
               events={record.events}
               context={route.context}
               navigate={navigate}
+              settings={settings}
             />
           )}
           {route.page === "timeline" && <Timeline events={record.events} context={route.context} />}

@@ -647,6 +647,32 @@ body {
   text-underline-offset: 2px;
 }
 
+.ai-panel-notes {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.ai-panel-notes-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-panel-notes-outcome {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.ai-panel-feedback {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
 .ai-panel-technical-details summary {
   cursor: pointer;
   color: var(--text-muted);

@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { LanguageProvider } from "../../i18n/LanguageContext";
 import { AiSessionProvider } from "../../data/aiSession";
 import { DEFAULT_AI_SETTINGS, writeAiSettings } from "../../data/aiSettings";
+import { DEFAULT_SETTINGS } from "../../data/source";
 import { AiAssistantPanel } from "./AiAssistantPanel";
 import type { Incident, NetRewindEvent } from "../../types";
 
@@ -56,27 +57,55 @@ const events: NetRewindEvent[] = [
   },
 ];
 
+function analyzeResponseBody(handles: { handle: string; kind: string; ref: string }[]) {
+  return JSON.stringify({
+    version: 1,
+    verdict: "answered",
+    guardrail: { refuse: false, ceiling: 75 },
+    handles,
+    output: {
+      summary: "ARP binding changed on the gateway.",
+      ranked_hypotheses: [{ cause: "l2.arp_binding_changed", entity: "10.0.0.1", confidence: 75 }],
+      evidence_handles: handles.map((h) => h.handle),
+      counter_evidence: [],
+      unknowns: [],
+      confidence_ceiling: 75,
+      next_checks: [],
+    },
+    validation: { ok: true, retried: false, first_attempt_valid: true, violations: [] },
+    timing: { prompt_ms: 1, predicted_ms: 2, total_ms: 3 },
+  });
+}
+
 function installAnsweredShell(handles: { handle: string; kind: string; ref: string }[]) {
   installShell(async (cmd) => {
     if (cmd === "ai_status") return { running: true, port: 1234 };
-    if (cmd === "ai_analyze") {
-      return JSON.stringify({
-        version: 1,
-        verdict: "answered",
-        guardrail: { refuse: false, ceiling: 75 },
-        handles,
-        output: {
-          summary: "ARP binding changed on the gateway.",
-          ranked_hypotheses: [{ cause: "l2.arp_binding_changed", entity: "10.0.0.1", confidence: 75 }],
-          evidence_handles: handles.map((h) => h.handle),
-          counter_evidence: [],
-          unknowns: [],
-          confidence_ceiling: 75,
-          next_checks: [],
-        },
-        validation: { ok: true, retried: false, first_attempt_valid: true, violations: [] },
-        timing: { prompt_ms: 1, predicted_ms: 2, total_ms: 3 },
-      });
+    if (cmd === "ai_analyze") return analyzeResponseBody(handles);
+    throw new Error("unexpected command " + cmd);
+  });
+}
+
+/** Same as installAnsweredShell, but also answers the /v1/notes routes the
+ *  NotesSection reads/writes - agent_get for the existing annotation
+ *  (404 = none yet), agent_request for the PUT/POST writes. `calls`
+ *  records every agent_request invocation so a test can assert on the
+ *  exact body sent. */
+function installAnsweredShellWithNotes(
+  handles: { handle: string; kind: string; ref: string }[],
+  opts: { existingNote?: Record<string, unknown>; calls: Record<string, unknown>[] },
+) {
+  installShell(async (cmd, args) => {
+    if (cmd === "ai_status") return { running: true, port: 1234 };
+    if (cmd === "ai_analyze") return analyzeResponseBody(handles);
+    if (cmd === "agent_get") {
+      if (opts.existingNote) return { status: 200, body: JSON.stringify(opts.existingNote), headers: {} };
+      return { status: 404, body: JSON.stringify({ error: { code: "not_found", message: "no note" } }), headers: {} };
+    }
+    if (cmd === "agent_request") {
+      opts.calls.push(args ?? {});
+      const method = args?.method as string;
+      if (method === "PUT") return { status: 200, body: JSON.stringify({ incident_id: "inc-1", outcome: (JSON.parse(args?.body as string)).outcome }), headers: {} };
+      return { status: 204, body: "", headers: {} };
     }
     throw new Error("unexpected command " + cmd);
   });
@@ -123,5 +152,75 @@ describe("AiAssistantPanel: evidence handle navigation", () => {
     fireEvent.click(await screen.findByText("Analyze this incident locally"));
     await waitFor(() => expect(screen.getByText("E1")).toBeInTheDocument());
     expect(screen.getByText("E1").closest("button")).toBeNull();
+  });
+});
+
+describe("AiAssistantPanel: notes and feedback", () => {
+  it("reports notes as unavailable when no live source is given", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf" });
+    installAnsweredShell([]);
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    expect(await screen.findByText("Notes are only available while connected to a live recorder.")).toBeInTheDocument();
+  });
+
+  it("reports notes as unavailable for a demo/bundle source", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf" });
+    installAnsweredShell([]);
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} settings={{ ...DEFAULT_SETTINGS, kind: "demo" }} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    expect(await screen.findByText("Notes are only available while connected to a live recorder.")).toBeInTheDocument();
+  });
+
+  it("saves an outcome note against a live source, with the incident's own rule/cause fields", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf" });
+    const calls: Record<string, unknown>[] = [];
+    installAnsweredShellWithNotes([], { calls });
+
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} settings={{ ...DEFAULT_SETTINGS, kind: "live" }} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    fireEvent.click(await screen.findByText("Confirmed cause"));
+    fireEvent.click(screen.getByText("Save note"));
+
+    await waitFor(() => expect(screen.getByText("Saved")).toBeInTheDocument());
+    const putCall = calls.find((c) => c.method === "PUT");
+    expect(putCall?.path).toBe("/v1/notes/incidents/inc-1");
+    expect(JSON.parse(putCall?.body as string)).toMatchObject({
+      rule_id: "gateway-hijack",
+      root_cause_kind: "l2.arp_binding_changed",
+      root_cause_entity: "10.0.0.1",
+      outcome: "confirmed",
+    });
+  });
+
+  it("pre-fills the form from an existing note", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf" });
+    installAnsweredShellWithNotes([], {
+      calls: [],
+      existingNote: { incident_id: "inc-1", outcome: "unresolved", cause_note: "still investigating" },
+    });
+
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} settings={{ ...DEFAULT_SETTINGS, kind: "live" }} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    await waitFor(() => expect(screen.getByText("Unresolved")).toBeInTheDocument());
+    expect(await screen.findByDisplayValue("still investigating")).toBeInTheDocument();
+    expect((screen.getByRole("radio", { name: "Unresolved" }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("sends helpful/not-helpful feedback tied to this answer", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf", profile: "balanced" });
+    const calls: Record<string, unknown>[] = [];
+    installAnsweredShellWithNotes([], { calls });
+
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} settings={{ ...DEFAULT_SETTINGS, kind: "live" }} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    fireEvent.click(await screen.findByText("Helpful"));
+
+    await waitFor(() => expect(screen.getByText("Thanks, your feedback was recorded locally.")).toBeInTheDocument());
+    const feedbackCall = calls.find((c) => c.path === "/v1/notes/feedback");
+    const body = JSON.parse(feedbackCall?.body as string);
+    expect(body).toMatchObject({ incident_id: "inc-1", profile: "balanced", model_id: "small.gguf", helpful: true });
+    expect(typeof body.answer_id).toBe("string");
+    expect(body.answer_id.length).toBeGreaterThan(0);
   });
 });

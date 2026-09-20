@@ -13,6 +13,7 @@ import { formatTime } from "../i18n/format";
 import { labelForFamily } from "../i18n/kindCatalogue";
 import type { Page } from "../components/Sidebar";
 import type { InvestigationContext } from "../routing/useRoute";
+import type { SourceSettings } from "../data/source";
 
 /** How far outside an incident's own [opened, end] span the local-AI
  *  assistant's evidence window reaches - matching internal/ai's own
@@ -178,6 +179,7 @@ export function Incidents({
   events = [],
   context = {},
   navigate,
+  settings,
 }: {
   incidents: Incident[];
   rules: RuleSummary[];
@@ -186,6 +188,9 @@ export function Incidents({
   events?: NetRewindEvent[];
   context?: InvestigationContext;
   navigate?: (page: Page, context?: InvestigationContext) => void;
+  /** Optional for the same reason as `events` - the source (endpoint,
+   *  kind) the local-AI panel needs to read/write operator notes. */
+  settings?: SourceSettings;
 }) {
   const { t, lang } = useLanguage();
   const onExport = navigate ? (inc: Incident) => navigate("evidence", contextForIncidentExport(inc)) : undefined;
@@ -297,6 +302,7 @@ export function Incidents({
                 events={selectAiEvents(selected, events)}
                 history={selectAiHistory(selected, incidents)}
                 navigate={navigate}
+                settings={settings}
               />
             )}
           </InspectorPanel>

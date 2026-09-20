@@ -22,6 +22,11 @@ export interface AiEntry<TResult, TError> {
   state: AiEntryState;
   result?: TResult;
   error?: TError;
+  /** A client-generated id for this one answer, present only once state is
+   *  "result" - internal/notes.Feedback keys on it (see docs/api.md's
+   *  POST /v1/notes/feedback), and the shipped analyze response carries no
+   *  server-side answer id of its own to reuse. */
+  answerId?: string;
 }
 
 interface AiSessionValue {

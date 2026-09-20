@@ -23,6 +23,8 @@ export type AiPanelState =
 export interface UseAiAssistantResult {
   state: AiPanelState;
   response?: AiAnalyzeResponse;
+  /** Only set once state is "answered" - see AiEntry.answerId. */
+  answerId?: string;
   errorCode?: string;
   errorMessage?: string;
   /** Only meaningful (and only shown by the panel) once state is one of
@@ -70,7 +72,7 @@ export function useAiAssistant(
           lang,
           policy: { max_history: 3 },
         });
-        session.setEntry(incident.incident_id, { state: "result", result: response });
+        session.setEntry(incident.incident_id, { state: "result", result: response, answerId: crypto.randomUUID() });
       } catch (e) {
         const err =
           e instanceof AiCommandError
@@ -109,7 +111,7 @@ export function useAiAssistant(
   // entry.state === "result"
   const response = entry.result;
   if (!response) return { state: "idle", analyze };
-  if (response.verdict === "answered") return { state: "answered", response, analyze };
+  if (response.verdict === "answered") return { state: "answered", response, answerId: entry.answerId, analyze };
   if (response.verdict === "insufficient_evidence") return { state: "insufficient_evidence", response, analyze };
   if (response.verdict === "refused_by_model") return { state: "refused_by_model", response, analyze };
   return { state: "invalid", response, analyze };

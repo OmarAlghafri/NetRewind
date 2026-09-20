@@ -1,14 +1,19 @@
+import { useEffect, useState } from "react";
 import type { Incident, NetRewindEvent } from "../../types";
 import { nsToDate } from "../../types";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { messageFor } from "../../i18n/aiStatusCatalogue";
 import { useAiAssistant } from "../../data/useAiAssistant";
-import { readAiSettings } from "../../data/aiSettings";
+import { readAiSettings, type AiSettings } from "../../data/aiSettings";
 import type { AiHandle } from "../../data/aiTypes";
 import type { Page } from "../Sidebar";
 import type { InvestigationContext } from "../../routing/useRoute";
+import type { SourceSettings } from "../../data/source";
+import { getNotesAnnotation, postNotesFeedback, putNotesAnnotation, type NotesOutcome } from "../../data/notes";
 import { Button } from "../Button";
 import { TechnicalValue } from "../TechnicalValue";
+
+type TFn = (key: Parameters<ReturnType<typeof useLanguage>["t"]>[0]) => string;
 
 /** Resolves an evidence handle (e.g. "E3") back to the real event it cites
  *  (AiHandle.ref) and jumps to it on the Timeline, narrowed to this
@@ -54,6 +59,7 @@ export function AiAssistantPanel({
   events,
   history,
   navigate,
+  settings,
 }: {
   incident: Incident;
   events: NetRewindEvent[];
@@ -63,21 +69,37 @@ export function AiAssistantPanel({
    *  `navigate` for the same "not every caller has a router" reason) -
    *  evidence handles simply render as plain text without it. */
   navigate?: (page: Page, context?: InvestigationContext) => void;
+  /** Optional, same reason as `navigate`: the recorder source, needed only
+   *  for reading/writing operator notes (Part B). Notes are offered only
+   *  for a `"live"` source - a demo or bundle recording has no recorder to
+   *  write them to. */
+  settings?: SourceSettings;
 }) {
   const { t, lang } = useLanguage();
-  // Settings are read fresh on every render rather than threaded down as a
-  // prop through Incidents.tsx/InspectorPanel: this panel is the only
-  // consumer of aiSettings today, and adding a prop through two more
-  // components for one reader would be a bigger change than the page
-  // rebuild that eventually gives Settings a shared, passed-down copy
-  // needs to justify.
-  const settings = readAiSettings();
-  const assistant = useAiAssistant(incident, events, history, lang, settings);
+  // AI settings (model/profile/threads) are read fresh on every render
+  // rather than threaded down as a prop through Incidents.tsx/
+  // InspectorPanel: this panel is the only consumer of them today, and
+  // adding a prop through two more components for one reader would be a
+  // bigger change than the page rebuild that eventually gives Settings a
+  // shared, passed-down copy needs to justify. `settings` (the source, for
+  // notes) is a real prop because Incidents.tsx already threads it.
+  const aiSettings = readAiSettings();
+  const assistant = useAiAssistant(incident, events, history, lang, aiSettings);
 
   return (
     <section className="ai-panel" aria-label={t("ai_panel_title")}>
       <h3 className="ai-panel-title">{t("ai_panel_title")}</h3>
-      <AiAssistantBody assistant={assistant} onAnalyze={assistant.analyze} events={events} navigate={navigate} lang={lang} t={t} />
+      <AiAssistantBody
+        assistant={assistant}
+        onAnalyze={assistant.analyze}
+        incident={incident}
+        events={events}
+        navigate={navigate}
+        settings={settings}
+        aiSettings={aiSettings}
+        lang={lang}
+        t={t}
+      />
     </section>
   );
 }
@@ -89,17 +111,23 @@ type NavigateFn = (page: Page, context?: InvestigationContext) => void;
 function AiAssistantBody({
   assistant,
   onAnalyze,
+  incident,
   events,
   navigate,
+  settings,
+  aiSettings,
   lang,
   t,
 }: {
   assistant: Assistant;
   onAnalyze: () => void;
+  incident: Incident;
   events: NetRewindEvent[];
   navigate?: NavigateFn;
+  settings?: SourceSettings;
+  aiSettings: AiSettings;
   lang: "ar" | "en";
-  t: (key: Parameters<ReturnType<typeof useLanguage>["t"]>[0]) => string;
+  t: TFn;
 }) {
   switch (assistant.state) {
     case "shell_required":
@@ -192,7 +220,18 @@ function AiAssistantBody({
         </div>
       );
     case "answered":
-      return <AiAnsweredResult assistant={assistant} onAnalyze={onAnalyze} events={events} navigate={navigate} t={t} />;
+      return (
+        <AiAnsweredResult
+          assistant={assistant}
+          onAnalyze={onAnalyze}
+          incident={incident}
+          events={events}
+          navigate={navigate}
+          settings={settings}
+          aiSettings={aiSettings}
+          t={t}
+        />
+      );
   }
 }
 
@@ -207,15 +246,21 @@ function RetryButton({ onAnalyze, t }: { onAnalyze: () => void; t: (key: Paramet
 function AiAnsweredResult({
   assistant,
   onAnalyze,
+  incident,
   events,
   navigate,
+  settings,
+  aiSettings,
   t,
 }: {
   assistant: Assistant;
   onAnalyze: () => void;
+  incident: Incident;
   events: NetRewindEvent[];
   navigate?: NavigateFn;
-  t: (key: Parameters<ReturnType<typeof useLanguage>["t"]>[0]) => string;
+  settings?: SourceSettings;
+  aiSettings: AiSettings;
+  t: TFn;
 }) {
   const output = assistant.response?.output;
   const handles = assistant.response?.handles ?? [];
@@ -291,7 +336,195 @@ function AiAnsweredResult({
         </div>
       )}
 
+      <NotesSection incident={incident} settings={settings} aiSettings={aiSettings} answerId={assistant.answerId} t={t} />
+
       <RetryButton onAnalyze={onAnalyze} t={t} />
+    </div>
+  );
+}
+
+/**
+ * The "memory" half of the feature (execution order's own framing: a model
+ * that "has memory"): the operator's own conclusion (outcome + free-text
+ * notes) and helpful/not-helpful feedback on this answer, both written to
+ * the recorder's notes store (ADR 0008) - never to the model, never
+ * leaving the device. Only offered for a `"live"` source: a demo or bundle
+ * recording has no recorder to write these to.
+ */
+function NotesSection({
+  incident,
+  settings,
+  aiSettings,
+  answerId,
+  t,
+}: {
+  incident: Incident;
+  settings?: SourceSettings;
+  aiSettings: AiSettings;
+  answerId?: string;
+  t: TFn;
+}) {
+  if (!settings || settings.kind !== "live") {
+    return (
+      <div className="ai-panel-notes">
+        <p className="ai-panel-hint">{t("ai_panel_notes_unavailable")}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="ai-panel-notes">
+      <AnnotationForm incident={incident} endpoint={settings.endpoint} t={t} />
+      {answerId && <FeedbackButtons incident={incident} endpoint={settings.endpoint} answerId={answerId} aiSettings={aiSettings} t={t} />}
+    </div>
+  );
+}
+
+const OUTCOMES: readonly NotesOutcome[] = ["confirmed", "false_positive", "unresolved"];
+
+function AnnotationForm({ incident, endpoint, t }: { incident: Incident; endpoint: string; t: TFn }) {
+  const [outcome, setOutcome] = useState<NotesOutcome | "">("");
+  const [causeNote, setCauseNote] = useState("");
+  const [resolutionNote, setResolutionNote] = useState("");
+  const [status, setStatus] = useState<"loading" | "idle" | "saving" | "saved" | "error">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    setStatus("loading");
+    setOutcome("");
+    setCauseNote("");
+    setResolutionNote("");
+    getNotesAnnotation(endpoint, incident.incident_id)
+      .then((a) => {
+        if (cancelled) return;
+        if (a) {
+          setOutcome(a.outcome);
+          setCauseNote(a.cause_note ?? "");
+          setResolutionNote(a.resolution_note ?? "");
+        }
+        setStatus("idle");
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [endpoint, incident.incident_id]);
+
+  const save = async () => {
+    if (!outcome) return;
+    setStatus("saving");
+    try {
+      await putNotesAnnotation(endpoint, incident.incident_id, {
+        ruleId: incident.rule_id,
+        rootCauseKind: incident.root_cause.kind,
+        rootCauseEntity: incident.root_cause.entity,
+        openedAtNs: incident.opened_at,
+        outcome,
+        causeNote: causeNote || undefined,
+        resolutionNote: resolutionNote || undefined,
+      });
+      setStatus("saved");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  if (status === "loading") return <p className="ai-panel-message">{t("ai_panel_notes_loading")}</p>;
+
+  return (
+    <div className="ai-panel-notes-form">
+      <strong>{t("ai_panel_notes_title")}</strong>
+      <div className="ai-panel-notes-outcome" role="radiogroup" aria-label={t("ai_panel_notes_outcome_label")}>
+        {OUTCOMES.map((o) => (
+          <label className="field-check" key={o}>
+            <input
+              type="radio"
+              name={`ai-notes-outcome-${incident.incident_id}`}
+              checked={outcome === o}
+              onChange={() => setOutcome(o)}
+            />
+            {t(`ai_panel_notes_outcome_${o}` as const)}
+          </label>
+        ))}
+      </div>
+      <label className="field-label">
+        {t("ai_panel_notes_cause_label")}
+        <textarea className="field-input" dir="auto" rows={2} value={causeNote} onChange={(e) => setCauseNote(e.target.value)} />
+      </label>
+      <label className="field-label">
+        {t("ai_panel_notes_resolution_label")}
+        <textarea className="field-input" dir="auto" rows={2} value={resolutionNote} onChange={(e) => setResolutionNote(e.target.value)} />
+      </label>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <Button variant="secondary" onClick={() => void save()} disabled={!outcome || status === "saving"}>
+          {t("ai_panel_notes_save_button")}
+        </Button>
+        {status === "saved" && (
+          <span className="inline-ok" role="status">
+            {t("ai_panel_notes_saved")}
+          </span>
+        )}
+        {status === "error" && (
+          <span className="inline-error" role="alert">
+            {t("ai_panel_notes_error")}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FeedbackButtons({
+  incident,
+  endpoint,
+  answerId,
+  aiSettings,
+  t,
+}: {
+  incident: Incident;
+  endpoint: string;
+  answerId: string;
+  aiSettings: AiSettings;
+  t: TFn;
+}) {
+  const [status, setStatus] = useState<"idle" | "sent" | "error">("idle");
+
+  const send = async (helpful: boolean) => {
+    try {
+      await postNotesFeedback(endpoint, {
+        answerId,
+        incidentId: incident.incident_id,
+        profile: aiSettings.profile,
+        modelId: aiSettings.modelFileName,
+        helpful,
+        ruleId: incident.rule_id,
+        rootCauseKind: incident.root_cause.kind,
+        rootCauseEntity: incident.root_cause.entity,
+      });
+      setStatus("sent");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  if (status === "sent") {
+    return <p className="ai-panel-hint">{t("ai_panel_feedback_thanks")}</p>;
+  }
+  return (
+    <div className="ai-panel-feedback">
+      <span className="ai-panel-hint">{t("ai_panel_feedback_question")}</span>
+      <Button variant="ghost" onClick={() => void send(true)}>
+        {t("ai_panel_feedback_helpful")}
+      </Button>
+      <Button variant="ghost" onClick={() => void send(false)}>
+        {t("ai_panel_feedback_not_helpful")}
+      </Button>
+      {status === "error" && (
+        <span className="inline-error" role="alert">
+          {t("ai_panel_feedback_error")}
+        </span>
+      )}
     </div>
   );
 }
