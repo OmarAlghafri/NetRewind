@@ -1,10 +1,40 @@
 import type { Incident, NetRewindEvent } from "../../types";
+import { nsToDate } from "../../types";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { messageFor } from "../../i18n/aiStatusCatalogue";
 import { useAiAssistant } from "../../data/useAiAssistant";
 import { readAiSettings } from "../../data/aiSettings";
+import type { AiHandle } from "../../data/aiTypes";
+import type { Page } from "../Sidebar";
+import type { InvestigationContext } from "../../routing/useRoute";
 import { Button } from "../Button";
 import { TechnicalValue } from "../TechnicalValue";
+
+/** Resolves an evidence handle (e.g. "E3") back to the real event it cites
+ *  (AiHandle.ref) and jumps to it on the Timeline, narrowed to this
+ *  analysis's own evidence window and highlighting the cited row - the
+ *  plan's "resolved and clickable" requirement for Part D. Only "event"
+ *  handles navigate anywhere; "history"/"annotation" handles point at a
+ *  prior incident or a note, neither of which is a Timeline row. */
+function navigateToHandle(
+  navigate: (page: Page, context?: InvestigationContext) => void,
+  handles: AiHandle[],
+  events: NetRewindEvent[],
+  handle: string,
+) {
+  const resolved = handles.find((h) => h.handle === handle && h.kind === "event");
+  if (!resolved) return;
+  if (events.length === 0) {
+    navigate("timeline", { selection: resolved.ref });
+    return;
+  }
+  const wallTimes = events.map((e) => e.ts_wall);
+  navigate("timeline", {
+    from: nsToDate(Math.min(...wallTimes)).toISOString(),
+    to: nsToDate(Math.max(...wallTimes)).toISOString(),
+    selection: resolved.ref,
+  });
+}
 
 /**
  * The local-AI assistant for one incident - rendered as a sibling below
@@ -23,10 +53,16 @@ export function AiAssistantPanel({
   incident,
   events,
   history,
+  navigate,
 }: {
   incident: Incident;
   events: NetRewindEvent[];
   history: Incident[];
+  /** Optional: absent only in contexts with no Timeline to jump to (there
+   *  are none today, but this mirrors Incidents.tsx's own optional
+   *  `navigate` for the same "not every caller has a router" reason) -
+   *  evidence handles simply render as plain text without it. */
+  navigate?: (page: Page, context?: InvestigationContext) => void;
 }) {
   const { t, lang } = useLanguage();
   // Settings are read fresh on every render rather than threaded down as a
@@ -41,21 +77,27 @@ export function AiAssistantPanel({
   return (
     <section className="ai-panel" aria-label={t("ai_panel_title")}>
       <h3 className="ai-panel-title">{t("ai_panel_title")}</h3>
-      <AiAssistantBody assistant={assistant} onAnalyze={assistant.analyze} lang={lang} t={t} />
+      <AiAssistantBody assistant={assistant} onAnalyze={assistant.analyze} events={events} navigate={navigate} lang={lang} t={t} />
     </section>
   );
 }
 
 type Assistant = ReturnType<typeof useAiAssistant>;
 
+type NavigateFn = (page: Page, context?: InvestigationContext) => void;
+
 function AiAssistantBody({
   assistant,
   onAnalyze,
+  events,
+  navigate,
   lang,
   t,
 }: {
   assistant: Assistant;
   onAnalyze: () => void;
+  events: NetRewindEvent[];
+  navigate?: NavigateFn;
   lang: "ar" | "en";
   t: (key: Parameters<ReturnType<typeof useLanguage>["t"]>[0]) => string;
 }) {
@@ -150,7 +192,7 @@ function AiAssistantBody({
         </div>
       );
     case "answered":
-      return <AiAnsweredResult assistant={assistant} onAnalyze={onAnalyze} t={t} />;
+      return <AiAnsweredResult assistant={assistant} onAnalyze={onAnalyze} events={events} navigate={navigate} t={t} />;
   }
 }
 
@@ -165,13 +207,18 @@ function RetryButton({ onAnalyze, t }: { onAnalyze: () => void; t: (key: Paramet
 function AiAnsweredResult({
   assistant,
   onAnalyze,
+  events,
+  navigate,
   t,
 }: {
   assistant: Assistant;
   onAnalyze: () => void;
+  events: NetRewindEvent[];
+  navigate?: NavigateFn;
   t: (key: Parameters<ReturnType<typeof useLanguage>["t"]>[0]) => string;
 }) {
   const output = assistant.response?.output;
+  const handles = assistant.response?.handles ?? [];
   if (!output) return null;
   return (
     <div className="ai-panel-result">
@@ -196,11 +243,24 @@ function AiAnsweredResult({
       {output.evidence_handles.length > 0 && (
         <p>
           {t("ai_panel_evidence_label")}:{" "}
-          {output.evidence_handles.map((h) => (
-            <TechnicalValue key={h} className="ai-panel-handle">
-              {h}
-            </TechnicalValue>
-          ))}
+          {output.evidence_handles.map((h) => {
+            const isEventHandle = handles.some((r) => r.handle === h && r.kind === "event");
+            return isEventHandle && navigate ? (
+              <button
+                key={h}
+                type="button"
+                className="ai-panel-handle-button"
+                onClick={() => navigateToHandle(navigate, handles, events, h)}
+                title={t("ai_panel_evidence_jump_hint")}
+              >
+                <TechnicalValue className="ai-panel-handle">{h}</TechnicalValue>
+              </button>
+            ) : (
+              <TechnicalValue key={h} className="ai-panel-handle">
+                {h}
+              </TechnicalValue>
+            );
+          })}
         </p>
       )}
 

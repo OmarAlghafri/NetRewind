@@ -632,6 +632,21 @@ body {
   margin-inline-end: 6px;
 }
 
+.ai-panel-handle-button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-inline-end: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ai-panel-handle-button .ai-panel-handle {
+  margin-inline-end: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .ai-panel-technical-details summary {
   cursor: pointer;
   color: var(--text-muted);
@@ -651,6 +666,15 @@ body {
   color: var(--text-muted);
   width: 100px;
   flex-shrink: 0;
+}
+
+/* Same convention as .incident-row-selected: --bg (a visible shift off
+   the card's own --bg-elevated) plus an accent-colored start border,
+   rather than a new color invented just for this row. */
+.timeline-row-selected {
+  background: var(--bg);
+  border-inline-start: 3px solid var(--accent);
+  padding-inline-start: 9px;
 }
 
 .capability-row {

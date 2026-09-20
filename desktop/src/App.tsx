@@ -155,7 +155,7 @@ function Shell() {
               navigate={navigate}
             />
           )}
-          {route.page === "timeline" && <Timeline events={record.events} />}
+          {route.page === "timeline" && <Timeline events={record.events} context={route.context} />}
           {route.page === "host" && <Host events={record.events} />}
           {route.page === "rules" && (
             <Rules

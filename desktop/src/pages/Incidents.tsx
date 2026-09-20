@@ -296,6 +296,7 @@ export function Incidents({
                 incident={selected}
                 events={selectAiEvents(selected, events)}
                 history={selectAiHistory(selected, incidents)}
+                navigate={navigate}
               />
             )}
           </InspectorPanel>
