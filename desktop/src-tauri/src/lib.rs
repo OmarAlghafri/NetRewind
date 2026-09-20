@@ -3,6 +3,7 @@
 //! reads.
 
 mod agent;
+mod ai;
 mod bundle;
 
 use agent::AgentError;
