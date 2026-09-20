@@ -29,6 +29,7 @@ import (
 	"github.com/OmarAlghafri/netrewind/internal/identity"
 	"github.com/OmarAlghafri/netrewind/internal/ipc"
 	"github.com/OmarAlghafri/netrewind/internal/metrics"
+	"github.com/OmarAlghafri/netrewind/internal/notes"
 	"github.com/OmarAlghafri/netrewind/internal/otel"
 	"github.com/OmarAlghafri/netrewind/internal/registry"
 	"github.com/OmarAlghafri/netrewind/internal/store"
@@ -236,6 +237,22 @@ func run(ctx context.Context, log *slog.Logger, cfg config) error {
 		}
 	}
 
+	// Notes is a second, separate database beside events.db (ADR 0008): the
+	// operator's own annotations, feedback and opt-in analysis history. It
+	// is opened independently of the API so a failure to open it degrades
+	// to "no notes", the same way a failure to serve the API degrades to
+	// "no API", rather than stopping the recorder.
+	var notesStore notes.Store
+	if cfg.Notes.enabled() {
+		n, err := notes.OpenSQLite(notes.DefaultPath(filepath.Dir(cfg.DBPath)))
+		if err != nil {
+			log.Error("notes store not opened; operator annotations and history disabled", "err", err)
+		} else {
+			notesStore = n
+			defer n.Close()
+		}
+	}
+
 	// The local API answers the desktop application over the local-only
 	// transport. It serves the same store and registry the CLI reads; it is
 	// started before the collectors so a client can see them come up.
@@ -259,6 +276,7 @@ func run(ctx context.Context, log *slog.Logger, cfg config) error {
 			api := &http.Server{Handler: (&apiv1.Server{
 				Store: st, Registry: reg, Version: version, ObserverID: observerID,
 				StorePath: dbPath, StartedAt: time.Now(), Rules: rules,
+				Notes: notesStore, NotesThreadsDisabled: !cfg.Notes.threads(),
 			}).Handler()}
 			go func() {
 				log.Info("serving the local API", "endpoint", apiPath)

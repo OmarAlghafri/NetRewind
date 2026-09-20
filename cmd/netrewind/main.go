@@ -42,7 +42,7 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(
 		newEventsCmd(), newTimelineCmd(), newWhatHappenedCmd(),
 		newIncidentsCmd(), newRulesCmd(), newServeCmd(), newStatusCmd(),
-		newBundleCmd(), newVersionCmd(),
+		newBundleCmd(), newVersionCmd(), newNoteCmd(), newNotesCmd(),
 	)
 	return root
 }

@@ -245,3 +245,52 @@ func TestCheckConfigStillRefusesAConfigurationThatWouldNotWork(t *testing.T) {
 		t.Fatal("--check-config accepted a configuration the recorder cannot use")
 	}
 }
+
+func TestNotesDefaultsToEnabledWithThreadsAllowed(t *testing.T) {
+	cfg, err := parse(t, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Notes.enabled() {
+		t.Error("notes should be enabled by default")
+	}
+	if !cfg.Notes.threads() {
+		t.Error("notes threads should be allowed by default")
+	}
+}
+
+func TestNotesCanBeDisabledWithoutDisablingTheApi(t *testing.T) {
+	cfg, err := parse(t, "notes:\n  enabled: false\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Notes.enabled() {
+		t.Error("notes.enabled: false was not honored")
+	}
+	if !cfg.API.enabled() {
+		t.Error("disabling notes must not disable the read-only API")
+	}
+}
+
+func TestNotesThreadsCanBeDisabledWithoutDisablingNotes(t *testing.T) {
+	cfg, err := parse(t, "notes:\n  threads: false\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Notes.enabled() {
+		t.Error("notes should stay enabled")
+	}
+	if cfg.Notes.threads() {
+		t.Error("notes.threads: false was not honored")
+	}
+}
+
+func TestNotesThreadsOnWithNotesOffIsRefused(t *testing.T) {
+	_, err := parse(t, "notes:\n  enabled: false\n  threads: true\n")
+	if err == nil {
+		t.Fatal("accepted threads:true with enabled:false, which can never persist anything")
+	}
+	if !strings.Contains(err.Error(), "no notes store") {
+		t.Errorf("the error does not explain the problem: %v", err)
+	}
+}

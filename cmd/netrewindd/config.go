@@ -64,6 +64,10 @@ type config struct {
 	// API is the local-only endpoint the desktop application reads from.
 	API apiConfig `yaml:"api"`
 
+	// Notes is the operator's own annotations, feedback and (opt-in)
+	// analysis history - see internal/notes and ADR 0008.
+	Notes notesConfig `yaml:"notes"`
+
 	// CheckOnly comes from --check-config and never from the file. It is what
 	// the systemd unit runs before starting, so a configuration the recorder
 	// cannot use stops the service instead of starting one that records the
@@ -117,6 +121,28 @@ type apiConfig struct {
 }
 
 func (a apiConfig) enabled() bool { return a.Enabled == nil || *a.Enabled }
+
+// notesConfig controls the recorder's separate operator-notes store
+// (internal/notes: a second database beside events.db, never merged into
+// it - see ADR 0008). It is off the record's own read-only guarantee
+// entirely, so it is opted into and out of independently from api.enabled.
+type notesConfig struct {
+	// Enabled is on by default. Off means notes.db is never opened and
+	// /v1/notes/* is never registered (internal/api/v1.Server treats a nil
+	// Notes field as "route not offered", not "route that errors").
+	Enabled *bool `yaml:"enabled"`
+	// Threads additionally allows persisted follow-up-question history.
+	// Off refuses every thread append with the same "history disabled"
+	// response the per-installation opt-in produces (notes.ErrHistoryDisabled),
+	// regardless of what the desktop's own settings ask for - an operator
+	// under a policy against storing model conversations turns this off
+	// once here instead of trusting it to every installation's own
+	// settings. On by default.
+	Threads *bool `yaml:"threads"`
+}
+
+func (n notesConfig) enabled() bool { return n.Enabled == nil || *n.Enabled }
+func (n notesConfig) threads() bool { return n.Threads == nil || *n.Threads }
 
 // duration is a time.Duration the config file can write the way the flag does.
 //
@@ -343,6 +369,10 @@ func (c *config) validate() error {
 	if c.Update.Apply && !c.Update.Check {
 		problems = append(problems,
 			"update: apply is on but check is off, so nothing would ever be installed")
+	}
+	if !c.Notes.enabled() && c.Notes.Threads != nil && *c.Notes.Threads {
+		problems = append(problems,
+			"notes: threads is on but enabled is off, so there is no notes store for a thread to persist in")
 	}
 	if c.Update.Check && time.Duration(c.Update.Every) < time.Hour {
 		problems = append(problems, fmt.Sprintf(

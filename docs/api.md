@@ -1,9 +1,15 @@
 # The local API
 
-`netrewindd` serves a read-only, versioned JSON API to processes on the same
-machine. It is what the desktop application and `netrewind status` read. It
-is never reachable from the network: the transport is a Unix domain socket on
-Linux and a named pipe on Windows, and there is no option to bind a TCP port.
+`netrewindd` serves a versioned JSON API to processes on the same machine. It
+is what the desktop application and `netrewind status` read. It is never
+reachable from the network: the transport is a Unix domain socket on Linux
+and a named pipe on Windows, and there is no option to bind a TCP port.
+
+Every route on the record itself is `GET`: the event store cannot be
+changed through this interface (see [Requests](#requests)). The one
+exception is `/v1/notes/*` (see [Notes](#notes-writable)), a completely
+separate database for the operator's own annotations - never the record,
+never evidence.
 
 ## Endpoint
 
@@ -23,9 +29,11 @@ recording without it.
 
 ## Requests
 
-Plain HTTP/1.1 over the stream. Every route is `GET`; anything else is a 405.
-The `Host` header is ignored. Times are RFC 3339; event timestamps in bodies
-are nanoseconds since the epoch, as in [the schema](schema.md).
+Plain HTTP/1.1 over the stream. Every route on the record is `GET`; any other
+method there is a 405 (`/v1/notes/*` registers `PUT`/`POST`/`DELETE` routes
+of its own - see below). The `Host` header is ignored. Times are RFC 3339;
+event timestamps in bodies are nanoseconds since the epoch, as in
+[the schema](schema.md).
 
 Errors share one shape:
 
@@ -172,12 +180,95 @@ Returns:
 `observed_labels` lists the host's *other* addresses (what the CLI prints
 as "also answered to: ..."), not the one given in the query.
 
+## Notes (writable)
+
+`internal/notes` (see ADR 0008) is a second, completely separate database
+next to the event store: the operator's own conclusions about an incident,
+feedback on a local-AI answer, and (opt-in only) follow-up-question
+history. It is never merged into the record, never treated as evidence, and
+never read by anything that also touches `events.db`. `netrewind note` and
+`netrewind notes` use it (see below) instead of any direct file access.
+
+These routes exist only when the recorder's configuration has `notes.enabled`
+(on by default - see [releasing.md](releasing.md) or the daemon's own
+`--help`); when it is off, every path under `/v1/notes` is unregistered and
+answers 404, the same as any other route this build does not have.
+
+Body limit: 64 KiB. Malformed or oversized JSON is a 400. Errors use the
+same `{ "error": { "code", "message" } }` shape as the rest of the API.
+
+### `GET/PUT/DELETE /v1/notes/incidents/{id}`
+
+`GET` returns the stored annotation or 404 if there is none. `PUT` creates
+or replaces it:
+
+```json
+{ "rule_id": "gateway-hijack", "root_cause_kind": "l2.arp_binding_changed",
+  "root_cause_entity": "10.99.0.1", "opened_at_ns": 1758270000000000000,
+  "outcome": "confirmed", "cause_note": "…", "resolution_note": "…" }
+```
+
+`outcome` must be `confirmed`, `false_positive`, or `unresolved`. `DELETE`
+removes it; both return `204` except `PUT`, which returns the stored
+annotation as confirmation.
+
+### `GET /v1/notes/similar`
+
+Query parameters `rule_id` and `root_cause_kind` (both required), `entity`,
+`exclude` (an incident id to leave out), `limit` (default 3). Returns prior
+annotated incidents for the same rule and root cause - same rule+kind+entity
+first, then same rule+kind, newest first within each tier - as
+`{ "incident_id", "outcome", "cause_note", ... }` (the same annotation shape
+`GET /v1/notes/incidents/{id}` returns, in an array). Never `null`.
+
+### `POST /v1/notes/feedback`
+
+Local-only helpful/not-helpful signal on a local-AI answer:
+
+```json
+{ "answer_id": "…", "incident_id": "…", "profile": "balanced",
+  "model_id": "…", "helpful": true, "rule_id": "…",
+  "root_cause_kind": "…", "root_cause_entity": "…" }
+```
+
+Returns `204`. The oldest entry is dropped once more than 500 are stored;
+this is never sent anywhere.
+
+### `GET/POST /v1/notes/threads/{id}`
+
+Opt-in follow-up-question history for one incident. `GET` returns the
+stored turns (never `null`). `POST` appends one:
+
+```json
+{ "answer_id": "…", "question_redacted": "…", "summary_redacted": "…" }
+```
+
+Refuses with `409 history_disabled` when history is not opted into - either
+the per-installation setting (`GET/PUT /v1/notes/settings`, below) or the
+operator's own `notes.threads: false` in the daemon's configuration, which
+overrides the per-installation setting regardless of what it says. At most
+20 turns are kept per incident; the oldest is dropped once exceeded.
+
+### `GET/PUT /v1/notes/settings`
+
+The per-installation history opt-in: `{ "history_opt_in": true|false }`.
+Turning it off deletes every stored thread immediately as part of the same
+request - off means forgotten, not merely "stop adding more".
+
+### `DELETE /v1/notes`
+
+Forgets everything: every annotation, every feedback entry, every thread.
+Does not change the history opt-in setting itself. Returns `204`.
+
 ## Using it from a shell
 
 ```bash
 netrewind status                      # health + capabilities, formatted
 netrewind status -o json              # the raw documents
 netrewind status --endpoint /tmp/x.sock
+
+netrewind note 01J8ZQXK7X8VN5T4R6E9W1C2D3 --outcome confirmed --cause "bad switch port"
+netrewind notes --rule gateway-hijack --kind l2.arp_binding_changed --entity 10.99.0.1
 ```
 
 Any HTTP client that can dial a Unix socket works on Linux, for example

@@ -26,6 +26,7 @@ import (
 	"github.com/OmarAlghafri/netrewind/internal/correlate"
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/incident"
+	"github.com/OmarAlghafri/netrewind/internal/notes"
 	"github.com/OmarAlghafri/netrewind/internal/registry"
 	"github.com/OmarAlghafri/netrewind/internal/store"
 )
@@ -57,13 +58,33 @@ type Server struct {
 	// Rules is the loaded correlation catalogue, so a client can show what
 	// the recorder is able to conclude, not only what it has concluded.
 	Rules []*correlate.Rule
+
+	// Notes is the operator's own annotations, feedback and (opt-in)
+	// analysis history - a completely separate store from Store above (see
+	// internal/notes's own package doc for why). Nil disables every
+	// /v1/notes/* route entirely rather than serving them against nothing;
+	// see registerNotesRoutes in notes.go. Every notes handler receives
+	// this field's type, notes.Store, and never Store - see
+	// TestNotesHandlersNeverTouchTheRecord.
+	Notes notes.Store
+	// NotesThreadsDisabled is an operator-level override (config's
+	// notes.threads: false) that refuses every persisted follow-up thread
+	// regardless of the per-installation history opt-in stored in
+	// notes.db. False (the zero value) matches the default of allowing
+	// threads, so existing callers that never set this field are
+	// unaffected.
+	NotesThreadsDisabled bool
 }
 
-// Handler returns the routed API. Every route requires GET: this interface
-// cannot change the record, matching internal/web's own read-only design
-// (see its TestTheInterfaceIsReadOnly) for the same reason - a recorder's
-// job is to observe, and an interface that could write to it would be a
-// second, less-audited path to the same mistake.
+// Handler returns the routed API. Every route on the record (events,
+// incidents, health, capabilities, rules, bundle, what-happened) requires
+// GET: this interface cannot change the record, matching internal/web's own
+// read-only design (see its TestTheInterfaceIsReadOnly) for the same reason
+// - a recorder's job is to observe, and an interface that could write to it
+// would be a second, less-audited path to the same mistake. The one
+// exception is /v1/notes/*, added below only when s.Notes is set: an
+// operator's own annotations, on a completely separate store the record's
+// own read-only guarantee never covered in the first place.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/health", s.handleHealth)
@@ -73,6 +94,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/rules", s.handleRules)
 	mux.HandleFunc("GET /v1/bundle", s.handleBundle)
 	mux.HandleFunc("GET /v1/what-happened", s.handleWhatHappened)
+	if s.Notes != nil {
+		s.registerNotesRoutes(mux)
+	}
 	return mux
 }
 
