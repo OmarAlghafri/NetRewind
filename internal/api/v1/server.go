@@ -450,6 +450,10 @@ func (s *Server) handleBundle(w http.ResponseWriter, r *http.Request) {
 		Capabilities:   caps,
 		IncludeSecrets: includeSecrets,
 		Limit:          limit,
+		// nil when notes are disabled on this daemon (s.Notes, same field
+		// registerNotesRoutes checks) - Export then leaves notes.json out
+		// of the archive entirely rather than claiming a definite zero.
+		Notes: s.Notes,
 	})
 	if err != nil {
 		// Headers may already be out; the archive is then truncated and its

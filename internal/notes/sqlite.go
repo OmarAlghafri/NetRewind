@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite" // pure-Go driver: keeps CGO_ENABLED=0 and the binary static, matching internal/store
@@ -190,6 +191,42 @@ func (s *SQLite) Similar(ctx context.Context, ruleID, rootCauseKind, rootCauseEn
 		if err := rows.Scan(&a.IncidentID, &a.Fingerprint, &a.RuleID, &a.RootCauseKind, &a.RootCauseEntity,
 			&a.OpenedAtNS, &a.Outcome, &a.CauseNote, &a.ResolutionNote, &a.CreatedAtMS, &a.UpdatedAtMS, &tier); err != nil {
 			return nil, fmt.Errorf("notes: similar scan: %w", err)
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// GetAnnotations bulk-loads by incident_id - a single `IN (...)` query
+// rather than one GetAnnotation call per id, built with one placeholder
+// per id (never string-interpolated) the same way every other query in
+// this file parameterizes. Returns (nil, nil) for an empty input rather
+// than issuing a query with zero placeholders, which SQLite would refuse.
+func (s *SQLite) GetAnnotations(ctx context.Context, incidentIDs []string) ([]Annotation, error) {
+	if len(incidentIDs) == 0 {
+		return nil, nil
+	}
+	placeholders := make([]string, len(incidentIDs))
+	args := make([]any, len(incidentIDs))
+	for i, id := range incidentIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	query := `SELECT incident_id, fingerprint, rule_id, root_cause_kind, root_cause_entity,
+		opened_at_ns, outcome, cause_note, resolution_note, created_at_ms, updated_at_ms
+		FROM incident_notes WHERE incident_id IN (` + strings.Join(placeholders, ",") + `)`
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("notes: get annotations: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Annotation
+	for rows.Next() {
+		var a Annotation
+		if err := rows.Scan(&a.IncidentID, &a.Fingerprint, &a.RuleID, &a.RootCauseKind, &a.RootCauseEntity,
+			&a.OpenedAtNS, &a.Outcome, &a.CauseNote, &a.ResolutionNote, &a.CreatedAtMS, &a.UpdatedAtMS); err != nil {
+			return nil, fmt.Errorf("notes: get annotations scan: %w", err)
 		}
 		out = append(out, a)
 	}

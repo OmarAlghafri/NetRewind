@@ -75,6 +75,12 @@ application's own Export button, which asks the live recorder for a window
 (last hour, day or week) and saves the result where you choose. DNS names are
 left out unless you tick *include DNS names*.
 
+When the exporting recorder has notes enabled, the bundle also carries
+`notes.json` — the sender's own operator conclusions (ADR 0008) for the
+incidents in that window. A recipient sees these read-only, clearly marked
+as coming from the sender's own record; opening a bundle never writes them
+(or anything else) into your own notes.
+
 "Export this incident's evidence" on an incident (Incidents page) opens the
 Evidence page scoped to that one incident instead of a fixed recent window —
 its own start and end, with an adjustable padding (five minutes either side

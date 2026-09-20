@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/OmarAlghafri/netrewind/internal/bundle"
+	"github.com/OmarAlghafri/netrewind/internal/notes"
 	"github.com/OmarAlghafri/netrewind/internal/store"
 	"github.com/spf13/cobra"
 )
@@ -75,8 +77,25 @@ func newBundleExportCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// notes.db beside events.db, opened only if it already exists -
+			// this command must not create a fresh empty one just because
+			// it ran against an events.db that happens to have no sibling
+			// notes store (an old bundle, a bare CLI-only deployment).
+			var notesStore notes.Store
+			notesPath := notes.DefaultPath(filepath.Dir(dbPath))
+			if _, statErr := os.Stat(notesPath); statErr == nil {
+				ns, openErr := notes.OpenSQLite(notesPath)
+				if openErr != nil {
+					f.Close()
+					os.Remove(out)
+					return fmt.Errorf("opening %s: %w", notesPath, openErr)
+				}
+				defer ns.Close()
+				notesStore = ns
+			}
 			m, err := bundle.Export(context.Background(), st, f, bundle.ExportOptions{
 				From: from, To: to, AppVersion: version, ObserverID: observer, IncludeSecrets: includeSecrets,
+				Notes: notesStore,
 			})
 			if cerr := f.Close(); err == nil {
 				err = cerr

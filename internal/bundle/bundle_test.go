@@ -16,8 +16,19 @@ import (
 
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/incident"
+	"github.com/OmarAlghafri/netrewind/internal/notes"
 	"github.com/OmarAlghafri/netrewind/internal/store"
 )
+
+func newTestNotesStore(t *testing.T) notes.Store {
+	t.Helper()
+	ns, err := notes.OpenSQLite(filepath.Join(t.TempDir(), "notes.db"))
+	if err != nil {
+		t.Fatalf("notes.OpenSQLite: %v", err)
+	}
+	t.Cleanup(func() { ns.Close() })
+	return ns
+}
 
 func newTestStore(t *testing.T) store.Store {
 	t.Helper()
@@ -104,6 +115,147 @@ func TestExportImportRoundTrip(t *testing.T) {
 	if events[0].Attrs["resolver_new"] != "10.0.0.99" {
 		t.Errorf("non-redacted attribute lost: %v", events[0].Attrs["resolver_new"])
 	}
+}
+
+// TestExportWithNotesIncludesAnnotationsForInWindowIncidents is ADR 0008's
+// own tracked gap, closed: a bundle exported with a notes.Store folds in
+// the operator's own conclusion for every incident already in its window.
+func TestExportWithNotesIncludesAnnotationsForInWindowIncidents(t *testing.T) {
+	st := newTestStore(t)
+	seedEvent(t, st, event.KindDNSResolverChanged, nil)
+	seedIncident(t, st)
+	ns := newTestNotesStore(t)
+	if err := ns.PutAnnotation(context.Background(), notes.Annotation{
+		IncidentID: "01TESTINCIDENT00000000000", RuleID: "test-rule",
+		RootCauseKind: "l2.arp_binding_changed", RootCauseEntity: "10.0.0.5",
+		Outcome: notes.OutcomeConfirmed, CauseNote: "bad switch port",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	manifest, err := Export(context.Background(), st, &buf, ExportOptions{
+		From: time.Now().Add(-time.Hour), To: time.Now().Add(time.Hour),
+		AppVersion: "test", ObserverID: "obs-1", Notes: ns,
+	})
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	if manifest.NotesCount == nil || *manifest.NotesCount != 1 {
+		t.Fatalf("manifest.NotesCount = %v, want a pointer to 1", manifest.NotesCount)
+	}
+
+	c, err := Inspect(bytes.NewReader(buf.Bytes()), "")
+	if err != nil {
+		t.Fatalf("Inspect: %v", err)
+	}
+	if len(c.Notes) != 1 {
+		t.Fatalf("got %d notes, want 1: %+v", len(c.Notes), c.Notes)
+	}
+	if c.Notes[0].CauseNote != "bad switch port" {
+		t.Errorf("CauseNote = %q, want %q", c.Notes[0].CauseNote, "bad switch port")
+	}
+}
+
+// TestExportWithoutNotesOmitsTheNotesJSONMemberEntirely proves the "not
+// requested" case (ExportOptions.Notes left nil, every pre-existing test
+// above this one) never claims a definite zero - notes.json must be
+// entirely absent, not an empty array, and NotesCount must be nil, not a
+// pointer to 0.
+func TestExportWithoutNotesOmitsTheNotesJSONMemberEntirely(t *testing.T) {
+	st := newTestStore(t)
+	seedEvent(t, st, event.KindDNSResolverChanged, nil)
+
+	var buf bytes.Buffer
+	manifest, err := Export(context.Background(), st, &buf, ExportOptions{
+		From: time.Now().Add(-time.Hour), To: time.Now().Add(time.Hour),
+		AppVersion: "test", ObserverID: "obs-1",
+	})
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	if manifest.NotesCount != nil {
+		t.Errorf("manifest.NotesCount = %v, want nil (notes were never requested)", *manifest.NotesCount)
+	}
+
+	c, err := Inspect(bytes.NewReader(buf.Bytes()), "")
+	if err != nil {
+		t.Fatalf("Inspect: %v", err)
+	}
+	if c.Notes != nil {
+		t.Errorf("c.Notes = %+v, want nil", c.Notes)
+	}
+}
+
+// TestExportWithNotesButNoneAnnotatedIncludesAnEmptyNotesArray is the third
+// case: a notes.Store was given, but nothing in the window has an
+// annotation - notes.json must still be present, as a genuinely-empty
+// array, distinguishing "queried, found none" from "never queried".
+func TestExportWithNotesButNoneAnnotatedIncludesAnEmptyNotesArray(t *testing.T) {
+	st := newTestStore(t)
+	seedEvent(t, st, event.KindDNSResolverChanged, nil)
+	seedIncident(t, st)
+	ns := newTestNotesStore(t) // never annotated
+
+	var buf bytes.Buffer
+	manifest, err := Export(context.Background(), st, &buf, ExportOptions{
+		From: time.Now().Add(-time.Hour), To: time.Now().Add(time.Hour),
+		AppVersion: "test", ObserverID: "obs-1", Notes: ns,
+	})
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	if manifest.NotesCount == nil || *manifest.NotesCount != 0 {
+		t.Fatalf("manifest.NotesCount = %v, want a pointer to 0", manifest.NotesCount)
+	}
+
+	c, err := Inspect(bytes.NewReader(buf.Bytes()), "")
+	if err != nil {
+		t.Fatalf("Inspect: %v", err)
+	}
+	if c.Notes == nil {
+		t.Error("c.Notes is nil, want a non-nil empty slice (notes were queried, just found none)")
+	}
+	if len(c.Notes) != 0 {
+		t.Errorf("c.Notes = %+v, want empty", c.Notes)
+	}
+}
+
+// TestImportNeverTouchesNotesEvenWhenTheBundleCarriesThem is ADR 0008's own
+// "never merged from a bundle" rule: importing a bundle that DOES carry
+// notes.json must not fail, and must not put anything notes-shaped into
+// the destination store - Import has no notes.Store to write to at all,
+// which is the point, not an oversight.
+func TestImportNeverTouchesNotesEvenWhenTheBundleCarriesThem(t *testing.T) {
+	st := newTestStore(t)
+	seedEvent(t, st, event.KindDNSResolverChanged, nil)
+	seedIncident(t, st)
+	ns := newTestNotesStore(t)
+	if err := ns.PutAnnotation(context.Background(), notes.Annotation{
+		IncidentID: "01TESTINCIDENT00000000000", RuleID: "test-rule",
+		RootCauseKind: "l2.arp_binding_changed", RootCauseEntity: "10.0.0.5",
+		Outcome: notes.OutcomeConfirmed,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := Export(context.Background(), st, &buf, ExportOptions{
+		From: time.Now().Add(-time.Hour), To: time.Now().Add(time.Hour),
+		AppVersion: "test", ObserverID: "obs-1", Notes: ns,
+	}); err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+
+	dest := filepath.Join(t.TempDir(), "imported.db")
+	if _, err := Import(&buf, ImportOptions{DestPath: dest}); err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	// The imported store is an internal/store.Store, which has no
+	// notes-shaped table or method at all - Import succeeding here, with
+	// notes.json present in the source archive, already proves nothing
+	// about notes was written anywhere: there is nowhere in this store it
+	// could have gone.
 }
 
 func TestIncludeSecretsPreservesTheName(t *testing.T) {

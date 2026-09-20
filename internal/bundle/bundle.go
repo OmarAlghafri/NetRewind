@@ -27,6 +27,7 @@ import (
 
 	"github.com/OmarAlghafri/netrewind/internal/event"
 	"github.com/OmarAlghafri/netrewind/internal/incident"
+	"github.com/OmarAlghafri/netrewind/internal/notes"
 	"github.com/OmarAlghafri/netrewind/internal/registry"
 	"github.com/OmarAlghafri/netrewind/internal/store"
 	"github.com/OmarAlghafri/netrewind/internal/update"
@@ -47,6 +48,7 @@ const (
 	manifestFile  = "manifest.json"
 	eventsFile    = "events.json"
 	incidentsFile = "incidents.json"
+	notesFile     = "notes.json"
 	checksumsFile = "SHA256SUMS"
 	signatureFile = "SHA256SUMS.sig"
 )
@@ -83,6 +85,13 @@ type Manifest struct {
 	Truncated    bool                `json:"truncated"`
 	Redacted     bool                `json:"redacted"`
 	Capabilities []registry.Snapshot `json:"capabilities,omitempty"`
+	// NotesCount is a pointer so "0 notes, genuinely queried" (an empty
+	// notes.json member is present) is distinguishable from "not queried
+	// at all" (ExportOptions.Notes was nil, no notes.json in the archive)
+	// - the same reason a Go nil slice and an empty one encode differently
+	// only when a caller bothers to check, which json.Marshal's omitempty
+	// on a *int actually enforces.
+	NotesCount *int `json:"notes_count,omitempty"`
 }
 
 // ExportOptions controls what Export includes.
@@ -99,6 +108,13 @@ type ExportOptions struct {
 	// Limit bounds how many events and incidents are read. Zero means
 	// DefaultExportLimit.
 	Limit int
+	// Notes, when non-nil, folds every operator annotation for an
+	// exported incident into a notes.json member (ADR 0008's own tracked
+	// gap: a bundle previously carried none of this at all). Nil - the
+	// daemon's own notes.Store disabled, or a CLI export against a
+	// events.db with no sibling notes.db - leaves notes.json out of the
+	// archive entirely, never as a claimed-empty array.
+	Notes notes.Store
 }
 
 // redactedAttrs are event attribute keys stripped from a redacted export -
@@ -138,6 +154,18 @@ func Export(ctx context.Context, st store.Store, w io.Writer, opts ExportOptions
 		}
 	}
 
+	var annotations []notes.Annotation
+	if opts.Notes != nil {
+		ids := make([]string, len(incidents))
+		for i, inc := range incidents {
+			ids[i] = inc.ID
+		}
+		annotations, err = opts.Notes.GetAnnotations(ctx, ids)
+		if err != nil {
+			return Manifest{}, fmt.Errorf("bundle: query notes: %w", err)
+		}
+	}
+
 	manifest := Manifest{
 		FormatVersion: FormatVersion,
 		SchemaVersion: event.SchemaVersion,
@@ -152,8 +180,12 @@ func Export(ctx context.Context, st store.Store, w io.Writer, opts ExportOptions
 		Redacted:      !opts.IncludeSecrets,
 		Capabilities:  opts.Capabilities,
 	}
+	if opts.Notes != nil {
+		n := len(annotations)
+		manifest.NotesCount = &n
+	}
 
-	members, err := marshalMembers(manifest, events, incidents)
+	members, err := marshalMembers(manifest, events, incidents, opts.Notes != nil, annotations)
 	if err != nil {
 		return Manifest{}, err
 	}
@@ -173,7 +205,7 @@ func redact(e *event.Event) {
 	}
 }
 
-func marshalMembers(m Manifest, events []*event.Event, incidents []*incident.Incident) (map[string][]byte, error) {
+func marshalMembers(m Manifest, events []*event.Event, incidents []*incident.Incident, includeNotes bool, annotations []notes.Annotation) (map[string][]byte, error) {
 	// An empty window is an empty array, never null: a reader that is not
 	// Go should not have to know that Go encodes a nil slice as null.
 	if events == nil {
@@ -199,6 +231,16 @@ func marshalMembers(m Manifest, events []*event.Event, incidents []*incident.Inc
 		manifestFile:  manifestJSON,
 		eventsFile:    eventsJSON,
 		incidentsFile: incidentsJSON,
+	}
+	if includeNotes {
+		if annotations == nil {
+			annotations = []notes.Annotation{}
+		}
+		notesJSON, err := json.MarshalIndent(annotations, "", "  ")
+		if err != nil {
+			return nil, fmt.Errorf("bundle: encode notes: %w", err)
+		}
+		members[notesFile] = notesJSON
 	}
 	members[checksumsFile] = []byte(checksumFile(members))
 	return members, nil
@@ -269,6 +311,13 @@ type Contents struct {
 	Manifest  Manifest
 	Events    []*event.Event
 	Incidents []*incident.Incident
+	// Notes is nil when the bundle carries no notes.json member at all
+	// (an older bundle, or one exported with no notes.Store available) -
+	// distinct from a non-nil empty slice, which means the exporting
+	// recorder genuinely had zero annotations for this window. ADR 0008:
+	// these are the *sender's* own operator notes, shown read-only and
+	// labelled as such by a caller - never merged into anything.
+	Notes []notes.Annotation
 	// Signed reports whether the archive carried a signature that verified
 	// against the key given to Inspect. False with no key given means
 	// "not checked", not "unsigned".
@@ -310,6 +359,11 @@ func Inspect(r io.Reader, publicKey string) (Contents, error) {
 	}
 	if err := json.Unmarshal(members[incidentsFile], &c.Incidents); err != nil {
 		return Contents{}, fmt.Errorf("bundle: incidents.json does not parse: %w", err)
+	}
+	if raw, ok := members[notesFile]; ok {
+		if err := json.Unmarshal(raw, &c.Notes); err != nil {
+			return Contents{}, fmt.Errorf("bundle: notes.json does not parse: %w", err)
+		}
 	}
 	return c, nil
 }
@@ -390,7 +444,7 @@ func readTarGz(r io.Reader) (map[string][]byte, error) {
 
 	members := make(map[string][]byte)
 	allowed := map[string]bool{
-		manifestFile: true, eventsFile: true, incidentsFile: true,
+		manifestFile: true, eventsFile: true, incidentsFile: true, notesFile: true,
 		checksumsFile: true, signatureFile: true,
 	}
 

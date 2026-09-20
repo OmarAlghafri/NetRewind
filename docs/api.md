@@ -144,6 +144,15 @@ anywhere by serving it. The `limit` parameter caps events and incidents;
 without it the bundle's own, much larger default applies and the manifest's
 `truncated` flag says whether it was hit.
 
+When this daemon has notes enabled (`notes.enabled`, on by default - see
+"Notes (writable)" below), the archive also carries `notes.json`: the
+operator's own annotations (ADR 0008) for whichever incidents fall in the
+exported window, labelled read-only on import - never merged into the
+recipient's own record or notes store. The manifest's `notes_count` is
+absent entirely when notes were not available to export (an older build,
+or `notes.enabled: false`), and a real number (possibly `0`) whenever they
+were - the two are deliberately distinguishable.
+
 ### `GET /v1/what-happened`
 
 Answers exactly what `netrewind what-happened --host <addr> --at <time>

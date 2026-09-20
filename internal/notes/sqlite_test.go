@@ -120,6 +120,48 @@ func TestDeleteAnnotationRemovesIt(t *testing.T) {
 	}
 }
 
+func TestGetAnnotationsBulkLoadsByIDAndSkipsUnannotatedOnes(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	if err := s.PutAnnotation(ctx, Annotation{IncidentID: "a", Outcome: OutcomeConfirmed}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PutAnnotation(ctx, Annotation{IncidentID: "b", Outcome: OutcomeFalsePositive}); err != nil {
+		t.Fatal(err)
+	}
+	// "c" is deliberately never annotated, and "z" is asked for but was
+	// never even created - both must be silently absent from the result,
+	// not an error.
+	got, err := s.GetAnnotations(ctx, []string{"a", "b", "c", "z"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]Annotation{}
+	for _, a := range got {
+		byID[a.IncidentID] = a
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d annotations, want exactly 2 (a and b): %+v", len(got), got)
+	}
+	if byID["a"].Outcome != OutcomeConfirmed {
+		t.Errorf("a.Outcome = %q, want confirmed", byID["a"].Outcome)
+	}
+	if byID["b"].Outcome != OutcomeFalsePositive {
+		t.Errorf("b.Outcome = %q, want false_positive", byID["b"].Outcome)
+	}
+}
+
+func TestGetAnnotationsReturnsNilForEmptyInputRatherThanQuerying(t *testing.T) {
+	s := openTest(t)
+	got, err := s.GetAnnotations(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != nil {
+		t.Errorf("got %+v, want nil", got)
+	}
+}
+
 // TestSimilarOrdersSameEntityFirstThenSameKindThenNewestAndExcludesSelf is
 // the exact ranking the approved plan specifies: tier 1 (same rule+kind+
 // entity) before tier 2 (same rule+kind only), newest first within each

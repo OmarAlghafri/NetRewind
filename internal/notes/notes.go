@@ -103,6 +103,15 @@ type Store interface {
 	// returns more than limit rows.
 	Similar(ctx context.Context, ruleID, rootCauseKind, rootCauseEntity, excludeIncidentID string, limit int) ([]Annotation, error)
 
+	// GetAnnotations is the bulk form of GetAnnotation, for a bundle export
+	// (internal/bundle) folding in every note for the incidents already in
+	// its window - one query instead of one GetAnnotation call per
+	// incident. Silently skips any id with no annotation (an incident an
+	// operator never annotated is not an error); never returns more rows
+	// than distinct ids were asked for. Empty in, empty (not nil-error)
+	// out.
+	GetAnnotations(ctx context.Context, incidentIDs []string) ([]Annotation, error)
+
 	PutFeedback(ctx context.Context, f Feedback) error
 
 	// HistoryOptIn reports the current on-device-history setting; threads

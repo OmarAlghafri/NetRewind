@@ -90,11 +90,19 @@ rather than remaining absolute.
   tracked separately) the corresponding delta: this is a strictly smaller
   capability than "can modify the record," but it is not nothing, and the
   threat model should say so explicitly rather than by omission.
-- **Known gap, not yet implemented:** the 1.2.0 plan's bundle-export member
-  (`notes.json`, read-only, labelled "from this bundle" on import) does not
-  exist yet - `internal/bundle` has no notes-aware export path today. A
-  recipient of an exported evidence bundle sees only the deterministic
-  record; the sender's own operator notes stay local until this lands.
+- **Closed 2026-09-20:** the 1.2.0 plan's bundle-export member (`notes.json`)
+  now exists - `ExportOptions.Notes` (a `notes.Store`, nil-safe) folds every
+  annotation for an in-window incident into the archive via the new bulk
+  `Store.GetAnnotations`, read back by `Inspect` into `Contents.Notes`.
+  Optional on both the write and read side (`internal/bundle`'s allow-list,
+  and Rust's own independent `desktop/src-tauri/src/bundle.rs` reader): an
+  older bundle, or one exported with notes disabled, simply has no
+  `notes.json` member, and `Manifest.NotesCount` is a `nil` pointer rather
+  than a claimed zero in that case (a real, possibly-zero count when notes
+  genuinely were queried). Import still never writes anything from it
+  anywhere - there is no notes.Store in `ImportOptions` to write to, which
+  is the point: a bundle's own claimed "confirmed cause" must never become
+  the recipient's.
 - `netrewind note <incident-id> --outcome ... --cause ...` and `netrewind
   notes --rule --kind --entity` (`cmd/netrewind/note.go`) are the CLI's own
   client of this same write surface - like the desktop panel, over the API,
@@ -115,4 +123,11 @@ rather than remaining absolute.
   thread-append refusal both from the per-installation opt-in and from the
   operator's own policy override; `GET /v1/notes/stats` reflecting real
   counts, not a hard-coded value.
+- `internal/bundle/bundle_test.go`: an export with `Notes` set folds in the
+  matching annotation and stamps a real `NotesCount`; an export with `Notes`
+  left nil omits `notes.json` entirely and leaves `NotesCount` `nil`, not a
+  claimed zero; an export with `Notes` set but nothing annotated still
+  produces a present-but-empty array (the third, distinct case); importing
+  a bundle that carries `notes.json` succeeds and has nowhere to write it
+  to (`ImportOptions` has no notes.Store).
 - `go build ./... && go vet ./... && CGO_ENABLED=0 go test ./... && gofmt -l cmd internal ai` clean.
