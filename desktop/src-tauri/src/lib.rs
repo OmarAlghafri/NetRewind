@@ -10,6 +10,7 @@ use agent::AgentError;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tauri::State;
 use tokio::sync::Notify;
 
@@ -306,12 +307,224 @@ fn bundle_open(path: String, public_key: Option<String>) -> Result<bundle::Conte
     bundle::open(&path, public_key.as_deref())
 }
 
+/// The running sidecar, if `ai_runtime_start` has ever succeeded and
+/// `ai_runtime_stop` (or app exit) has not since stopped it - the
+/// port/token every `ai_analyze` call in the meantime must use. Dropping
+/// `child` (replacing it with `None`, or the whole `AiState` on app exit)
+/// kills the process (`kill_on_drop`, set where it is spawned) rather
+/// than leaving an orphaned llama-server behind.
+struct Sidecar {
+    child: tokio::process::Child,
+    port: u16,
+    token: String,
+}
+
+/// One local-AI sidecar for the whole app session - never more than one
+/// llama-server at a time, matching there being exactly one model
+/// profile active at once in the plan's own design.
+#[derive(Default)]
+struct AiState {
+    sidecar: tokio::sync::Mutex<Option<Sidecar>>,
+}
+
+#[derive(Serialize)]
+struct AiStatusResponse {
+    running: bool,
+    port: Option<u16>,
+}
+
+/// Whether a sidecar is currently running, and on which port - enough for
+/// the frontend to decide whether `ai_analyze` can be called yet, without
+/// exposing the token (that stays entirely server-side, attached by
+/// `ai_analyze` itself, never sent to the frontend to relay back).
+#[tauri::command]
+async fn ai_status(state: State<'_, AiState>) -> Result<AiStatusResponse, String> {
+    let mut guard = state.sidecar.lock().await;
+    // try_wait() is Ok(Some(_)) once the child has actually exited (a
+    // crash, or llama-server refusing its own arguments) - reported as
+    // "not running" rather than as whatever state this struct was left in
+    // right after spawn, which kill_on_drop alone would not catch until
+    // this whole AiState is dropped.
+    if let Some(sidecar) = guard.as_mut() {
+        if matches!(sidecar.child.try_wait(), Ok(Some(_))) {
+            *guard = None;
+        }
+    }
+    Ok(AiStatusResponse {
+        running: guard.is_some(),
+        port: guard.as_ref().map(|s| s.port),
+    })
+}
+
+/// Stops the running sidecar, if any - a no-op, not an error, if none is
+/// running (stopping something already stopped is not a failure).
+#[tauri::command]
+async fn ai_runtime_stop(state: State<'_, AiState>) -> Result<(), String> {
+    *state.sidecar.lock().await = None;
+    Ok(())
+}
+
+/// Verifies the staged runtime and model files against their own locks,
+/// picks a free loopback port and a fresh per-session token, and spawns
+/// `llama-server`, replacing any sidecar already running. Returns once
+/// `/health` answers - the frontend does not poll for readiness itself.
+///
+/// `model_file_name` names the model already downloaded under
+/// `ai::models::models_dir` (by `netrewind ai model download`, spawned
+/// separately - this command never downloads anything). `extra_args` are
+/// the runtime lock's own `server_args` for this platform, read by the
+/// frontend from the staged `runtime.lock.json` alongside this call, kept
+/// as a parameter rather than this command re-reading that file itself so
+/// there is exactly one place (the frontend's own settings/status flow)
+/// that decides which runtime build is in use.
+#[tauri::command]
+async fn ai_runtime_start(
+    app: tauri::AppHandle,
+    model_file_name: String,
+    extra_args: Vec<String>,
+    threads: Option<usize>,
+    state: State<'_, AiState>,
+) -> Result<AiStatusResponse, String> {
+    use tauri::Manager;
+
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("{}: {e}", ai::codes::RUNTIME_MISSING))?;
+    let data_dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| format!("{}: {e}", ai::codes::MODEL_MISSING))?;
+
+    let runtime_dir = resource_dir.join("llama-runtime");
+    let lock_path = runtime_dir.join("runtime.lock.json");
+    let lock_data = std::fs::read(&lock_path)
+        .map_err(|e| format!("{}: {lock_path:?}: {e}", ai::codes::RUNTIME_MISSING))?;
+    let lock: ai::runtime::RuntimeLock = serde_json::from_slice(&lock_data)
+        .map_err(|e| format!("{}: runtime.lock.json: {e}", ai::codes::RUNTIME_MISSING))?;
+    let target = env!("TARGET");
+    let entry = lock.targets.get(target).ok_or_else(|| {
+        format!(
+            "{}: no runtime.lock.json entry for {target}",
+            ai::codes::RUNTIME_MISSING
+        )
+    })?;
+    ai::runtime::verify_runtime_files(&runtime_dir, entry)
+        .map_err(|(name, code)| format!("{code}: {name}"))?;
+
+    let models_dir = ai::models::models_dir(&data_dir);
+    let model_path = models_dir.join(&model_file_name);
+    let meta_path = models_dir.join(format!("{model_file_name}.meta.json"));
+    let meta_data = std::fs::read(&meta_path)
+        .map_err(|e| format!("{}: {meta_path:?}: {e}", ai::codes::MODEL_MISSING))?;
+    let meta: ai::runtime::ModelMeta = serde_json::from_slice(&meta_data).map_err(|e| {
+        format!(
+            "{}: {model_file_name}.meta.json: {e}",
+            ai::codes::MODEL_MISSING
+        )
+    })?;
+    ai::runtime::verify_model_file(&model_path, &meta)?;
+
+    let port = ai::runtime::pick_free_port()
+        .map_err(|e| format!("{}: {e}", ai::codes::RUNTIME_PORT_UNAVAILABLE))?;
+    let token = ai::runtime::generate_token();
+    let thread_count = ai::runtime::default_threads(threads);
+    let mut args =
+        ai::runtime::build_server_args(port, &token, &model_path, thread_count, &entry.server_args);
+    args.extend(extra_args);
+
+    let exe = runtime_dir.join(if cfg!(windows) {
+        "llama-server.exe"
+    } else {
+        "llama-server"
+    });
+    let mut command = tokio::process::Command::new(&exe);
+    command.args(&args).kill_on_drop(true);
+    #[cfg(windows)]
+    {
+        // tokio::process::Command exposes this Windows builder method
+        // directly (no std::os::windows trait import needed).
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
+        command.creation_flags(CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS);
+    }
+    let child = command
+        .spawn()
+        .map_err(|e| format!("{}: {exe:?}: {e}", ai::codes::RUNTIME_SPAWN_FAILED))?;
+
+    let mut guard = state.sidecar.lock().await;
+    *guard = Some(Sidecar {
+        child,
+        port,
+        token: token.clone(),
+    });
+    drop(guard);
+
+    ai::runtime::wait_until_ready(
+        &format!("http://127.0.0.1:{port}"),
+        Duration::from_secs(120),
+        Duration::from_millis(250),
+    )
+    .await?;
+
+    Ok(AiStatusResponse {
+        running: true,
+        port: Some(port),
+    })
+}
+
+/// Runs one analysis: injects the running sidecar's own url/token into
+/// `request_json` (never sent from the frontend - the token is this
+/// process's own secret) and spawns `netrewind ai analyze` with it,
+/// returning its stdout verbatim (the frontend parses the same
+/// `aiAnalyzeResponse` shape `netrewind ai analyze` always produces).
+/// Fails with `runtime_not_ready` if no sidecar is running yet.
+#[tauri::command]
+async fn ai_analyze(
+    app: tauri::AppHandle,
+    request_json: String,
+    timeout_seconds: Option<u64>,
+    state: State<'_, AiState>,
+) -> Result<String, String> {
+    use tauri::Manager;
+
+    let (port, token) = {
+        let guard = state.sidecar.lock().await;
+        let sidecar = guard
+            .as_ref()
+            .ok_or_else(|| ai::codes::RUNTIME_NOT_READY.to_string())?;
+        (sidecar.port, sidecar.token.clone())
+    };
+
+    let mut request: serde_json::Value = serde_json::from_str(&request_json)
+        .map_err(|e| format!("{}: request_json: {e}", ai::codes::ANALYSIS_INVALID))?;
+    request["server"] =
+        serde_json::json!({"url": format!("http://127.0.0.1:{port}"), "token": token});
+
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("{}: {e}", ai::codes::CLI_MISSING))?;
+    let cli_path =
+        ai::cli::locate_cli(&resource_dir).ok_or_else(|| ai::codes::CLI_MISSING.to_string())?;
+
+    let timeout = Duration::from_secs(timeout_seconds.unwrap_or(180));
+    let output = ai::cli::spawn_analyze(&cli_path, &request.to_string(), timeout)
+        .await
+        .map_err(|e| format!("{}: {e}", ai::codes::CLI_FAILED))?;
+    if output.stdout.trim().is_empty() {
+        return Err(format!("{}: {}", ai::codes::CLI_FAILED, output.stderr));
+    }
+    Ok(output.stdout)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(AgentState::default())
+        .manage(AiState::default())
         .invoke_handler(tauri::generate_handler![
             launch_options,
             agent_default_endpoint,
@@ -319,7 +532,11 @@ pub fn run() {
             agent_request,
             agent_cancel,
             agent_export_bundle,
-            bundle_open
+            bundle_open,
+            ai_status,
+            ai_runtime_start,
+            ai_runtime_stop,
+            ai_analyze
         ])
         .run(tauri::generate_context!())
         .expect("error while running the NetRewind desktop application");
