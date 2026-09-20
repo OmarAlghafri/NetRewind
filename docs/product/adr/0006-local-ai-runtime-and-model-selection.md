@@ -1,7 +1,9 @@
 # ADR 0006 — Local AI runtime, model manager, and candidate selection
 
-**Status:** Proposed.
-**Date:** 2026-09-19.
+**Status:** Accepted; runtime/model-manager code implemented per the
+Amendment below; the evaluation gate itself (Verification, below) remains
+pending real hardware.
+**Date:** 2026-09-19. Amended 2026-09-20.
 
 ## Context
 
@@ -79,3 +81,71 @@ every gap/collector-down case, zero confidence-ceiling violations, zero
 tool/network/command content in any model output, measured RAM/latency
 within the budget documented before the run. Thresholds are fixed before
 the run and never lowered after seeing a result.
+
+## Amendment (2026-09-20)
+
+Written after the runtime, model manager, and desktop UI described below
+were actually built, against the 1.2.0 plan this ADR's Decision predates.
+Recorded here rather than by silently rewriting the Decision above, so the
+original reasoning stays legible.
+
+- **Governing change: one Go core, not per-consumer logic.** `internal/ai`
+  (handle resolution, prompt/schema construction, the guardrail table,
+  post-answer validation, similarity ranking, the chat client) was
+  extracted from `ai/eval/harness` into a shared library. `ai/eval/run`,
+  `cmd/netrewind/ai.go` (`netrewind ai analyze`/`explain`/`report`), and the
+  desktop shell (which spawns the same CLI as a subprocess, never
+  reimplementing any of this in Rust or TypeScript) all call the identical
+  code path - "what was measured is what ships" holds by construction, not
+  by convention.
+- **Not `externalBin`.** Tauri's `externalBin` copies exactly one binary
+  into the bundle; llama.cpp's own release archives ship the server
+  alongside shared libraries (`ggml*`, `llama.*`) it needs beside it at
+  runtime, which `externalBin` cannot carry. The actual implementation
+  (`desktop/src-tauri/src/ai/runtime.rs`) stages the whole runtime
+  directory as a bundled resource instead, and verifies every staged
+  file's SHA-256 against `runtime.lock.json` on every launch (not only at
+  install time) - the risk `externalBin` would not have covered any better
+  than this does, since a single-file copy still needs its own integrity
+  check.
+- **Model manager landed as designed**, with one implementation detail the
+  original Decision left open now settled: downloads run in Go
+  (`internal/aimodel`, resumable to `.partial`, quarantine-on-mismatch,
+  never silently deleted) driven by a signed manifest, and the Rust shell
+  spawns the staged `netrewind` CLI for both the download and the analyze
+  path rather than carrying its own TLS/HTTP stack - `Cargo.toml` gained no
+  networking crate for this feature.
+- **Candidate list superseded.** The Qwen3-4B-Instruct/Phi-4-mini/Gemma
+  list above is the pre-1.2.0-plan sweep's result, not the current
+  candidate set. The 1.2.0 plan replaced it with a tiered catalogue -
+  Small/Balanced/Full profiles (Qwen3.5 0.8B/2B/4B as the current
+  candidates, Full already pre-registered) plus an optional Falcon-H1
+  comparator pending its own licence sign-off - selected per tier by gate
+  result on that tier's hardware, never by size or popularity. See the
+  1.2.0 plan document for the full table and the excluded-with-reason
+  list (Gemma, Llama, LFM2, Ministral, SmolLM2/3, Jais).
+- **Operator notes / memory** (annotations, retrieval, feedback, opt-in
+  follow-up threads) is a related but separate decision - see ADR 0008,
+  not folded into this one because it is about the recorder's own write
+  surface, not the runtime or model selection.
+- **Still open, in the order they block each other:** no `runtime.lock.json`
+  exists in the repo yet - `desktop/src-tauri/src/ai/runtime.rs`'s own
+  tests parse a document of the intended shape as a fixture, but nothing
+  has staged a real one against actual per-file SHA-256 digests of a
+  genuine llama.cpp release (blocked on downloading that release to hash
+  it - held pending the standing "no model/asset downloads without an
+  explicit URL and size confirmed first" rule); the `make desktop-runtime`
+  Makefile target, CI caching, and the arm64 runtime build job do not
+  exist yet, and are not useful to write against a lock file that does not
+  yet carry real hashes; `models.json` is not yet signed or published.
+  **`AI_FEATURE_ENABLED` itself - the compile-time gate this ADR's Decision
+  and `ai/mod.rs`'s own doc comment both describe - does not exist as code
+  anywhere yet.** Today the panel's only gate is `aiSettings.enabled`, a
+  plain runtime setting the operator can already turn on in Settings
+  (default off) as long as they have typed in a model file name obtained
+  out of band - there is no build-time switch stopping that regardless of
+  whether any profile has passed its evaluation gate. Adding the real
+  compile-time gate, and having it actually key off a signed manifest's
+  `gate.passed` per profile as the plan specifies, remains open and is a
+  precondition for `AI_FEATURE_ENABLED` to mean what this ADR says it
+  means.
