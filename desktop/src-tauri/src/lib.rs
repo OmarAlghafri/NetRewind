@@ -177,6 +177,73 @@ async fn agent_get(
     })
 }
 
+/// Whether `path` is inside the one write surface the record's own
+/// read-only API has (`/v1/notes/*` - internal/api/v1/notes.go). A plain
+/// prefix check, factored out of `agent_request` so this security
+/// boundary is directly unit-testable rather than only reachable through
+/// a full Tauri command invocation.
+fn is_notes_path(path: &str) -> bool {
+    path == "/v1/notes" || path.starts_with("/v1/notes/") || path.starts_with("/v1/notes?")
+}
+
+/// `method path` (PUT/POST/DELETE) against the recorder at `endpoint`,
+/// restricted to `/v1/notes/*` - the one write surface the record's own
+/// read-only API has (internal/api/v1/notes.go; the record itself,
+/// events.db, has none). `agent_get` stays the only way to reach every
+/// other route: this command exists specifically for the operator's own
+/// annotations/feedback/history settings, never widened to an arbitrary
+/// path the way that would blur the record's read-only guarantee this
+/// shell has always relied on.
+#[tauri::command]
+async fn agent_request(
+    endpoint: String,
+    method: String,
+    path: String,
+    headers: Option<HashMap<String, String>>,
+    body: Option<String>,
+    request_id: Option<String>,
+    state: State<'_, AgentState>,
+) -> Result<AgentResponse, AgentError> {
+    if !is_notes_path(&path) {
+        return Err(AgentError::new(
+            agent::codes::INVALID_PATH,
+            &[],
+            "only /v1/notes paths accept a write",
+        ));
+    }
+    let endpoint = if endpoint.trim().is_empty() {
+        agent::default_endpoint()
+    } else {
+        endpoint
+    };
+    let extra_headers: Vec<(String, String)> = headers.unwrap_or_default().into_iter().collect();
+    let body_bytes = body.map(|b| b.into_bytes());
+
+    let notify = request_id.as_ref().map(|id| {
+        let n = Arc::new(Notify::new());
+        state.inflight.lock().unwrap().insert(id.clone(), n.clone());
+        n
+    });
+
+    let result = race_cancellable(
+        agent::request(&endpoint, &method, &path, &extra_headers, body_bytes),
+        notify.as_deref(),
+        cancelled_error(),
+    )
+    .await;
+
+    if let Some(id) = &request_id {
+        state.inflight.lock().unwrap().remove(id);
+    }
+
+    let resp = result?;
+    Ok(AgentResponse {
+        status: resp.status,
+        body: String::from_utf8_lossy(&resp.body).into_owned(),
+        headers: resp.headers.into_iter().collect(),
+    })
+}
+
 /// Interrupts the in-flight `agent_get` call registered under
 /// `request_id`, if it is still running. A no-op (not an error) if the
 /// request already finished - cancellation racing completion is normal,
@@ -249,6 +316,7 @@ pub fn run() {
             launch_options,
             agent_default_endpoint,
             agent_get,
+            agent_request,
             agent_cancel,
             agent_export_bundle,
             bundle_open
@@ -259,7 +327,9 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{agent::codes, cancelled_error, parse_launch_options, race_cancellable};
+    use super::{
+        agent::codes, cancelled_error, is_notes_path, parse_launch_options, race_cancellable,
+    };
     use tokio::sync::Notify;
 
     #[test]
@@ -328,5 +398,32 @@ mod tests {
         .await;
         assert_eq!(got, Err(cancelled_error()));
         assert_eq!(got.unwrap_err().code, codes::CANCELLED);
+    }
+
+    #[test]
+    fn is_notes_path_accepts_the_notes_namespace_and_its_query_strings() {
+        for path in [
+            "/v1/notes",
+            "/v1/notes/incidents/inc-1",
+            "/v1/notes/similar?rule_id=x",
+            "/v1/notes?foo=bar",
+        ] {
+            assert!(is_notes_path(path), "{path} should be accepted");
+        }
+    }
+
+    #[test]
+    fn is_notes_path_rejects_the_record_and_lookalike_paths() {
+        for path in [
+            "/v1/events",
+            "/v1/incidents",
+            "/v1/health",
+            "/v1/notesevil",
+            "/v1/",
+            "/v1",
+            "",
+        ] {
+            assert!(!is_notes_path(path), "{path} should be rejected");
+        }
     }
 }

@@ -6,7 +6,7 @@
 //! all a viewer polling a local daemon needs.
 
 use bytes::Bytes;
-use http_body_util::{BodyExt, Empty};
+use http_body_util::{BodyExt, Full};
 use hyper::Request;
 use hyper_util::rt::TokioIo;
 use serde::Serialize;
@@ -148,29 +148,65 @@ pub async fn get(
     path: &str,
     extra_headers: &[(String, String)],
 ) -> Result<Response, AgentError> {
-    tokio::time::timeout(REQUEST_TIMEOUT, get_inner(endpoint, path, extra_headers))
-        .await
-        .map_err(|_| {
-            AgentError::new(
-                codes::TIMEOUT,
-                &[
-                    ("endpoint", endpoint),
-                    ("seconds", &REQUEST_TIMEOUT.as_secs().to_string()),
-                ],
-                format!(
-                    "the recorder at {endpoint} did not answer within {}s",
-                    REQUEST_TIMEOUT.as_secs()
-                ),
-            )
-        })?
+    request(endpoint, "GET", path, extra_headers, None).await
 }
 
-async fn get_inner(
+/// `get`, generalized to any method and an optional body - `PUT`/`POST`/
+/// `DELETE` against `/v1/notes/*` use this (see `lib.rs`'s `agent_request`
+/// command); every other property (timeout, error codes) is identical.
+pub async fn request(
     endpoint: &str,
+    method: &str,
     path: &str,
     extra_headers: &[(String, String)],
+    body: Option<Vec<u8>>,
+) -> Result<Response, AgentError> {
+    tokio::time::timeout(
+        REQUEST_TIMEOUT,
+        request_inner(endpoint, method, path, extra_headers, body),
+    )
+    .await
+    .map_err(|_| {
+        AgentError::new(
+            codes::TIMEOUT,
+            &[
+                ("endpoint", endpoint),
+                ("seconds", &REQUEST_TIMEOUT.as_secs().to_string()),
+            ],
+            format!(
+                "the recorder at {endpoint} did not answer within {}s",
+                REQUEST_TIMEOUT.as_secs()
+            ),
+        )
+    })?
+}
+
+async fn request_inner(
+    endpoint: &str,
+    method: &str,
+    path: &str,
+    extra_headers: &[(String, String)],
+    body: Option<Vec<u8>>,
 ) -> Result<Response, AgentError> {
     let stream = connect(endpoint).await?;
+    request_over(stream, method, path, extra_headers, body).await
+}
+
+/// Sends one HTTP/1.1 request over an already-connected stream, generic
+/// over the transport: the recorder's local IPC (named pipe/Unix socket)
+/// for every `/v1/*` call today, and reusable for a loopback TCP stream
+/// (the local model's own sidecar) without a second copy of this logic
+/// drifting from this one.
+pub async fn request_over<S>(
+    stream: S,
+    method: &str,
+    path: &str,
+    extra_headers: &[(String, String)],
+    body: Option<Vec<u8>>,
+) -> Result<Response, AgentError>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
     let (mut sender, conn) = hyper::client::conn::http1::handshake(TokioIo::new(stream))
         .await
         .map_err(|e| {
@@ -186,20 +222,26 @@ async fn get_inner(
         let _ = conn.await;
     });
     let mut builder = Request::builder()
-        .method("GET")
+        .method(method)
         .uri(path)
         .header("Host", "netrewind")
         .header("Accept", "application/json, application/gzip");
     for (name, value) in extra_headers {
         builder = builder.header(name.as_str(), value.as_str());
     }
-    let req = builder.body(Empty::<Bytes>::new()).map_err(|e| {
-        AgentError::new(
-            codes::REQUEST_BUILD_FAILED,
-            &[],
-            format!("could not build the request: {e}"),
-        )
-    })?;
+    let body_bytes = body.unwrap_or_default();
+    if !body_bytes.is_empty() {
+        builder = builder.header("Content-Type", "application/json");
+    }
+    let req = builder
+        .body(Full::new(Bytes::from(body_bytes)))
+        .map_err(|e| {
+            AgentError::new(
+                codes::REQUEST_BUILD_FAILED,
+                &[],
+                format!("could not build the request: {e}"),
+            )
+        })?;
     let resp = sender.send_request(req).await.map_err(|e| {
         AgentError::new(
             codes::REQUEST_FAILED,
@@ -310,8 +352,105 @@ async fn connect(
 
 #[cfg(test)]
 mod tests {
-    use super::codes;
+    use super::{codes, request_over};
     use std::collections::HashSet;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    /// request_over is generic over the stream precisely so it can be
+    /// exercised here over a plain TCP loopback connection - the same
+    /// code path a future local-model sidecar request will use - without
+    /// needing a real named pipe or Unix socket test harness. Proves the
+    /// generalization actually forwards method/path/body/headers
+    /// correctly, not just that it still compiles against `connect()`'s
+    /// concrete platform stream.
+    #[tokio::test]
+    async fn request_over_sends_the_method_path_and_body_and_reads_the_response() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let served = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let n = socket.read(&mut buf).await.unwrap();
+            let request_text = String::from_utf8_lossy(&buf[..n]).into_owned();
+
+            let body = r#"{"incident_id":"inc-1","outcome":"confirmed"}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            socket.write_all(response.as_bytes()).await.unwrap();
+            socket.shutdown().await.unwrap();
+            request_text
+        });
+
+        let stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        let put_body = br#"{"outcome":"confirmed","cause_note":"bad switch port"}"#.to_vec();
+        let resp = request_over(
+            stream,
+            "PUT",
+            "/v1/notes/incidents/inc-1",
+            &[("X-Test".to_string(), "yes".to_string())],
+            Some(put_body.clone()),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(resp.status, 200);
+        assert!(String::from_utf8_lossy(&resp.body).contains("confirmed"));
+
+        let request_text = served.await.unwrap();
+        assert!(
+            request_text.starts_with("PUT /v1/notes/incidents/inc-1 "),
+            "{request_text}"
+        );
+        assert!(
+            request_text.contains("x-test: yes") || request_text.contains("X-Test: yes"),
+            "{request_text}"
+        );
+        assert!(
+            request_text.contains("content-type: application/json")
+                || request_text.contains("Content-Type: application/json"),
+            "{request_text}"
+        );
+        assert!(
+            request_text.ends_with(&String::from_utf8_lossy(&put_body).into_owned()),
+            "the request body was not forwarded verbatim: {request_text}"
+        );
+    }
+
+    #[tokio::test]
+    async fn request_over_with_no_body_sends_no_content_type_header() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let served = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let n = socket.read(&mut buf).await.unwrap();
+            let request_text = String::from_utf8_lossy(&buf[..n]).into_owned();
+            let response = "HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n";
+            socket.write_all(response.as_bytes()).await.unwrap();
+            socket.shutdown().await.unwrap();
+            request_text
+        });
+
+        let stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        let resp = request_over(stream, "DELETE", "/v1/notes/incidents/inc-1", &[], None)
+            .await
+            .unwrap();
+        assert_eq!(resp.status, 204);
+
+        let request_text = served.await.unwrap();
+        assert!(
+            request_text.starts_with("DELETE /v1/notes/incidents/inc-1 "),
+            "{request_text}"
+        );
+        assert!(
+            !request_text.to_ascii_lowercase().contains("content-type:"),
+            "a bodyless request should not carry a Content-Type header: {request_text}"
+        );
+    }
 
     /// `desktop/src/i18n/agentErrorCatalogue.test.ts` hand-keeps a matching
     /// literal list and checks its catalogue against it - this is the
