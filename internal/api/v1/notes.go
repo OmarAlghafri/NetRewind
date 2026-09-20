@@ -31,6 +31,7 @@ func (s *Server) registerNotesRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/notes/threads/{id}", s.handleNotesThreadsAppend)
 	mux.HandleFunc("GET /v1/notes/settings", s.handleNotesSettingsGet)
 	mux.HandleFunc("PUT /v1/notes/settings", s.handleNotesSettingsPut)
+	mux.HandleFunc("GET /v1/notes/stats", s.handleNotesStats)
 	mux.HandleFunc("DELETE /v1/notes", s.handleNotesForgetAll)
 }
 
@@ -236,6 +237,19 @@ func (s *Server) handleNotesSettingsPut(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleNotesStats backs Diagnostics's "notes" row: counts and an on-disk
+// size, never a path (notes.Stats's own doc comment - the store file lives
+// next to events.db, whose own path already carries a Windows username on
+// this OS).
+func (s *Server) handleNotesStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := s.Notes.Stats(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "notes_read_failed", err.Error())
+		return
+	}
+	writeJSON(w, stats)
 }
 
 func (s *Server) handleNotesForgetAll(w http.ResponseWriter, r *http.Request) {

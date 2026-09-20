@@ -83,6 +83,9 @@ func TestNotesHandlersNeverTouchTheRecord(t *testing.T) {
 	if rec := doJSON(t, srv.Handler(), "PUT", "/v1/notes/settings", map[string]bool{"history_opt_in": true}); rec.Code != http.StatusNoContent {
 		t.Fatalf("settings PUT status = %d, body = %s", rec.Code, rec.Body)
 	}
+	if rec := doJSON(t, srv.Handler(), "GET", "/v1/notes/stats", nil); rec.Code != http.StatusOK {
+		t.Fatalf("stats status = %d, body = %s", rec.Code, rec.Body)
+	}
 	if rec := doJSON(t, srv.Handler(), "POST", "/v1/notes/threads/inc-1", notesThreadAppendRequest{AnswerID: "a1", QuestionRedacted: "q", SummaryRedacted: "s"}); rec.Code != http.StatusNoContent {
 		t.Fatalf("thread append status = %d, body = %s", rec.Code, rec.Body)
 	}
@@ -128,6 +131,47 @@ func TestNotesGetForUnknownIncidentReturns404(t *testing.T) {
 	rec := doJSON(t, srv.Handler(), "GET", "/v1/notes/incidents/never-annotated", nil)
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("status = %d, want 404", rec.Code)
+	}
+}
+
+// TestNotesStatsReflectsWrites proves the route actually forwards to
+// notes.Store.Stats (not a hard-coded zero value) and that its JSON field
+// names match what Diagnostics reads - a body-shape typo here would
+// otherwise only surface as a silently-blank Diagnostics row.
+func TestNotesStatsReflectsWrites(t *testing.T) {
+	srv, _ := newTestServerWithNotes(t)
+
+	rec := doJSON(t, srv.Handler(), "GET", "/v1/notes/stats", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body)
+	}
+	var before notes.Stats
+	if err := json.Unmarshal(rec.Body.Bytes(), &before); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if before.Annotations != 0 || before.Feedback != 0 {
+		t.Fatalf("before = %+v, want zero counts on a fresh store", before)
+	}
+
+	if rec := doJSON(t, srv.Handler(), "PUT", "/v1/notes/incidents/inc-1", notesPutRequest{
+		RuleID: "gateway-hijack", RootCauseKind: "l2.arp_binding_changed", Outcome: notes.OutcomeConfirmed,
+	}); rec.Code != http.StatusOK {
+		t.Fatalf("PUT status = %d, body = %s", rec.Code, rec.Body)
+	}
+	if rec := doJSON(t, srv.Handler(), "POST", "/v1/notes/feedback", notesFeedbackRequest{AnswerID: "a1", IncidentID: "inc-1", Helpful: true}); rec.Code != http.StatusNoContent {
+		t.Fatalf("feedback status = %d, body = %s", rec.Code, rec.Body)
+	}
+
+	rec = doJSON(t, srv.Handler(), "GET", "/v1/notes/stats", nil)
+	var after notes.Stats
+	if err := json.Unmarshal(rec.Body.Bytes(), &after); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if after.Annotations != 1 || after.Feedback != 1 {
+		t.Errorf("after = %+v, want Annotations=1 Feedback=1", after)
+	}
+	if after.Bytes <= 0 {
+		t.Errorf("Bytes = %d, want > 0 once the store has written rows", after.Bytes)
 	}
 }
 

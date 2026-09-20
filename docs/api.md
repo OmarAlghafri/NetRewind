@@ -255,6 +255,14 @@ The per-installation history opt-in: `{ "history_opt_in": true|false }`.
 Turning it off deletes every stored thread immediately as part of the same
 request - off means forgotten, not merely "stop adding more".
 
+### `GET /v1/notes/stats`
+
+Counts for the desktop's Diagnostics page: `{ "annotations", "feedback",
+"threads", "bytes" }` (`threads` counts incidents with at least one stored
+turn; `bytes` is the notes database's on-disk size). Deliberately nothing
+more specific than that - never a path, which on this OS carries a Windows
+username.
+
 ### `DELETE /v1/notes`
 
 Forgets everything: every annotation, every feedback entry, every thread.
