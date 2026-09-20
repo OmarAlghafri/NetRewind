@@ -565,6 +565,79 @@ body {
   justify-content: flex-end;
 }
 
+/* The local-AI assistant (components/ai/AiAssistantPanel.tsx) - a
+   separate card below IncidentCard inside the same InspectorPanel, never
+   inside IncidentCard itself, so it reads as its own, clearly-labelled
+   voice rather than an extension of the deterministic engine's own
+   account above it. */
+.ai-panel {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-top: 14px;
+  font-size: 0.9rem;
+}
+
+.ai-panel-title {
+  font-size: 0.95rem;
+  margin: 0 0 8px;
+}
+
+.ai-panel-message {
+  color: var(--text-muted);
+}
+
+.ai-panel-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.ai-panel-idle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* execution order §4.10's "button says analyze locally, never find the
+   cause" - the banner every answer/refusal carries so a local model's
+   hypothesis is never visually mistaken for the deterministic engine's
+   own root-cause conclusion above it in IncidentCard. */
+.ai-panel-hypothesis-banner {
+  border-inline-start: 3px solid var(--warn-line);
+  background: var(--warn-bg);
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  margin: 0 0 10px;
+}
+
+.ai-panel-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-panel-list {
+  margin: 4px 0 0;
+  padding-inline-start: 20px;
+}
+
+.ai-panel-hypotheses {
+  margin: 4px 0 0;
+  padding-inline-start: 20px;
+}
+
+.ai-panel-handle {
+  margin-inline-end: 6px;
+}
+
+.ai-panel-technical-details summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
 .timeline-row {
   display: flex;
   gap: 14px;

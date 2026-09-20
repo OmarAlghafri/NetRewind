@@ -5,6 +5,7 @@ import { CapabilityTable } from "./CapabilityTable";
 import { SourceBanner } from "./SourceBanner";
 import { Settings } from "../pages/Settings";
 import { DEFAULT_SETTINGS } from "../data/source";
+import { DEFAULT_AI_SETTINGS } from "../data/aiSettings";
 import type { Record } from "../data/useRecord";
 import type { Capability } from "../data/types";
 
@@ -143,7 +144,7 @@ describe("SourceBanner", () => {
 
 describe("Settings", () => {
   it("only offers the demo source outside the desktop shell", () => {
-    english(<Settings settings={DEFAULT_SETTINGS} onChange={() => {}} onReopenWizard={() => {}} />);
+    english(<Settings settings={DEFAULT_SETTINGS} onChange={() => {}} aiSettings={DEFAULT_AI_SETTINGS} onChangeAiSettings={() => {}} onReopenWizard={() => {}} />);
     const live = screen.getByLabelText("Live recorder on this machine") as HTMLInputElement;
     expect(live.disabled).toBe(true);
     expect((screen.getByLabelText("Demo recording") as HTMLInputElement).checked).toBe(true);
@@ -153,7 +154,7 @@ describe("Settings", () => {
   // once there is something to decide about, not a permanently-visible,
   // merely-disabled button.
   it("shows no save/discard bar at all until something actually changes", () => {
-    english(<Settings settings={DEFAULT_SETTINGS} onChange={() => {}} onReopenWizard={() => {}} />);
+    english(<Settings settings={DEFAULT_SETTINGS} onChange={() => {}} aiSettings={DEFAULT_AI_SETTINGS} onChangeAiSettings={() => {}} onReopenWizard={() => {}} />);
     expect(screen.queryByText("Save")).not.toBeInTheDocument();
     expect(screen.queryByText("Discard changes")).not.toBeInTheDocument();
   });
@@ -168,7 +169,7 @@ describe("Settings", () => {
 
   it("shows the save bar once a field changes, and saves the new value", () => {
     const onChange = vi.fn();
-    english(<Settings settings={savedAsLive} onChange={onChange} onReopenWizard={() => {}} />);
+    english(<Settings settings={savedAsLive} onChange={onChange} aiSettings={DEFAULT_AI_SETTINGS} onChangeAiSettings={() => {}} onReopenWizard={() => {}} />);
     expect(screen.queryByText("You have unsaved changes")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("Demo recording"));
@@ -181,7 +182,7 @@ describe("Settings", () => {
 
   it("discarding reverts the draft without calling onChange", () => {
     const onChange = vi.fn();
-    english(<Settings settings={savedAsLive} onChange={onChange} onReopenWizard={() => {}} />);
+    english(<Settings settings={savedAsLive} onChange={onChange} aiSettings={DEFAULT_AI_SETTINGS} onChangeAiSettings={() => {}} onReopenWizard={() => {}} />);
 
     fireEvent.click(screen.getByLabelText("Demo recording"));
     expect(screen.getByText("You have unsaved changes")).toBeInTheDocument();
@@ -191,6 +192,48 @@ describe("Settings", () => {
     expect(screen.queryByText("You have unsaved changes")).not.toBeInTheDocument();
     // Reverted to the saved value (live), not left on the discarded draft.
     expect((screen.getByLabelText("Demo recording") as HTMLInputElement).checked).toBe(false);
+  });
+});
+
+describe("Settings: local AI assistant card", () => {
+  it("hides the profile/model-file/threads fields until the assistant is enabled", () => {
+    english(<Settings settings={DEFAULT_SETTINGS} onChange={() => {}} aiSettings={DEFAULT_AI_SETTINGS} onChangeAiSettings={() => {}} onReopenWizard={() => {}} />);
+    expect(screen.queryByLabelText("Downloaded model file name")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Turn on the local AI assistant"));
+    expect(screen.getByLabelText("Downloaded model file name")).toBeInTheDocument();
+  });
+
+  it("one dirty check and one save bar covers both source and AI settings - changing only the AI side still shows it", () => {
+    english(<Settings settings={DEFAULT_SETTINGS} onChange={() => {}} aiSettings={DEFAULT_AI_SETTINGS} onChangeAiSettings={() => {}} onReopenWizard={() => {}} />);
+    expect(screen.queryByText("You have unsaved changes")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Turn on the local AI assistant"));
+    expect(screen.getByText("You have unsaved changes")).toBeInTheDocument();
+  });
+
+  it("saving calls onChangeAiSettings with the edited draft, leaving the source settings call intact", () => {
+    const onChange = vi.fn();
+    const onChangeAiSettings = vi.fn();
+    english(<Settings settings={DEFAULT_SETTINGS} onChange={onChange} aiSettings={DEFAULT_AI_SETTINGS} onChangeAiSettings={onChangeAiSettings} onReopenWizard={() => {}} />);
+
+    fireEvent.click(screen.getByLabelText("Turn on the local AI assistant"));
+    fireEvent.change(screen.getByLabelText("Downloaded model file name"), { target: { value: "small.gguf" } });
+    fireEvent.click(screen.getByText("Save"));
+
+    expect(onChangeAiSettings).toHaveBeenCalledTimes(1);
+    expect(onChangeAiSettings.mock.calls[0][0]).toMatchObject({ enabled: true, modelFileName: "small.gguf" });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0]).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it("discarding reverts the AI draft too, without calling onChangeAiSettings", () => {
+    const onChangeAiSettings = vi.fn();
+    english(<Settings settings={DEFAULT_SETTINGS} onChange={() => {}} aiSettings={DEFAULT_AI_SETTINGS} onChangeAiSettings={onChangeAiSettings} onReopenWizard={() => {}} />);
+
+    fireEvent.click(screen.getByLabelText("Turn on the local AI assistant"));
+    fireEvent.click(screen.getByText("Discard changes"));
+
+    expect(onChangeAiSettings).not.toHaveBeenCalled();
+    expect((screen.getByLabelText("Turn on the local AI assistant") as HTMLInputElement).checked).toBe(false);
   });
 });
 
@@ -207,7 +250,7 @@ describe("Settings unsaved-changes guard", () => {
   it("reverts an in-app navigation away from a dirty form when the user declines to lose it", () => {
     window.location.hash = "#/settings";
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-    english(<Settings settings={{ ...DEFAULT_SETTINGS, kind: "live" }} onChange={() => {}} onReopenWizard={() => {}} />);
+    english(<Settings settings={{ ...DEFAULT_SETTINGS, kind: "live" }} onChange={() => {}} aiSettings={DEFAULT_AI_SETTINGS} onChangeAiSettings={() => {}} onReopenWizard={() => {}} />);
     fireEvent.click(screen.getByLabelText("Demo recording"));
     expect(screen.getByText("You have unsaved changes")).toBeInTheDocument();
 
@@ -222,7 +265,7 @@ describe("Settings unsaved-changes guard", () => {
   it("lets the navigation through when the user confirms losing the draft", () => {
     window.location.hash = "#/settings";
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-    english(<Settings settings={{ ...DEFAULT_SETTINGS, kind: "live" }} onChange={() => {}} onReopenWizard={() => {}} />);
+    english(<Settings settings={{ ...DEFAULT_SETTINGS, kind: "live" }} onChange={() => {}} aiSettings={DEFAULT_AI_SETTINGS} onChangeAiSettings={() => {}} onReopenWizard={() => {}} />);
     fireEvent.click(screen.getByLabelText("Demo recording"));
 
     window.location.hash = "#/incidents";
@@ -236,7 +279,7 @@ describe("Settings unsaved-changes guard", () => {
   it("does not ask at all when the form is clean", () => {
     window.location.hash = "#/settings";
     const confirmSpy = vi.spyOn(window, "confirm");
-    english(<Settings settings={DEFAULT_SETTINGS} onChange={() => {}} onReopenWizard={() => {}} />);
+    english(<Settings settings={DEFAULT_SETTINGS} onChange={() => {}} aiSettings={DEFAULT_AI_SETTINGS} onChangeAiSettings={() => {}} onReopenWizard={() => {}} />);
 
     window.location.hash = "#/incidents";
     window.dispatchEvent(new HashChangeEvent("hashchange"));
@@ -247,7 +290,7 @@ describe("Settings unsaved-changes guard", () => {
   });
 
   it("marks a beforeunload event as needing confirmation while the form is dirty, and not when it is clean", () => {
-    english(<Settings settings={{ ...DEFAULT_SETTINGS, kind: "live" }} onChange={() => {}} onReopenWizard={() => {}} />);
+    english(<Settings settings={{ ...DEFAULT_SETTINGS, kind: "live" }} onChange={() => {}} aiSettings={DEFAULT_AI_SETTINGS} onChangeAiSettings={() => {}} onReopenWizard={() => {}} />);
 
     const cleanEvent = new Event("beforeunload", { cancelable: true });
     window.dispatchEvent(cleanEvent);

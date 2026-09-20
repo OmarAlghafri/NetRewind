@@ -1,12 +1,40 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { LanguageProvider } from "../i18n/LanguageContext";
-import { Incidents, contextForIncidentExport, filterAndSortIncidents } from "./Incidents";
-import type { Incident } from "../types";
+import { AiSessionProvider } from "../data/aiSession";
+import { DEFAULT_AI_SETTINGS, writeAiSettings } from "../data/aiSettings";
+import { Incidents, contextForIncidentExport, filterAndSortIncidents, selectAiEvents, selectAiHistory } from "./Incidents";
+import type { Incident, NetRewindEvent } from "../types";
 
+// Every page eventually sits under both providers in App.tsx - matched
+// here so a test rendering something that transitively uses
+// useAiSession() (AiAssistantPanel, reached only when `events` is passed
+// and non-empty) does not throw "used outside AiSessionProvider" just
+// because this helper predates that panel existing.
 function english<T>(ui: React.ReactElement<T>) {
   window.localStorage.setItem("netrewind.lang", "en");
-  return render(<LanguageProvider>{ui}</LanguageProvider>);
+  window.localStorage.removeItem("netrewind.ai");
+  return render(
+    <LanguageProvider>
+      <AiSessionProvider>{ui}</AiSessionProvider>
+    </LanguageProvider>,
+  );
+}
+
+function event(over: Partial<NetRewindEvent> = {}): NetRewindEvent {
+  return {
+    event_id: "e1",
+    schema_v: 1,
+    ts_wall: Date.parse("2026-09-19T10:01:00Z") * 1e6,
+    ts_mono: 0,
+    observer_id: "obs",
+    source: "netlink",
+    kind: "link.down",
+    severity: "warn",
+    confidence: 80,
+    subject: { kind: "iface", id: "eth0", label: "eth0" },
+    ...over,
+  };
 }
 
 function incident(over: Partial<Incident> = {}): Incident {
@@ -242,5 +270,70 @@ describe("Incidents master/detail", () => {
     expect(screen.queryByRole("region")).not.toBeInTheDocument();
     expect(screen.queryByText("Gateway hijacked")).not.toBeInTheDocument();
     expect(screen.getAllByText("A link went down")).toHaveLength(1);
+  });
+});
+
+describe("selectAiEvents", () => {
+  it("includes events inside the padded window and excludes ones well outside it", () => {
+    const inc = incident({ opened_at: Date.parse("2026-09-19T10:00:00Z") * 1e6, closed_at: Date.parse("2026-09-19T10:02:00Z") * 1e6 });
+    const nearby = event({ event_id: "near", ts_wall: Date.parse("2026-09-19T09:57:00Z") * 1e6 }); // 3 min before open - inside the 5 min pad
+    const farAway = event({ event_id: "far", ts_wall: Date.parse("2026-09-19T08:00:00Z") * 1e6 }); // 2 hours before - outside the pad
+    const result = selectAiEvents(inc, [nearby, farAway]);
+    expect(result.map((e) => e.event_id)).toEqual(["near"]);
+  });
+
+  it("always includes a chain-cited event even if it fell outside the padded window", () => {
+    const inc = incident({
+      opened_at: Date.parse("2026-09-19T10:00:00Z") * 1e6,
+      closed_at: Date.parse("2026-09-19T10:02:00Z") * 1e6,
+      chain: [{ seq: 0, event_id: "chain-1", kind: "link.down", at: Date.parse("2026-09-19T10:01:00Z") * 1e6, subject: "eth0", relation: "", why: "" }],
+    });
+    // Same event_id as the chain link, but stored with a timestamp far
+    // outside the window - should not happen in real data, but the
+    // selection must not silently drop a cited event either way.
+    const chainEvent = event({ event_id: "chain-1", ts_wall: Date.parse("2026-09-19T01:00:00Z") * 1e6 });
+    const result = selectAiEvents(inc, [chainEvent]);
+    expect(result.map((e) => e.event_id)).toEqual(["chain-1"]);
+  });
+
+  it("returns events oldest first regardless of input order", () => {
+    const inc = incident({ opened_at: Date.parse("2026-09-19T10:00:00Z") * 1e6, closed_at: Date.parse("2026-09-19T10:02:00Z") * 1e6 });
+    const first = event({ event_id: "first", ts_wall: Date.parse("2026-09-19T10:00:30Z") * 1e6 });
+    const second = event({ event_id: "second", ts_wall: Date.parse("2026-09-19T10:01:30Z") * 1e6 });
+    expect(selectAiEvents(inc, [second, first]).map((e) => e.event_id)).toEqual(["first", "second"]);
+  });
+});
+
+describe("selectAiHistory", () => {
+  it("returns other incidents with the same rule, excluding the target itself", () => {
+    const target = incident({ incident_id: "a", rule_id: "gateway-hijack" });
+    const sameRule = incident({ incident_id: "b", rule_id: "gateway-hijack" });
+    const differentRule = incident({ incident_id: "c", rule_id: "link-flap" });
+    const result = selectAiHistory(target, [target, sameRule, differentRule]);
+    expect(result.map((i) => i.incident_id)).toEqual(["b"]);
+  });
+});
+
+describe("Incidents page: local-AI panel", () => {
+  const withEvents = [incident({ incident_id: "a", title: "Gateway hijacked", chain: [{ seq: 0, event_id: "e1", kind: "link.down", at: Date.parse("2026-09-19T10:01:00Z") * 1e6, subject: "eth0", relation: "", why: "" }] })];
+
+  it("shows the assistant panel when events are available and an incident is selected", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf" });
+    english(<Incidents incidents={withEvents} rules={[]} events={[event()]} context={{ selection: "a" }} />);
+    expect(screen.getByRole("heading", { name: "Local AI assistant" })).toBeInTheDocument();
+    // Outside the Tauri shell (every vitest run), the panel must fail
+    // closed to "this only works inside the desktop application" rather
+    // than silently offering a button that could never work.
+    await waitFor(() => expect(screen.getByText("This assistant only works inside the desktop application.")).toBeInTheDocument());
+  });
+
+  it("does not show the assistant panel when no events were given, even with an incident selected", () => {
+    english(<Incidents incidents={withEvents} rules={[]} context={{ selection: "a" }} />);
+    expect(screen.queryByRole("heading", { name: "Local AI assistant" })).not.toBeInTheDocument();
+  });
+
+  it("does not show the assistant panel when nothing is selected, even with events available", () => {
+    english(<Incidents incidents={withEvents} rules={[]} events={[event()]} />);
+    expect(screen.queryByRole("heading", { name: "Local AI assistant" })).not.toBeInTheDocument();
   });
 });

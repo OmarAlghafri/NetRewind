@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import "./assets/fonts/fonts.css";
 import "./App.css";
 import { LanguageProvider, useLanguage } from "./i18n/LanguageContext";
+import { AiSessionProvider } from "./data/aiSession";
 import { Sidebar, type Page } from "./components/Sidebar";
 import { useRoute } from "./routing/useRoute";
 import { SourceBanner } from "./components/SourceBanner";
@@ -16,6 +17,7 @@ import { Diagnostics } from "./pages/Diagnostics";
 import { Wizard } from "./onboarding/Wizard";
 import { readOnboardingComplete, writeOnboardingComplete } from "./onboarding/onboardingStorage";
 import { readSettings, writeSettings, type SourceSettings } from "./data/source";
+import { readAiSettings, writeAiSettings, type AiSettings } from "./data/aiSettings";
 import { useRecord } from "./data/useRecord";
 import { launchOptions } from "./data/tauri";
 
@@ -31,6 +33,7 @@ function Shell() {
   const { route, navigate } = useRoute();
   const [onboardingComplete, setOnboardingComplete] = useState<boolean>(readOnboardingComplete);
   const [settings, setSettingsState] = useState<SourceSettings>(readSettings);
+  const [aiSettings, setAiSettingsState] = useState<AiSettings>(readAiSettings);
   const [launched, setLaunched] = useState(false);
 
   // Command-line options (desktop shell only) override the saved settings
@@ -70,6 +73,10 @@ function Shell() {
   const setSettings = (next: SourceSettings) => {
     setSettingsState(next);
     writeSettings(next);
+  };
+  const setAiSettings = (next: AiSettings) => {
+    setAiSettingsState(next);
+    writeAiSettings(next);
   };
 
   // Every page takes plain events/incidents (plus the record's metadata)
@@ -143,6 +150,7 @@ function Shell() {
             <Incidents
               incidents={record.incidents}
               rules={record.rules}
+              events={record.events}
               context={route.context}
               navigate={navigate}
             />
@@ -170,6 +178,8 @@ function Shell() {
             <Settings
               settings={settings}
               onChange={setSettings}
+              aiSettings={aiSettings}
+              onChangeAiSettings={setAiSettings}
               onReopenWizard={() => {
                 writeOnboardingComplete(false);
                 setOnboardingComplete(false);
@@ -188,7 +198,9 @@ function Shell() {
 export default function App() {
   return (
     <LanguageProvider>
-      <Shell />
+      <AiSessionProvider>
+        <Shell />
+      </AiSessionProvider>
     </LanguageProvider>
   );
 }

@@ -1,17 +1,56 @@
 import { useLanguage } from "../i18n/LanguageContext";
 import type { Lang } from "../i18n/translations";
-import type { Incident } from "../types";
+import type { Incident, NetRewindEvent } from "../types";
 import { nsToDate } from "../types";
 import type { RuleSummary } from "../data/types";
 import { IncidentCard } from "../components/IncidentCard";
 import { InspectorPanel } from "../components/InspectorPanel";
 import { SeverityBadge } from "../components/SeverityBadge";
 import { TechnicalValue } from "../components/TechnicalValue";
+import { AiAssistantPanel } from "../components/ai/AiAssistantPanel";
 import { findRule, titleFor } from "../i18n/rulesCatalogue";
 import { formatTime } from "../i18n/format";
 import { labelForFamily } from "../i18n/kindCatalogue";
 import type { Page } from "../components/Sidebar";
 import type { InvestigationContext } from "../routing/useRoute";
+
+/** How far outside an incident's own [opened, end] span the local-AI
+ *  assistant's evidence window reaches - matching internal/ai's own
+ *  explainWindowEvents (cmd/netrewind/explain.go), so what the desktop
+ *  panel offers a model is the same window the CLI's `netrewind explain`
+ *  would. */
+const AI_WINDOW_PAD_NS = 5 * 60 * 1e9;
+/** A budget on how many events the panel offers, not a hard protocol
+ *  limit - a "nearest events first, chain events always included" trim
+ *  is a nicer version of this to build once a real model/window makes the
+ *  difference visible; for now this keeps a busy window from becoming an
+ *  unbounded prompt. */
+const AI_MAX_EVENTS = 200;
+
+/** The event window offered to the local-AI assistant for one incident:
+ *  every event in [opened_at - pad, end + pad], always including every
+ *  chain-cited event even in the (should not happen) case one fell
+ *  outside that span, oldest first. */
+export function selectAiEvents(incident: Incident, allEvents: NetRewindEvent[]): NetRewindEvent[] {
+  const lastLinkAt = incident.chain.length > 0 ? incident.chain[incident.chain.length - 1].at : incident.opened_at;
+  const end = incident.closed_at ?? lastLinkAt;
+  const start = incident.opened_at - AI_WINDOW_PAD_NS;
+  const stop = end + AI_WINDOW_PAD_NS;
+  const chainIds = new Set(incident.chain.map((l) => l.event_id));
+
+  const inWindow = allEvents.filter((e) => e.ts_wall >= start && e.ts_wall <= stop);
+  const inWindowIds = new Set(inWindow.map((e) => e.event_id));
+  const missingChainEvents = allEvents.filter((e) => chainIds.has(e.event_id) && !inWindowIds.has(e.event_id));
+
+  return [...inWindow, ...missingChainEvents].sort((a, b) => a.ts_wall - b.ts_wall).slice(0, AI_MAX_EVENTS);
+}
+
+/** The prior-incident pool RankSimilar (internal/ai, Go) chooses from -
+ *  every other incident sharing this one's rule, letting the Go side's own
+ *  weighting decide which (if any) are actually offered as H-handles. */
+export function selectAiHistory(incident: Incident, allIncidents: Incident[]): Incident[] {
+  return allIncidents.filter((i) => i.incident_id !== incident.incident_id && i.rule_id === incident.rule_id);
+}
 
 // PRD U5: exporting "a specific incident" means the Evidence page's window
 // is this incident's own, not "the last hour" - opened_at to closed_at, or
@@ -136,11 +175,15 @@ function IncidentRow({
 export function Incidents({
   incidents,
   rules,
+  events = [],
   context = {},
   navigate,
 }: {
   incidents: Incident[];
   rules: RuleSummary[];
+  /** Optional: absent callers (the onboarding wizard's sample step) get no
+   *  local-AI panel rather than one with nothing to offer a model. */
+  events?: NetRewindEvent[];
   context?: InvestigationContext;
   navigate?: (page: Page, context?: InvestigationContext) => void;
 }) {
@@ -248,6 +291,13 @@ export function Incidents({
           </div>
           <InspectorPanel title={titleFor(findRule(selected.rule_id, rules), lang, selected.title)} onClose={() => select(undefined)}>
             <IncidentCard incident={selected} rules={rules} onExport={onExport} />
+            {events.length > 0 && (
+              <AiAssistantPanel
+                incident={selected}
+                events={selectAiEvents(selected, events)}
+                history={selectAiHistory(selected, incidents)}
+              />
+            )}
           </InspectorPanel>
         </div>
       ) : (

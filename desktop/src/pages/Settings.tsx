@@ -3,8 +3,14 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { Button } from "../components/Button";
 import { TechnicalValue } from "../components/TechnicalValue";
 import type { SourceKind, SourceSettings } from "../data/source";
+import type { AiProfile, AiSettings } from "../data/aiSettings";
 import { agentDefaultEndpoint, agentGet, isTauri } from "../data/tauri";
 import type { Health } from "../data/types";
+
+interface SettingsDraft {
+  source: SourceSettings;
+  ai: AiSettings;
+}
 
 /**
  * execution order §9 Phase 5: Settings "with a sticky save/discard bar and
@@ -52,39 +58,44 @@ function useUnsavedChangesGuard(dirty: boolean, confirmMessage: string) {
 export function Settings({
   settings,
   onChange,
+  aiSettings,
+  onChangeAiSettings,
   onReopenWizard,
 }: {
   settings: SourceSettings;
   onChange: (next: SourceSettings) => void;
+  aiSettings: AiSettings;
+  onChangeAiSettings: (next: AiSettings) => void;
   onReopenWizard: () => void;
 }) {
   const { t, lang, setLang } = useLanguage();
   const inShell = isTauri();
-  const [draft, setDraft] = useState<SourceSettings>(settings);
+  const [draft, setDraft] = useState<SettingsDraft>({ source: settings, ai: aiSettings });
   const [defaultEndpoint, setDefaultEndpoint] = useState("");
   const [saved, setSaved] = useState(false);
   const [test, setTest] = useState<{ ok: boolean; text: string } | null>(null);
 
-  useEffect(() => setDraft(settings), [settings]);
+  useEffect(() => setDraft({ source: settings, ai: aiSettings }), [settings, aiSettings]);
   useEffect(() => {
     if (inShell) agentDefaultEndpoint().then(setDefaultEndpoint).catch(() => setDefaultEndpoint(""));
   }, [inShell]);
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(settings);
+  const dirty = JSON.stringify(draft) !== JSON.stringify({ source: settings, ai: aiSettings });
   useUnsavedChangesGuard(dirty, t("settings_unsaved_changes_confirm"));
 
   const save = () => {
-    onChange(draft);
+    onChange(draft.source);
+    onChangeAiSettings(draft.ai);
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2000);
   };
 
-  const discard = () => setDraft(settings);
+  const discard = () => setDraft({ source: settings, ai: aiSettings });
 
   const testConnection = async () => {
     setTest(null);
     try {
-      const h = await agentGet<Health>(draft.endpoint, "/v1/health");
+      const h = await agentGet<Health>(draft.source.endpoint, "/v1/health");
       setTest({ ok: true, text: `${t("settings_connection_ok")}: ${h.observer_id} ${h.version}` });
     } catch (e) {
       setTest({ ok: false, text: `${t("settings_connection_failed")}: ${e instanceof Error ? e.message : String(e)}` });
@@ -97,9 +108,9 @@ export function Settings({
         type="radio"
         name="source"
         value={kind}
-        checked={draft.kind === kind}
+        checked={draft.source.kind === kind}
         disabled={!enabled}
-        onChange={() => setDraft({ ...draft, kind })}
+        onChange={() => setDraft({ ...draft, source: { ...draft.source, kind } })}
       />
       {label}
     </label>
@@ -126,7 +137,7 @@ export function Settings({
         <div style={{ marginTop: 8 }}>
           {sourceOption("demo", t("settings_source_demo"), true)}
           {sourceOption("live", t("settings_source_live"), inShell)}
-          {sourceOption("bundle", t("settings_source_bundle"), inShell && draft.bundlePath !== "")}
+          {sourceOption("bundle", t("settings_source_bundle"), inShell && draft.source.bundlePath !== "")}
         </div>
         {!inShell && <p className="wizard-step-note">{t("settings_shell_note")}</p>}
 
@@ -137,9 +148,9 @@ export function Settings({
               <input
                 className="field-input ltr-field"
                 dir="ltr"
-                value={draft.endpoint}
+                value={draft.source.endpoint}
                 placeholder={defaultEndpoint}
-                onChange={(e) => setDraft({ ...draft, endpoint: e.target.value })}
+                onChange={(e) => setDraft({ ...draft, source: { ...draft.source, endpoint: e.target.value } })}
               />
             </label>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -160,8 +171,8 @@ export function Settings({
                 type="number"
                 min={2}
                 max={60}
-                value={draft.refreshSeconds}
-                onChange={(e) => setDraft({ ...draft, refreshSeconds: Number(e.target.value) })}
+                value={draft.source.refreshSeconds}
+                onChange={(e) => setDraft({ ...draft, source: { ...draft.source, refreshSeconds: Number(e.target.value) } })}
               />
             </label>
             <label className="field-label">
@@ -169,8 +180,8 @@ export function Settings({
               <input
                 className="field-input ltr-field"
                 dir="ltr"
-                value={draft.publicKey}
-                onChange={(e) => setDraft({ ...draft, publicKey: e.target.value })}
+                value={draft.source.publicKey}
+                onChange={(e) => setDraft({ ...draft, source: { ...draft.source, publicKey: e.target.value } })}
               />
             </label>
             <p className="wizard-step-note">{t("settings_public_key_note")}</p>
@@ -183,6 +194,74 @@ export function Settings({
               {t("settings_saved")}
             </span>
           </div>
+        )}
+      </div>
+
+      <div className="card">
+        <strong>{t("settings_ai_title")}</strong>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.88rem" }}>{t("settings_ai_body")}</p>
+        <label className="field-check" style={{ marginTop: 8 }}>
+          <input
+            type="checkbox"
+            checked={draft.ai.enabled}
+            onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, enabled: e.target.checked } })}
+          />
+          {t("settings_ai_enable_label")}
+        </label>
+
+        {draft.ai.enabled && (
+          <>
+            <label className="field-label">
+              {t("settings_ai_profile_label")}
+              <select
+                className="field-input"
+                value={draft.ai.profile}
+                onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, profile: e.target.value as AiProfile } })}
+              >
+                <option value="small">{t("settings_ai_profile_small")}</option>
+                <option value="balanced">{t("settings_ai_profile_balanced")}</option>
+                <option value="full">{t("settings_ai_profile_full")}</option>
+              </select>
+            </label>
+            <label className="field-label">
+              {t("settings_ai_model_file_label")}
+              <input
+                className="field-input ltr-field"
+                dir="ltr"
+                value={draft.ai.modelFileName}
+                onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, modelFileName: e.target.value } })}
+              />
+            </label>
+            <p className="wizard-step-note">{t("settings_ai_model_file_hint")}</p>
+            <label className="field-label">
+              {t("settings_ai_threads_label")}
+              <input
+                className="field-input ltr-field"
+                dir="ltr"
+                type="number"
+                min={0}
+                max={64}
+                value={draft.ai.threads}
+                onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, threads: Number(e.target.value) } })}
+              />
+            </label>
+            <label className="field-check">
+              <input
+                type="checkbox"
+                checked={draft.ai.historyOptIn}
+                onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, historyOptIn: e.target.checked } })}
+              />
+              {t("settings_ai_history_opt_in_label")}
+            </label>
+            <label className="field-check">
+              <input
+                type="checkbox"
+                checked={draft.ai.debugSavePrompts}
+                onChange={(e) => setDraft({ ...draft, ai: { ...draft.ai, debugSavePrompts: e.target.checked } })}
+              />
+              {t("settings_ai_debug_prompts_label")}
+            </label>
+          </>
         )}
       </div>
 
