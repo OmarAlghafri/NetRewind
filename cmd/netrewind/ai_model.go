@@ -100,6 +100,7 @@ func newAIModelListCmd() *cobra.Command {
 			type row struct {
 				Profile   string `json:"profile"`
 				ID        string `json:"id"`
+				FileName  string `json:"file_name"`
 				SizeBytes int64  `json:"size_bytes"`
 				GatePass  bool   `json:"gate_passed"`
 				Installed bool   `json:"installed"`
@@ -110,7 +111,7 @@ func newAIModelListCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				rows = append(rows, row{Profile: m.Profile, ID: m.ID, SizeBytes: m.SizeBytes, GatePass: m.Gate.Passed, Installed: meta != nil})
+				rows = append(rows, row{Profile: m.Profile, ID: m.ID, FileName: m.FileName, SizeBytes: m.SizeBytes, GatePass: m.Gate.Passed, Installed: meta != nil})
 			}
 
 			out := safeOut(cmd)

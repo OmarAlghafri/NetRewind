@@ -124,6 +124,7 @@ func TestAIModelListFallsBackToTheEmbeddedCatalogueWithoutManifestCoordinates(t 
 	}
 	var rows []struct {
 		Profile  string `json:"profile"`
+		FileName string `json:"file_name"`
 		GatePass bool   `json:"gate_passed"`
 	}
 	if err := json.Unmarshal([]byte(out), &rows); err != nil {
@@ -135,6 +136,13 @@ func TestAIModelListFallsBackToTheEmbeddedCatalogueWithoutManifestCoordinates(t 
 	for _, r := range rows {
 		if r.GatePass {
 			t.Errorf("profile %q reports gate_passed=true - none has actually passed an evaluation gate yet", r.Profile)
+		}
+		// file_name is what a caller (the desktop shell) must write into
+		// aiSettings.modelFileName after a successful download, so
+		// ai_runtime_start later resolves the right file - a row without
+		// it would leave that caller with no way to know what to write.
+		if r.FileName == "" {
+			t.Errorf("profile %q has an empty file_name", r.Profile)
 		}
 	}
 }
