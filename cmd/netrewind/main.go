@@ -56,6 +56,7 @@ func newRootCmd() *cobra.Command {
 		newEventsCmd(), newTimelineCmd(), newWhatHappenedCmd(),
 		newIncidentsCmd(), newRulesCmd(), newServeCmd(), newStatusCmd(),
 		newBundleCmd(), newVersionCmd(), newNoteCmd(), newNotesCmd(), newAICmd(),
+		newExplainCmd(),
 	)
 	return root
 }
