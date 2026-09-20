@@ -1,11 +1,11 @@
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { Incident, NetRewindEvent } from "../types";
 import type { Lang } from "../i18n/translations";
 import type { AiSettings } from "./aiSettings";
 import type { AiAnalyzeResponse } from "./aiTypes";
 import { AiCommandError, aiAnalyze, aiRuntimeStart } from "./ai";
 import { isTauri } from "./tauri";
-import { useAiSession } from "./aiSession";
+import { useAiSession, type AiFollowUpTurn } from "./aiSession";
 import { AI_FEATURE_ENABLED } from "./aiFeature";
 
 export type AiPanelState =
@@ -34,6 +34,22 @@ export interface UseAiAssistantResult {
    *  the plan's "button says analyze locally, never find the cause": the
    *  operator asks again, nothing runs on its own. */
   analyze: () => void;
+  /** Every follow-up asked so far this session, oldest first - only ever
+   *  set (and only ever non-empty) once state is "answered" (a follow-up
+   *  re-uses the same evidence as the main answer, so it makes no sense
+   *  before one exists). */
+  followUps?: AiFollowUpTurn<AiAnalyzeResponse>[];
+  /** True while a follow-up request is in flight - separate from `state`
+   *  itself, which stays "answered" throughout (unlike the initial
+   *  analyze(), asking a follow-up must not hide the answer already on
+   *  screen while it runs). Only meaningful once state is "answered". */
+  followUpPending?: boolean;
+  /** Re-runs the whole analysis with a real question instead of the
+   *  default blank one, appending the result to `followUps` - see
+   *  AiFollowUpTurn's own doc comment for why this is independent turns,
+   *  not a threaded conversation the model itself remembers. Only present
+   *  once state is "answered"; a no-op while one is already pending. */
+  askFollowUp?: (question: string) => void;
 }
 
 /**
@@ -54,6 +70,16 @@ export function useAiAssistant(
 ): UseAiAssistantResult {
   const session = useAiSession();
   const entry = session.getEntry<AiAnalyzeResponse, { code?: string; message: string }>(incident.incident_id);
+  const [followUpPending, setFollowUpPending] = useState(false);
+  // The guard below reads this ref, not the `followUpPending` state: two
+  // askFollowUp() calls fired back to back in the same tick (a double
+  // click before React re-renders) would otherwise both close over the
+  // same pre-update `followUpPending`, since setFollowUpPending(true)
+  // does not take effect for a *second* call to the same callback
+  // instance until the next render - the identical stale-closure hazard
+  // documented on aiSession.tsx's own `entries` ref, here for a boolean
+  // instead of a map.
+  const followUpPendingRef = useRef(false);
 
   const analyze = useCallback(() => {
     session.setEntry(incident.incident_id, { state: "analyzing" });
@@ -92,6 +118,45 @@ export function useAiAssistant(
     // analyze() call tried (and failed) to start a second one.
   }, [session, incident, events, history, lang, settings.modelFileName, settings.threads]);
 
+  const askFollowUp = useCallback(
+    (question: string) => {
+      const trimmed = question.trim();
+      if (!trimmed || followUpPendingRef.current) return;
+      followUpPendingRef.current = true;
+      setFollowUpPending(true);
+      void (async () => {
+        try {
+          const response = await aiAnalyze({
+            incident,
+            events,
+            history,
+            question: trimmed,
+            lang,
+            policy: { max_history: 3 },
+          });
+          const current = session.getEntry<AiAnalyzeResponse, { code?: string; message: string }>(incident.incident_id);
+          const nextFollowUps = [...(current?.followUps ?? []), { question: trimmed, answerId: crypto.randomUUID(), result: response }];
+          session.setEntry(incident.incident_id, { ...current, state: "result", followUps: nextFollowUps });
+        } catch {
+          // A failed follow-up leaves the main answer and any earlier
+          // follow-ups exactly as they were - it is not a reason to
+          // discard what already worked. The panel's own input stays
+          // filled so the operator can just retry.
+        } finally {
+          followUpPendingRef.current = false;
+          setFollowUpPending(false);
+        }
+      })();
+      // `session` is read fresh inside the async closure via
+      // session.getEntry (not captured from this render), so this
+      // callback itself does not need `session` as a dependency the way
+      // `analyze` above does - there is no stale runtimeStatus read here,
+      // only a stale `current.followUps` list, which re-reading at call
+      // time already avoids.
+    },
+    [incident, events, history, lang],
+  );
+
   // Checked before isTauri() and every other state: while the compile-time
   // gate is off, nothing else about this hook's state matters - not even
   // whether the shell is reachable, since there would be nothing to reach
@@ -120,7 +185,17 @@ export function useAiAssistant(
   // entry.state === "result"
   const response = entry.result;
   if (!response) return { state: "idle", analyze };
-  if (response.verdict === "answered") return { state: "answered", response, answerId: entry.answerId, analyze };
+  if (response.verdict === "answered") {
+    return {
+      state: "answered",
+      response,
+      answerId: entry.answerId,
+      analyze,
+      followUps: entry.followUps ?? [],
+      followUpPending,
+      askFollowUp,
+    };
+  }
   if (response.verdict === "insufficient_evidence") return { state: "insufficient_evidence", response, analyze };
   if (response.verdict === "refused_by_model") return { state: "refused_by_model", response, analyze };
   return { state: "invalid", response, analyze };

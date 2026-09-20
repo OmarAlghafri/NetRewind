@@ -647,6 +647,12 @@ body {
   text-underline-offset: 2px;
 }
 
+.ai-panel-followups {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
 .ai-panel-notes {
   border-top: 1px solid var(--border);
   padding-top: 10px;

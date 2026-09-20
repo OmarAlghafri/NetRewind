@@ -188,6 +188,78 @@ describe("AiAssistantPanel: previously-on-this-network retrieval", () => {
   });
 });
 
+describe("AiAssistantPanel: follow-up questions", () => {
+  it("asks a follow-up, shows the question and answer, and clears the input", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf" });
+    installAnsweredShell([]);
+
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    await waitFor(() => expect(screen.getByText("ARP binding changed on the gateway.")).toBeInTheDocument());
+
+    const input = screen.getByPlaceholderText("Ask a follow-up question about this incident…") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "why did this happen twice?" } });
+    fireEvent.click(screen.getByText("Ask"));
+
+    await waitFor(() => expect(screen.getByText("why did this happen twice?")).toBeInTheDocument());
+    expect(screen.getAllByText("ARP binding changed on the gateway.")).toHaveLength(2);
+    expect(input.value).toBe("");
+  });
+
+  it("does not persist a follow-up thread when history opt-in is off", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf", historyOptIn: false });
+    const calls: Record<string, unknown>[] = [];
+    installAnsweredShellWithNotes([], { calls });
+
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} settings={{ ...DEFAULT_SETTINGS, kind: "live" }} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    await waitFor(() => expect(screen.getByText("ARP binding changed on the gateway.")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByPlaceholderText("Ask a follow-up question about this incident…"), { target: { value: "root cause?" } });
+    fireEvent.click(screen.getByText("Ask"));
+    await waitFor(() => expect(screen.getByText("root cause?")).toBeInTheDocument());
+
+    expect(calls.some((c) => c.path === "/v1/notes/threads/inc-1")).toBe(false);
+  });
+
+  it("does not persist a follow-up thread for a non-live source, even with history opt-in on", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf", historyOptIn: true });
+    const calls: Record<string, unknown>[] = [];
+    installAnsweredShellWithNotes([], { calls });
+
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} settings={{ ...DEFAULT_SETTINGS, kind: "bundle" }} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    await waitFor(() => expect(screen.getByText("ARP binding changed on the gateway.")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByPlaceholderText("Ask a follow-up question about this incident…"), { target: { value: "root cause?" } });
+    fireEvent.click(screen.getByText("Ask"));
+    await waitFor(() => expect(screen.getByText("root cause?")).toBeInTheDocument());
+
+    expect(calls.some((c) => c.path === "/v1/notes/threads/inc-1")).toBe(false);
+  });
+
+  it("persists a redacted follow-up thread turn on a live source with history opt-in on", async () => {
+    writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf", historyOptIn: true });
+    const calls: Record<string, unknown>[] = [];
+    installAnsweredShellWithNotes([], { calls });
+
+    english(<AiAssistantPanel incident={incident} events={events} history={[]} settings={{ ...DEFAULT_SETTINGS, kind: "live" }} />);
+    fireEvent.click(await screen.findByText("Analyze this incident locally"));
+    await waitFor(() => expect(screen.getByText("ARP binding changed on the gateway.")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByPlaceholderText("Ask a follow-up question about this incident…"), { target: { value: "root cause?" } });
+    fireEvent.click(screen.getByText("Ask"));
+    await waitFor(() => expect(screen.getByText("root cause?")).toBeInTheDocument());
+
+    await waitFor(() => expect(calls.some((c) => c.path === "/v1/notes/threads/inc-1")).toBe(true));
+    const threadCall = calls.find((c) => c.path === "/v1/notes/threads/inc-1");
+    const body = JSON.parse(threadCall?.body as string);
+    expect(body.question_redacted).toBe("[redacted] root cause?");
+    expect(body.summary_redacted).toBe("[redacted] ARP binding changed on the gateway.");
+    expect(typeof body.answer_id).toBe("string");
+  });
+});
+
 describe("AiAssistantPanel: notes and feedback", () => {
   it("reports notes as unavailable when no live source is given", async () => {
     writeAiSettings({ ...DEFAULT_AI_SETTINGS, enabled: true, modelFileName: "small.gguf" });

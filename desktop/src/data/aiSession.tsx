@@ -18,6 +18,19 @@ const STATUS_POLL_MS = 3000;
 
 export type AiEntryState = "analyzing" | "result" | "error";
 
+/** One follow-up question asked against the same evidence as the entry's
+ *  main `result` - re-runs the whole analysis with a real `question`
+ *  instead of the default blank one, since internal/ai.Analyze does not
+ *  yet thread prior turns into the model's own context (see
+ *  cmd/netrewind/ai.go's own doc comment on what it does not do yet); each
+ *  turn is independent, and the operator's own running list of what they
+ *  asked and what came back is what "follow-up" means here. */
+export interface AiFollowUpTurn<TResult> {
+  question: string;
+  answerId: string;
+  result: TResult;
+}
+
 export interface AiEntry<TResult, TError> {
   state: AiEntryState;
   result?: TResult;
@@ -27,6 +40,10 @@ export interface AiEntry<TResult, TError> {
    *  POST /v1/notes/feedback), and the shipped analyze response carries no
    *  server-side answer id of its own to reuse. */
   answerId?: string;
+  /** Every follow-up asked this session, oldest first - kept here (not
+   *  local component state) so it survives switching to another incident
+   *  and back, the same reason `result` itself lives in the session. */
+  followUps?: AiFollowUpTurn<TResult>[];
 }
 
 interface AiSessionValue {

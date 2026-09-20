@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Incident, NetRewindEvent } from "../../types";
 import { nsToDate } from "../../types";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -9,7 +9,14 @@ import type { AiAnalyzeResponse, AiHandle } from "../../data/aiTypes";
 import type { Page } from "../Sidebar";
 import type { InvestigationContext } from "../../routing/useRoute";
 import type { SourceSettings } from "../../data/source";
-import { getNotesAnnotation, postNotesFeedback, putNotesAnnotation, type NotesAnnotation, type NotesOutcome } from "../../data/notes";
+import {
+  getNotesAnnotation,
+  postNotesFeedback,
+  postNotesThreadAppend,
+  putNotesAnnotation,
+  type NotesAnnotation,
+  type NotesOutcome,
+} from "../../data/notes";
 import { aiReportRedact } from "../../data/ai";
 import { buildAiReport } from "./aiReport";
 import type { Lang } from "../../i18n/translations";
@@ -376,6 +383,8 @@ function AiAnsweredResult({
         </div>
       )}
 
+      <FollowUpSection assistant={assistant} incident={incident} settings={settings} aiSettings={aiSettings} t={t} />
+
       <NotesSection incident={incident} settings={settings} aiSettings={aiSettings} answerId={assistant.answerId} t={t} />
 
       {assistant.response && (
@@ -445,6 +454,109 @@ function CopyReportButton({
           {t("ai_panel_copy_report_failed")}
         </span>
       )}
+    </div>
+  );
+}
+
+/**
+ * "Follow-up questions" (execution order's own memory framing, and the
+ * plan's opt-in persisted-thread feature): re-runs the whole analysis
+ * against the SAME evidence with a real question in place of the initial
+ * blank one - see AiFollowUpTurn's own doc comment for why each turn is
+ * independent rather than a conversation the model itself remembers
+ * (internal/ai.Analyze does not yet thread prior turns into the prompt).
+ * Always offered once answered, regardless of source: asking again needs
+ * only the sidecar and the same events, not a live recorder. Persisting
+ * the transcript (opt-in, `aiSettings.historyOptIn`) is the one part that
+ * does need a live source, since it is the recorder's own notes store
+ * (ADR 0008) being written to - redacted the same way a copied report is
+ * before it reaches that store, since a persisted thread outlives this one
+ * session the same way a report leaving the panel does.
+ */
+function FollowUpSection({
+  assistant,
+  incident,
+  settings,
+  aiSettings,
+  t,
+}: {
+  assistant: Assistant;
+  incident: Incident;
+  settings?: SourceSettings;
+  aiSettings: AiSettings;
+  t: TFn;
+}) {
+  const [question, setQuestion] = useState("");
+  const followUps = assistant.followUps ?? [];
+
+  const submit = () => {
+    const trimmed = question.trim();
+    if (!trimmed || !assistant.askFollowUp) return;
+    assistant.askFollowUp(trimmed);
+    setQuestion("");
+  };
+
+  const persist = (turnQuestion: string, turnAnswerId: string, summary: string) => {
+    if (!settings || settings.kind !== "live" || !aiSettings.historyOptIn) return;
+    void (async () => {
+      try {
+        const [questionRedacted, summaryRedacted] = await Promise.all([aiReportRedact(turnQuestion), aiReportRedact(summary)]);
+        await postNotesThreadAppend(settings.endpoint, incident.incident_id, {
+          answerId: turnAnswerId,
+          questionRedacted,
+          summaryRedacted,
+        });
+      } catch {
+        // Best-effort: the follow-up itself already succeeded and is shown
+        // on screen either way - a failed persistence attempt is not worth
+        // surfacing as an error on top of a working answer.
+      }
+    })();
+  };
+
+  // Persists exactly once per turn, the moment a new one appears - a ref
+  // (not state) since it only needs to remember "have I already persisted
+  // this many turns", never to trigger a render of its own.
+  const persistedCount = useRef(0);
+  useEffect(() => {
+    for (let i = persistedCount.current; i < followUps.length; i++) {
+      persist(followUps[i].question, followUps[i].answerId, followUps[i].result.output.summary);
+    }
+    persistedCount.current = followUps.length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followUps.length]);
+
+  return (
+    <div className="ai-panel-followups">
+      {followUps.length > 0 && (
+        <ul className="ai-panel-list">
+          {followUps.map((turn) => (
+            <li key={turn.answerId}>
+              <strong dir="auto">{turn.question}</strong>
+              <p dir="auto" style={{ margin: "2px 0 0" }}>
+                {turn.result.output.summary}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <input
+          className="field-input"
+          dir="auto"
+          style={{ flex: 1 }}
+          value={question}
+          placeholder={t("ai_panel_followup_placeholder")}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
+          }}
+          disabled={assistant.followUpPending}
+        />
+        <Button variant="secondary" onClick={submit} disabled={assistant.followUpPending || question.trim() === ""}>
+          {assistant.followUpPending ? t("ai_panel_followup_asking") : t("ai_panel_followup_ask_button")}
+        </Button>
+      </div>
     </div>
   );
 }

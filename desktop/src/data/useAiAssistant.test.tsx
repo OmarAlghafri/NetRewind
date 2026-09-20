@@ -179,3 +179,153 @@ describe("useAiAssistant's analyze flow", () => {
     expect(result.current.state).toBe("idle"); // inc-2 has no entry yet - must not show inc-1's result
   });
 });
+
+function answeredResponse(summary: string) {
+  return JSON.stringify({
+    version: 1,
+    verdict: "answered",
+    guardrail: { refuse: false, ceiling: 75 },
+    handles: [],
+    output: { summary, ranked_hypotheses: [], evidence_handles: [], counter_evidence: [], unknowns: [], confidence_ceiling: 75, next_checks: [] },
+    validation: { ok: true, retried: false, first_attempt_valid: true, violations: [] },
+    timing: { prompt_ms: 1, predicted_ms: 2, total_ms: 3 },
+  });
+}
+
+describe("useAiAssistant's askFollowUp", () => {
+  async function answered() {
+    installShell(async (cmd) => {
+      if (cmd === "ai_status") return { running: true, port: 1 };
+      if (cmd === "ai_analyze") return answeredResponse("first answer");
+      throw new Error("unexpected command " + cmd);
+    });
+    const { result } = renderHook(() => useAiAssistant(incident, EMPTY_EVENTS, EMPTY_HISTORY, "en", configuredSettings), { wrapper });
+    await waitFor(() => expect(result.current.state).toBe("idle"));
+    act(() => result.current.analyze());
+    await waitFor(() => expect(result.current.state).toBe("answered"));
+    return result;
+  }
+
+  function questionOf(args: Record<string, unknown> | undefined): string {
+    return JSON.parse(String(args?.requestJson)).question;
+  }
+
+  it("appends a follow-up turn without disturbing the main answer", async () => {
+    const questions: string[] = [];
+    installShell(async (cmd, args) => {
+      if (cmd === "ai_status") return { running: true, port: 1 };
+      if (cmd === "ai_analyze") {
+        questions.push(questionOf(args));
+        return answeredResponse("first answer");
+      }
+      throw new Error("unexpected command " + cmd);
+    });
+    const { result } = renderHook(() => useAiAssistant(incident, EMPTY_EVENTS, EMPTY_HISTORY, "en", configuredSettings), { wrapper });
+    await waitFor(() => expect(result.current.state).toBe("idle"));
+    act(() => result.current.analyze());
+    await waitFor(() => expect(result.current.state).toBe("answered"));
+
+    installShell(async (cmd, args) => {
+      if (cmd === "ai_status") return { running: true, port: 1 };
+      if (cmd === "ai_analyze") {
+        questions.push(questionOf(args));
+        return answeredResponse("follow-up answer");
+      }
+      throw new Error("unexpected command " + cmd);
+    });
+    act(() => result.current.askFollowUp?.("why did this repeat?"));
+    expect(result.current.followUpPending).toBe(true);
+    // The main answer must stay visible while the follow-up is in flight.
+    expect(result.current.state).toBe("answered");
+    expect(result.current.response?.output.summary).toBe("first answer");
+
+    await waitFor(() => expect(result.current.followUpPending).toBe(false));
+    expect(result.current.followUps).toHaveLength(1);
+    expect(result.current.followUps?.[0].question).toBe("why did this repeat?");
+    expect(result.current.followUps?.[0].result.output.summary).toBe("follow-up answer");
+    expect(result.current.response?.output.summary).toBe("first answer");
+    expect(questions).toContain("why did this repeat?");
+  });
+
+  it("accumulates multiple sequential follow-ups, oldest first", async () => {
+    let n = 0;
+    installShell(async (cmd) => {
+      if (cmd === "ai_status") return { running: true, port: 1 };
+      if (cmd === "ai_analyze") return answeredResponse(`answer ${++n}`);
+      throw new Error("unexpected command " + cmd);
+    });
+    const { result } = renderHook(() => useAiAssistant(incident, EMPTY_EVENTS, EMPTY_HISTORY, "en", configuredSettings), { wrapper });
+    await waitFor(() => expect(result.current.state).toBe("idle"));
+    act(() => result.current.analyze());
+    await waitFor(() => expect(result.current.state).toBe("answered"));
+
+    act(() => result.current.askFollowUp?.("first question"));
+    await waitFor(() => expect(result.current.followUpPending).toBe(false));
+    act(() => result.current.askFollowUp?.("second question"));
+    await waitFor(() => expect(result.current.followUpPending).toBe(false));
+
+    expect(result.current.followUps).toHaveLength(2);
+    expect(result.current.followUps?.[0].question).toBe("first question");
+    expect(result.current.followUps?.[1].question).toBe("second question");
+  });
+
+  it("ignores a blank question and never calls ai_analyze for it", async () => {
+    const result = await answered();
+    const before = result.current.followUps ?? [];
+    act(() => result.current.askFollowUp?.("   "));
+    expect(result.current.followUpPending).toBeFalsy();
+    expect(result.current.followUps).toBe(before);
+  });
+
+  it("guards against a second submission while one is already pending", async () => {
+    let inFlight = 0;
+    let maxConcurrent = 0;
+    installShell(async (cmd) => {
+      if (cmd === "ai_status") return { running: true, port: 1 };
+      if (cmd === "ai_analyze") {
+        inFlight++;
+        maxConcurrent = Math.max(maxConcurrent, inFlight);
+        await new Promise((r) => setTimeout(r, 10));
+        inFlight--;
+        return answeredResponse("answer");
+      }
+      throw new Error("unexpected command " + cmd);
+    });
+    const { result } = renderHook(() => useAiAssistant(incident, EMPTY_EVENTS, EMPTY_HISTORY, "en", configuredSettings), { wrapper });
+    await waitFor(() => expect(result.current.state).toBe("idle"));
+    act(() => result.current.analyze());
+    await waitFor(() => expect(result.current.state).toBe("answered"));
+
+    act(() => {
+      result.current.askFollowUp?.("first question");
+      result.current.askFollowUp?.("second question");
+    });
+    await waitFor(() => expect(result.current.followUpPending).toBe(false));
+    expect(result.current.followUps).toHaveLength(1);
+    expect(maxConcurrent).toBe(1);
+  });
+
+  it("keeps the existing answer and follow-ups when a follow-up call rejects", async () => {
+    let fail = false;
+    installShell(async (cmd) => {
+      if (cmd === "ai_status") return { running: true, port: 1 };
+      if (cmd === "ai_analyze") {
+        if (fail) throw new Error("server unreachable");
+        return answeredResponse("first answer");
+      }
+      throw new Error("unexpected command " + cmd);
+    });
+    const { result } = renderHook(() => useAiAssistant(incident, EMPTY_EVENTS, EMPTY_HISTORY, "en", configuredSettings), { wrapper });
+    await waitFor(() => expect(result.current.state).toBe("idle"));
+    act(() => result.current.analyze());
+    await waitFor(() => expect(result.current.state).toBe("answered"));
+
+    fail = true;
+    act(() => result.current.askFollowUp?.("will this fail?"));
+    await waitFor(() => expect(result.current.followUpPending).toBe(false));
+
+    expect(result.current.state).toBe("answered");
+    expect(result.current.response?.output.summary).toBe("first answer");
+    expect(result.current.followUps).toHaveLength(0);
+  });
+});
