@@ -1,13 +1,19 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { LanguageProvider } from "../i18n/LanguageContext";
+import { AiSessionProvider } from "../data/aiSession";
 import { buildSupportSummary, Diagnostics } from "./Diagnostics";
 import { DEFAULT_SETTINGS } from "../data/source";
+import { DEFAULT_AI_SETTINGS } from "../data/aiSettings";
 import type { Record } from "../data/useRecord";
 
 function english<T>(ui: React.ReactElement<T>) {
   window.localStorage.setItem("netrewind.lang", "en");
-  return render(<LanguageProvider>{ui}</LanguageProvider>);
+  return render(
+    <LanguageProvider>
+      <AiSessionProvider>{ui}</AiSessionProvider>
+    </LanguageProvider>,
+  );
 }
 
 function record(over: Partial<Record> = {}): Record {
@@ -99,6 +105,7 @@ describe("Diagnostics copy button", () => {
         incidents={[]}
         settings={{ ...DEFAULT_SETTINGS, kind: "live" }}
         record={record()}
+        aiSettings={DEFAULT_AI_SETTINGS}
       />,
     );
 
@@ -116,10 +123,94 @@ describe("Diagnostics copy button", () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn(async () => Promise.reject(new Error("denied"))) } });
 
     english(
-      <Diagnostics events={[]} incidents={[]} settings={{ ...DEFAULT_SETTINGS, kind: "live" }} record={record()} />,
+      <Diagnostics events={[]} incidents={[]} settings={{ ...DEFAULT_SETTINGS, kind: "live" }} record={record()} aiSettings={DEFAULT_AI_SETTINGS} />,
     );
 
     fireEvent.click(screen.getByText("Copy summary"));
     expect(await screen.findByText("Could not copy")).toBeInTheDocument();
+  });
+});
+
+function installShell(invoke: (cmd: string, args?: { [key: string]: unknown }) => Promise<unknown>) {
+  (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = { invoke };
+}
+
+function removeShell() {
+  delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+}
+
+describe("Diagnostics: local AI assistant card", () => {
+  afterEach(() => removeShell());
+
+  it("shows the assistant as disabled and hides profile/model rows when it is off", () => {
+    english(
+      <Diagnostics events={[]} incidents={[]} settings={{ ...DEFAULT_SETTINGS, kind: "live" }} record={record()} aiSettings={DEFAULT_AI_SETTINGS} />,
+    );
+    expect(screen.getByText("Local AI assistant")).toBeInTheDocument();
+    const enabledRow = screen.getByText("Enabled").closest(".capability-row");
+    expect(enabledRow).toHaveTextContent("No");
+    expect(screen.queryByText("Profile")).not.toBeInTheDocument();
+    expect(screen.queryByText("Model file")).not.toBeInTheDocument();
+  });
+
+  it("shows profile, model file, threads and history opt-in once enabled", () => {
+    english(
+      <Diagnostics
+        events={[]}
+        incidents={[]}
+        settings={{ ...DEFAULT_SETTINGS, kind: "live" }}
+        record={record()}
+        aiSettings={{ ...DEFAULT_AI_SETTINGS, enabled: true, profile: "full", modelFileName: "qwen3-4b.gguf", threads: 4, historyOptIn: true }}
+      />,
+    );
+    expect(screen.getByText("Full - best reasoning")).toBeInTheDocument();
+    expect(screen.getByText("qwen3-4b.gguf")).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
+    const historyRow = screen.getByText("On-device question history").closest(".capability-row");
+    expect(historyRow).toHaveTextContent("Yes");
+  });
+
+  it("shows threads as automatic when unset (0)", () => {
+    english(
+      <Diagnostics
+        events={[]}
+        incidents={[]}
+        settings={{ ...DEFAULT_SETTINGS, kind: "live" }}
+        record={record()}
+        aiSettings={{ ...DEFAULT_AI_SETTINGS, enabled: true, threads: 0 }}
+      />,
+    );
+    expect(screen.getByText("Automatic")).toBeInTheDocument();
+  });
+
+  it("reports notes as unavailable outside a live recorder connection", () => {
+    english(
+      <Diagnostics events={[]} incidents={[]} settings={{ ...DEFAULT_SETTINGS, kind: "demo" }} record={record()} aiSettings={DEFAULT_AI_SETTINGS} />,
+    );
+    expect(screen.getByText("Only available while connected to a live recorder")).toBeInTheDocument();
+  });
+
+  it("shows notes counts fetched from the live recorder's own stats route", async () => {
+    installShell(async (cmd, args) => {
+      if (cmd !== "agent_get") throw new Error("unexpected command " + cmd);
+      expect(args?.path).toBe("/v1/notes/stats");
+      return { status: 200, body: JSON.stringify({ annotations: 3, feedback: 2, threads: 1, bytes: 8192 }), headers: {} };
+    });
+    english(
+      <Diagnostics events={[]} incidents={[]} settings={{ ...DEFAULT_SETTINGS, kind: "live" }} record={record()} aiSettings={DEFAULT_AI_SETTINGS} />,
+    );
+    expect(await screen.findByText("3")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+  });
+
+  it("shows an error message rather than crashing when the stats route fails", async () => {
+    installShell(async () => {
+      throw { code: "notes_read_failed", technical_detail: "boom" };
+    });
+    english(
+      <Diagnostics events={[]} incidents={[]} settings={{ ...DEFAULT_SETTINGS, kind: "live" }} record={record()} aiSettings={DEFAULT_AI_SETTINGS} />,
+    );
+    expect(await screen.findByText("Could not read notes statistics")).toBeInTheDocument();
   });
 });

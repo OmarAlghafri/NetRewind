@@ -187,7 +187,7 @@ function Shell() {
             />
           )}
           {route.page === "diagnostics" && (
-            <Diagnostics events={record.events} incidents={record.incidents} settings={settings} record={record} />
+            <Diagnostics events={record.events} incidents={record.incidents} settings={settings} record={record} aiSettings={aiSettings} />
           )}
         </main>
       </div>
