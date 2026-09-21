@@ -312,7 +312,7 @@ recorded runs behind each claim in this file.
 
 - [Installing](docs/install.md) — packages, services, configuration, upgrades
 - [The desktop application](docs/desktop.md) — sources, pages, bundles, options
-- [دليل المستخدم بالعربية](docs/user-guide-ar.md) — the user guide in Arabic
+- [دليل المستخدم باللغة العربية](docs/user-guide-ar.md) — the user guide in Arabic
 - [The local API](docs/api.md) — the endpoint and every route
 - [Testing](docs/testing.md) — what is tested, where, and the evidence
 - [The event schema](docs/schema.md) — the contract everything else depends on

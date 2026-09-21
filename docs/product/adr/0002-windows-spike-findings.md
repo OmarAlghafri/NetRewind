@@ -7,10 +7,10 @@
 
 `PRODUCT_RELEASE_PLAN_AR.md` §5, Phase 5A, calls for exactly one thing before
 any Windows collector code is written against `internal/ports` or
-`internal/collect`: **"spike معزول، لا تدمجه مبكراً"** - an isolated spike,
+`internal/collect`: **"تجربة معزولة، لا تدمجها مبكرًا"** - an isolated spike,
 do not integrate it early. The plan's own words on what such a spike is for:
 Microsoft's docs confirm notifications exist for interfaces, routes, and
-unicast addresses, "لكنه لا يجعلها مكافئة لـnetlink تلقائياً" - but that does
+unicast addresses, "لكن ذلك لا يجعلها مكافئة لـnetlink تلقائيًا" - but that does
 not automatically make them equivalent to netlink; the spike has to test
 loss, callbacks, IPv4/IPv6, sleep/resume, and VPN, on a real machine, not
 just cite the API reference.
@@ -34,7 +34,7 @@ never even added or removed a loopback-only address to force a guaranteed
 test notification, even though that specific technique was offered as an
 acceptable, optional option. The product plan's own Phase 5B testing section
 reserves *active* network-change testing for an isolated VM with a
-snapshot to restore ("تجرى تغييرات الشبكة فقط داخل VM معزولة ثم تستعاد
+snapshot to restore ("تُجرى تغييرات الشبكة داخل VM معزولة، ثم تُستعاد
 snapshot") - not the bare development machine this spike ran on. Skipping
 the active test here is therefore consistent with the plan's own intended
 division of labour between 5A (passive, bare machine, cheap) and 5B (active,
@@ -283,7 +283,7 @@ network stack, not an idle VM. Checked directly rather than assumed:
   provisioned but idle even with no VPN in use.)
 
 This is exactly the kind of honest null result the task brief anticipated
-("قد لا يحدث شيء، وهذا مقبول ومفيد للتقرير" in spirit, even if not its exact
+("قد لا يحدث أي تغيير، وهذه نتيجة مقبولة ومفيدة للتقرير" in spirit, even if not its exact
 words) - it is informative, not a failure: it proves the registration path
 is live (via the synthetic notification) but it does **not** independently
 confirm that a real interface/address/route change is actually delivered

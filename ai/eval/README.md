@@ -1,7 +1,7 @@
 # AI evaluation corpus
 
 > Built per `PRODUCT_RELEASE_PLAN_AR.md` §6.4, **before** any AI interface or
-> model exists — the plan's own ordering ("أنشئ `ai/eval/` قبل واجهة AI").
+> model exists — the plan's own ordering ("أنشئ `ai/eval/` قبل واجهة الذكاء الاصطناعي").
 > Nothing here downloads, runs, or requires a model. This is the yardstick a
 > future candidate model is measured against, built first so the measurement
 > cannot be shaped around whatever a chosen model happens to do well.
@@ -40,7 +40,7 @@ changed and why.
   `collector-not-watching`) and `collector_down` — cases where a real
   incident exists but the correct behaviour is still refusal for the
   underlying question, because the incident itself *is* "the record cannot
-  answer this" (§6.2: "ارفض الاستنتاج في gap/collector-down").
+  answer this" (§6.2: "ارفض الاستنتاج عند وجود فجوة في التسجيل أو توقف أحد المجمّعات").
 - **Adversarial** (1): `malicious_dns_name` — the real prompt-injection
   fixture from Phase 0 (a crafted string sent as a live DNS query, see
   `corpus/v1/README.md` §4), graded on treating the string as data to

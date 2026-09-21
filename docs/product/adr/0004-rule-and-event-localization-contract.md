@@ -120,9 +120,9 @@ the Go struct, or every one of the 19 shipped rules fails to load.
   `docs/evidence/36-...log`).
 - `desktop/src/i18n/kindCatalogue.ts`: hand-written `{en, ar}` labels for
   all 49 kinds and 10 families, reusing the rule translations' own
-  vocabulary (المسار, العنوان, عنوان العتاد, البوابة, المُحلِّل, "توقف ...
+  vocabulary (المسار، العنوان، عنوان العتاد، البوابة، المحلّل، "توقف ...
   عن الإجابة") rather than inventing a second one, and the execution
-  order's glossary correction (وحدة جمع البيانات, not «جامعة»).
+  order's glossary correction (وحدة جمع البيانات، وليس «جامعة»).
   `labelForKind`/`labelForFamily` return `{name, known}`; `known: false`
   is the "unknown key falls back to the original, never blank, never a
   crash" path this ADR requires, for a kind an older GUI build predates.

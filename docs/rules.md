@@ -170,10 +170,10 @@ unknown clause already is:
 ```yaml
 i18n:
   ar:
-    title: مسار كان يعمل توقف عن العمل
-    advice: التغيير المذكور هنا هو الأقرب زمنياً، وليس سبباً مؤكداً...
+    title: تعطّل مسار كان يعمل
+    advice: هذا هو أقرب تغيير وقع قبل العطل، لكنه ليس سببًا مثبتًا...
     clauses:
-      change: هذا آخر شيء تغيّر على المسار قبل أن يتعطل.
+      change: هذا آخر تغيير رُصد على المسار قبل أن يتعطّل.
 ```
 
 Optional, and additive: a rule with no `i18n` block loads exactly as it

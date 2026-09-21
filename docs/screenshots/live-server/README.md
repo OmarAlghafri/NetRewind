@@ -49,7 +49,7 @@ evidence is not erased by the recovery.
 | 07 | `07-settings-en.png` | windowed | Settings: language, record source set to *Live recorder on this machine*, the pipe endpoint, refresh interval, bundle-signature key. |
 | 08 | `08-fault-timeline-en.png` | full-screen | The **fault** in the raw record: `link.down` (warn) / `link.up`, and the address and route that left and returned with the adapter. |
 | 09 | `09-fault-incident-en.png` | windowed | The **diagnosis**: "A port is flapping" (88%, `port-flapping`), the causal chain, the root cause, and the suggested next step. |
-| 10 | `10-fault-incident-ar.png` | windowed | The same incident in **Arabic (RTL)** — the UI chrome is fully bilingual (تحذير / الثقة / السبب الجذري / الخطوة التالية المقترحة). |
+| 10 | `10-fault-incident-ar.png` | windowed | The same incident in **Arabic (RTL)** — the UI chrome is fully bilingual (تحذير / مستوى الثقة / السبب الجذري / الخطوة التالية المقترحة). |
 | 11 | `11-recovered-health-en.png` | full-screen | Healthy again after the fix: recorder up, no observation gap. The flapping incident remains in the record as history. |
 
 ## Provenance
