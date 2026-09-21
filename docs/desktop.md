@@ -58,7 +58,9 @@ sudo usermod -aG netrewind "$USER"
   refreshed, event counts by family and severity; what to copy into a
   support request.
 - **Settings** — language, the source and its endpoint, the refresh interval,
-  and the public key that makes bundle signatures mandatory.
+  the public key that makes bundle signatures mandatory, and "Local AI
+  models" — pick a profile, press download, it verifies and saves to this
+  device immediately (see *Local AI* below for what this is and is not).
 
 The banner above every page says which source is on screen and, for a live
 recorder, when it was last refreshed. When the recorder cannot be reached the
@@ -95,6 +97,36 @@ bundle is shown, never merged: your local record is not touched.
 
 To restore a bundle into a store you can query with the CLI, use
 `netrewind bundle import <file> --into <new.db>`.
+
+## Local AI
+
+An optional local model can be downloaded from Settings today — pick a
+profile (Small/Balanced/Full), download starts immediately, verified by
+size and SHA-256 against a signed catalogue. Downloading and running a
+model are different actions with different risk: this download always
+works, independent of the feature below.
+
+Actually analyzing an incident with that model is a separate feature,
+gated behind a compile-time switch (`AI_FEATURE_ENABLED`) that is off in
+this build. It stays off because no candidate model has both passed this
+project's pre-registered safety gate (never fabricates a citation,
+never overclaims confidence, always refuses when the evidence is
+genuinely insufficient) and been useful enough to trust — one candidate
+(IBM Granite 4.2-3B) technically cleared the safety gate but found the
+correct cause in zero of nine held-out test cases, which this project
+judged not worth shipping. See ADR 0006 and
+`docs/evidence/54-ai-eval-three-tier-gate-run.log` through
+`56-ai-eval-granite-verbosity-fix-final.log` for the full numbers. If a
+future model passes both bars, the panel appears on the Incidents page
+next to the incident it can analyze, with every answer labelled as a
+hypothesis, never as a second, competing conclusion beside the
+correlation engine's own.
+
+Operator notes (an incident's confirmed cause / false positive /
+unresolved outcome, plus free text) and locally-recorded feedback on an
+answer are a separate, always-available feature (ADR 0008) once a live
+recorder is connected - independent of whether the AI panel itself is
+enabled, since a note is the operator's own conclusion, not the model's.
 
 ## Command-line options
 

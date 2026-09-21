@@ -1,9 +1,10 @@
 # ADR 0006 — Local AI runtime, model manager, and candidate selection
 
-**Status:** Accepted; runtime/model-manager code implemented per the
-Amendment below; the evaluation gate itself (Verification, below) remains
-pending real hardware.
-**Date:** 2026-09-19. Amended 2026-09-20.
+**Status:** Accepted; runtime/model-manager code implemented; the
+evaluation gate (Verification, below) has now been run on real hardware
+against two model families - neither is offered, for the reasons the
+2026-09-21 amendment records. `AI_FEATURE_ENABLED` stays `false`.
+**Date:** 2026-09-19. Amended 2026-09-20, 2026-09-21.
 
 ## Context
 
@@ -149,3 +150,69 @@ original reasoning stays legible.
   `gate.passed` per profile as the plan specifies, remains open and is a
   precondition for `AI_FEATURE_ENABLED` to mean what this ADR says it
   means.
+
+## Amendment (2026-09-21)
+
+Written after the tiered catalogue was actually run through the gate on
+the second test machine, twice - the first time this ADR's Verification
+section has real numbers behind it rather than a description of what a
+future run would check.
+
+- **`AI_FEATURE_ENABLED` now exists** (Rust `ai::AI_FEATURE_ENABLED`,
+  TS `data/aiFeature.ts`), checked before `ai_runtime_start`/`ai_analyze`
+  and first in the desktop panel's own state machine. It is `false` and
+  stays `false` - nothing in this amendment changes that.
+- **`models.json` is signed** and ships three profiles (Small/Balanced/
+  Full), each `gate.passed: false` with a real, specific evidence string
+  naming the exact failing run - not the placeholder empty string the
+  2026-09-20 amendment found.
+- **The Small/Balanced/Full Qwen3.5 catalogue (0.8B/2B/4B) failed its
+  gate outright**: Small on JSON validity (a repetition loop exhausts
+  the token budget before the object closes); Balanced and Full both on
+  refusal correctness (both confidently answered on both
+  insufficient-evidence cases in the test split instead of refusing).
+  `docs/evidence/54-ai-eval-three-tier-gate-run.log`.
+- **A second family, IBM Granite 4.x, was tried as a replacement** after
+  research into models specifically suited to structured-output
+  reliability and refusal calibration (Apache-2.0, dense architecture,
+  official Arabic support). All three tiers failed their first run too,
+  for a different, precisely diagnosed reason: verbose in-string
+  reasoning inside a JSON field exhausting the token budget, not
+  repetition. `docs/evidence/55-ai-eval-granite-gate-run.log`.
+- **The verbosity failure was fixed for real** (`internal/ai/schema.go`
+  gained per-field `maxLength`, grammar-enforced by llama-server itself;
+  two new system-prompt rules; `--no-reasoning-preserve` on the server -
+  the model's own chat template preserves reasoning by default). Granite
+  4.2-3B re-run on `test` then produced 9/9 valid JSON and held its 2/2
+  correct-refusal record - **the first candidate in this project's
+  history to technically meet every one of the six pre-registered safety
+  criteria.** `docs/evidence/56-ai-eval-granite-verbosity-fix-final.log`.
+- **Not offered anyway, on a usefulness judgment rather than a gate
+  failure**: that same run scored 0/9 top-1 cause hits and declined to
+  even attempt an answer on 5 of the 6 cases with a real, findable cause.
+  The six criteria were written to catch a *dangerous* model (one that
+  fabricates, overclaims, or fails to refuse) and were never meant to be
+  sufficient on their own - they say nothing about whether a model is
+  actually useful. A feature that is safe but almost never finds the
+  cause would train operators to stop trying it, which costs the
+  product's credibility more than shipping nothing does. This is exactly
+  the judgment call this ADR's own Decision always intended a human to
+  make on top of a passed gate, not a mechanical override of it.
+- **Gap in the gate methodology itself, flagged for the next
+  pre-registration, not retrofitted onto this one**: add a seventh,
+  usefulness-floor criterion (e.g. a minimum top-3 hit rate on
+  positive-kind cases) alongside the six safety criteria, so a
+  technically-safe-but-empty model cannot reach this same ambiguous
+  position again.
+- **Still genuinely open**: `runtime.lock.json` and the shipped desktop
+  app's own automatic runtime staging (`make desktop-runtime`,
+  `internal/ai/cmd/fetchruntime`, the CI caching and arm64 build job) -
+  every gate run to date started `llama-server` manually with a runtime
+  downloaded and hashed by hand for that run, which is sufficient for
+  evaluation but not for a real end-user's one-click download-and-run
+  flow. Not attempted in this amendment: building it for a runtime that
+  no approved model would yet use serves no one, and is better done once
+  (or if) a candidate actually passes on both safety and usefulness.
+  Gemma 4 (Apache-2.0 since April 2026, sizes matching this project's
+  tiers, but a documented JSON-strictness weakness of its own) was
+  identified as a third candidate and not yet tried.

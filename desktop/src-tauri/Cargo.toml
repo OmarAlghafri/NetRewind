@@ -1,6 +1,6 @@
 [package]
 name = "netrewind-desktop"
-version = "1.1.0"
+version = "1.2.0"
 description = "NetRewind desktop: the network black box recorder's viewer"
 authors = ["NetRewind contributors"]
 license = "AGPL-3.0-only"

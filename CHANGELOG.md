@@ -1,5 +1,99 @@
 # Changelog
 
+## 1.2.0 — 2026-09-21
+
+The local-AI assistant this project has been evaluating since 1.0.0 is now
+fully built end to end — runtime, model manager, guardrails, the desktop
+panel, an operator-memory layer beside the record — and honestly evaluated
+against a pre-registered gate on real hardware. It stays off by default.
+Everything around it (downloading a model, writing a note, exporting one in
+a bundle) works and ships regardless; the analysis feature itself does not
+turn on until a candidate is both safe and useful enough to trust, and none
+has been yet. No API contract broke; every addition is additive.
+
+### Local AI: built, evaluated twice, stays off
+
+`internal/ai` is the one library the CLI, the evaluation runner, and the
+desktop shell all call for prompt construction, the per-request JSON schema,
+the pre-inference guardrail (refuses before asking the model at all when a
+gap, a down collector, or a blindness rule makes the evidence untrustworthy),
+post-answer validation (one retry, never more), and similar-incident ranking
+— what gets measured and what ships cannot drift apart, because there is
+only one code path. `netrewind ai analyze` (stdin/stdout, opens no store),
+`netrewind ai model list|manifest|download|remove`, and `netrewind explain
+<incident-id>` make the same pipeline reachable from a real binary and the
+desktop shell alike; the desktop side (`desktop/src-tauri/src/ai/`) owns
+runtime lifecycle, model preflight, and spawning the CLI as a subprocess —
+Rust never re-implements any of the model-facing logic itself.
+
+A compile-time gate, `AI_FEATURE_ENABLED`, existed only in this project's
+own documentation until now — it is real code today (Rust `ai::
+AI_FEATURE_ENABLED`, TypeScript `data/aiFeature.ts`), checked first by
+every AI command and by the panel's own state machine. It is `false`.
+
+Two model families were run through the pre-registered gate (ADR 0006) on
+the second test machine, honestly, with the numbers published either way:
+
+- **Qwen3.5 (0.8B/2B/4B, the Small/Balanced/Full tiers)** failed outright.
+  The smallest tier degenerates into repetition loops that exhaust the
+  token budget before its JSON object can close; the two larger tiers both
+  answered confidently on both cases in the held-out split that should
+  have been refused — the exact failure mode a pre-inference guardrail and
+  a post-answer gate exist to catch.
+- **IBM Granite 4.x**, researched specifically for structured-output
+  reliability and refusal calibration after Qwen3.5's results, failed its
+  first run too, for a different, precisely diagnosed reason: the model
+  reasons out loud inside a JSON field's own text until the budget runs
+  out, not repetition. Fixed for real — every output field now carries a
+  `maxLength` enforced by the model server's own grammar, not just
+  requested in the prompt, plus a server flag the model's own chat
+  template needed disabled. Re-run once against the held-out split:
+  100% valid JSON, and it held its perfect refusal record — the first
+  candidate in this project's history to technically meet all six
+  pre-registered safety criteria. **Still not offered**: it scored zero
+  correct root-cause identifications out of nine cases and declined to
+  even attempt an answer on five of the six cases that had one. Safe but
+  almost never right is not a net positive for someone trying to diagnose
+  a real incident, and this project chose not to ship it on that
+  judgment, not because any safety check failed.
+
+Full numbers for every run: `docs/evidence/54-ai-eval-three-tier-gate-run.log`,
+`docs/evidence/55-ai-eval-granite-gate-run.log`,
+`docs/evidence/56-ai-eval-granite-verbosity-fix-final.log`.
+
+### Local AI models (Settings) — downloading works today, independent of the switch above
+
+Settings has a "Local AI models" card, always visible: pick a profile,
+press download, it starts immediately onto this device from an embedded,
+signed model catalogue (`internal/aimodel`, verified against
+`internal/update`'s existing ed25519 primitive) — resumable, hash-verified,
+quarantined rather than silently deleted on a mismatch. Downloading and
+running a model are different actions with different risk, so this stays
+available regardless of `AI_FEATURE_ENABLED`; none of the three catalogued
+profiles has passed its gate, and the card says so plainly.
+
+### Operator notes beside the record (ADR 0008)
+
+A second, isolated SQLite store next to the event record — `internal/notes`,
+its own `/v1/notes/*` routes — holds what the record itself never has: an
+operator's own conclusion on an incident (confirmed cause / false positive /
+unresolved, plus free text), locally-recorded helpful/not-helpful feedback,
+and opt-in follow-up-question threads. The record's own API stays entirely
+read-only; every write in this project now goes through this one narrow,
+separate surface, never the recorder's own database. A bundle carries a
+`notes.json` member when the exporting operator's own notes exist for
+incidents in the window — read-only on import, clearly labeled "from this
+bundle," never merged into the receiving operator's own notes.
+
+### Also
+
+- `internal/ai/golden`, the request-fixture regenerator
+  `ai/eval/run`'s own test failure message named but that never actually
+  existed until now — `go run ./internal/ai/golden` (re)captures the 74
+  golden request bodies whenever the prompt or schema changes on purpose.
+- `ai/eval/gen` gained `split_pins.json` so a new scenario can't reshuffle
+  which existing cases sit in the held-out `test` split.
+
 ## 1.1.0 — 2026-09-19
 
 A modernization pass on the desktop application: the shell no longer scrolls
