@@ -31,7 +31,7 @@
       "min_ram_available_bytes": 2147483648,
       "recommended_ctx": 8192,
       "runtime_min_build": "b10948",
-      "gate": { "passed": false, "evidence": "docs/evidence/54-ai-eval-three-tier-gate-run.log: FAILED criterion 3 (correct refusal on every gap/collector-down case) - both refusal-expected cases in the test split (link_flap, route_change) got a confident hypothesis instead of a refusal." }
+      "gate": { "passed": false, "evidence": "docs/evidence/54-ai-eval-three-tier-gate-run.log: FAILED criterion 3 (correct refusal on every gap/collector-down case) - both refusal-expected cases in the test split (link_flap, route_change) got a confident hypothesis instead of a refusal. A challenger for this profile (IBM Granite 4.2-3B, not this entry's own model) was tried next and fixed to meet all six safety criteria after a schema/prompt change (docs/evidence/56-ai-eval-granite-verbosity-fix-final.log) - still not offered, on a usefulness judgment: 0/9 top-1 cause hits, declined to answer 5 of 9 real-cause cases." }
     },
     {
       "profile": "full",
