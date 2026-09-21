@@ -1,0 +1,187 @@
+Evidence 55 — IBM Granite 4.x gate run, real hardware, real numbers
+====================================================================
+
+Date: 2026-09-21
+Pre-registration: docs/agent-state/AI_EVAL_PRE_REGISTERED_GATE_2026-09-20-granite.md
+(written and committed to disk before any of the three models below
+answered a single case)
+
+Purpose
+-------
+Evidence 54 (2026-09-20) failed all three Qwen3.5 tiers. Researched
+alternatives specifically for structured-output reliability and refusal
+calibration before picking a next candidate; IBM Granite 4.x (Apache-2.0,
+dense decoder-only transformer, marketed for enterprise agentic/tool-
+calling/structured tasks, ships a companion hallucination-detection
+model, officially lists Arabic support) was the strongest match found.
+This run tests it against the identical methodology and held-out split
+as every prior run in this project.
+
+Environment
+-----------
+Same machine, same pinned llama.cpp b10948, same server flags
+(--host 127.0.0.1 --port 8811 --ctx-size 8192 --threads 4 --no-jinja),
+same `test` split (9 cases), same `-lang en`, as evidence 54 - see that
+log for the full hardware/runtime detail, unchanged here.
+
+Models: `ibm-granite/granite-4.0-1b-GGUF` (Small, the Nano dense
+1B alternative to the hybrid line), `ibm-granite/granite-4.2-3b-GGUF`
+(Balanced), `ibm-granite/granite-4.2-8b-GGUF` (Full) - all Q4_K_M, all
+downloaded and verified against the pre-registration's own recorded
+size/SHA-256 before use (see that file for exact values).
+
+**Operational note, disclosed for completeness**: the Balanced model's
+first download attempt stalled mid-transfer (a dropped connection,
+common on a large file over a home connection) and the orchestration
+script's `Invoke-WebRequest`-based downloader had no resume/retry
+support, so it died silently and the run sat idle for roughly 4.5 hours
+before being noticed. Fixed by switching the downloader to `curl.exe`
+with `-C -` (real resume) and automatic retry, confirmed working (the
+partial 644MB file resumed and completed rather than restarting from
+zero), and by making the orchestration script trap and log any
+uncaught exception instead of dying silently. This delay was purely
+operational (a monitoring gap on this run's own tooling) and has no
+bearing on the results below, which are from a clean completed run.
+
+Results
+-------
+
+### Small (Granite 4.0 Nano 1B)
+
+    === summary: 9 cases, 6 produced valid schema JSON, 3 invalid/failed ===
+    pass (no hard violations): 5/6
+    top-1 cause hit: 0/6
+    top-3 cause hit: 0/6
+    correct refusals: 0
+    mean citation precision (non-empty citations): 0.42
+
+Peak RAM: 2.31 GB (budget 2.5 GB - within budget, but by a narrower
+margin than any prior tier).
+
+**Gate criterion 1 (100% valid JSON) FAILS**: 3 of 9 cases produced no
+parseable JSON. **Gate criterion 3 FAILS**: the one refusal-expected
+case in this split that returned valid JSON (route_change-negative-en)
+answered confidently instead of refusing - the same overconfidence
+pattern Qwen3.5 showed, at this size. Also never got a correct top-1
+cause even when it did produce valid JSON (0/6) - a real capability
+ceiling at this size for this task, distinct from (additional to) the
+structural failures.
+
+Gate: **NOT MET.**
+
+### Balanced (Granite 4.2 3B)
+
+    === summary: 9 cases, 7 produced valid schema JSON, 2 invalid/failed ===
+    pass (no hard violations): 2/7
+    top-1 cause hit: 0/7
+    top-3 cause hit: 0/7
+    correct refusals: 2
+    mean citation precision (non-empty citations): 0.00
+
+Peak RAM: 4.21 GB (budget 4.5 GB - within budget).
+
+**Gate criterion 1 FAILS**: 2 of 9 cases produced no parseable JSON
+(both `path_broke` positive cases).
+
+**Gate criterion 3 is genuinely MET on this run**: both refusal-expected
+cases (link_flap-negative-en, route_change-negative-en) correctly
+refused - 2/2, a first for this project across every candidate tested
+so far (Qwen3.5 Balanced and Full both got 0/2 on this exact criterion
+in evidence 54). This is a real, positive, worth-highlighting signal
+that Granite's calibration is meaningfully better than Qwen3.5's on
+this corpus, even though it does not save this run (criterion 1 still
+fails, and the gate needs all six criteria simultaneously).
+
+**New failure mode, different from Qwen3.5's, characterized directly
+from the raw output rather than assumed**: this is not a repetition
+loop. Inspecting `ai/eval/results/20260921T000225Z/results.json` (and
+the Full tier's own results below, which show the same pattern more
+clearly) shows the model reasoning out loud *inside* a JSON string
+value - one `ranked_hypotheses[].entity` field ran to several hundred
+words of hedged, self-debating prose ("...we cannot infer if it was
+triggered by something else not recorded. So confidence in stating
+'the change was due to the route modification (E3)' is 100% based on
+evidence. However, if interpreting 'caused' as external cause...") -
+consuming the entire 700-token generation budget before the JSON object
+could close. Elapsed time per case ranged 2m56s-5m34s, several times
+slower than any prior candidate at a comparable size, consistent with
+generating close to the full token budget on nearly every case rather
+than stopping early. Granite 4.2 ships a native "thinking: full/low/off"
+toggle; `--no-jinja` uses llama.cpp's own built-in Granite chat template
+rather than the model's own, and evidently does not suppress this
+in-string reasoning behavior the way it suppresses Qwen3.5's separate
+`<think>` channel - a real, specific incompatibility between this
+project's current invocation and this model family's expected way of
+constraining verbosity, not investigated further here (would mean
+retuning against the very split this gate exists to hold out, explicitly
+against this project's own rule).
+
+Gate: **NOT MET** (criterion 1; criterion 3 met, notably, for the first
+time in this project's history of gate runs).
+
+### Full (Granite 4.2 8B)
+
+    === summary: 9 cases, 4 produced valid schema JSON, 5 invalid/failed ===
+    pass (no hard violations): 4/4
+    top-1 cause hit: 0/4
+    top-3 cause hit: 0/4
+    correct refusals: 0
+    mean citation precision (non-empty citations): 0.75
+
+Peak RAM: 9.76 GB (budget 10 GB - within budget, but the narrowest
+margin of any tier in this project's history: 97.6% of budget used).
+
+**Gate criterion 1 FAILS worse than any other tier this run**: 5 of 9
+cases invalid, including *both* refusal-expected cases
+(link_flap-negative-en, route_change-negative-en) - so criterion 3
+cannot even be evaluated for this tier; both cases that should have
+been easy refusals instead ran out of budget mid-ramble, the same
+inline-reasoning pattern documented under Balanced above, worse here
+(the larger model reasons even more verbosely per case - elapsed times
+were the same 3-5 minute range as Balanced, at nearly double the
+parameter count, i.e. it did not use extra capacity to answer more
+efficiently). Mean citation precision (0.75) looks strong only because
+the denominator is small (4 valid cases) and skewed by the two
+default_route_lost cases both scoring 1.00.
+
+Gate: **NOT MET** (criterion 1, worst of the three tiers this run).
+
+Disposition
+-----------
+All three Granite tiers fail their pre-registered gate, the same
+disposition as Qwen3.5 in evidence 54, for a different dominant reason
+(inline in-string reasoning exhausting the token budget, rather than
+repetition or general overconfidence - though Small still showed the
+overconfidence pattern too). `internal/aimodel/models.json` is
+unchanged by this run: it already correctly names Qwen3.5 as the tested,
+rejected candidate for each profile (evidence 54), and Granite was
+evaluated as a *candidate to potentially replace it*, not something
+already occupying a profile slot - since it also failed, there is
+nothing to update there. `AI_FEATURE_ENABLED` stays `false`.
+
+**The one genuinely promising, worth-carrying-forward finding**:
+Granite 4.2 3B's 2/2 correct refusals is the first time any tested
+candidate has met that specific criterion. A future attempt at this
+model (or family) that first solves the token-budget/in-string-
+reasoning problem - e.g. a real `dev`-split experiment with an explicit
+"answer only in the fields given, no explanation inside a field value"
+instruction, or a higher `max_tokens` sized for this family's verbosity,
+or forcing `thinking: off` more forcefully via the request body rather
+than `--no-jinja` alone - would be worth a fresh pre-registered run
+against `test` again. Not attempted in this run, since doing so now
+would mean tuning against the same held-out split this gate exists to
+protect.
+
+Not done in this run (same exclusions as evidence 54's own list,
+unchanged): Granite 4.2-30B (out of CPU RAM budget), the Small tier's
+arm64 hardware gate, Gemma 4 (a separate candidate from the same
+research pass - not run here), WSL2/Ubuntu timing.
+
+Clean-up
+--------
+The scheduled task (`NetRewindAIEvalGranite`) used to run this was
+removed from the test machine after this run completed. The downloaded
+runtime/model files under D:\netrewind-eval (now holding both the
+Qwen3.5 and Granite model sets) were left in place, same reasoning as
+evidence 54: in case a follow-up run wants to reuse them without a
+second multi-gigabyte download.
