@@ -105,15 +105,18 @@ func TestLoadScenarioEventsOverridePathIsPortable(t *testing.T) {
 	}
 }
 
-// TestRequestGoldensMatchPreRefactorRunnerForEveryCaseAndLanguage is
-// Phase 0/1's exit gate: internal/ai/golden captured, from the runner as it
-// existed before this package split, the exact chatCompletionRequest body
-// (system prompt, per-case schema, redacted+deidentified events, question)
-// for all 37 cases in both languages - 74 files. This test rebuilds the
-// identical request through today's code (ai/eval/run + internal/ai) and
-// compares byte-for-byte. A single byte of drift here means the refactor
-// changed what a model would actually be asked, which the pre-registered
-// gate must never silently do.
+// TestRequestGoldensMatchPreRefactorRunnerForEveryCaseAndLanguage started
+// as Phase 0/1's exit gate (proving the internal/ai package split changed
+// nothing about what a model is actually asked) and now serves the same
+// purpose on an ongoing basis: internal/ai/golden captures the exact
+// chatCompletionRequest body (system prompt, per-case schema, redacted+
+// deidentified events, question) for all 37 cases in both languages - 74
+// files - and this test rebuilds the identical request through today's
+// code and compares byte-for-byte. A drift here means either an
+// accidental change (a bug) or a deliberate one (e.g. evidence 55's
+// maxLength/rule-7 fix for verbose model output) - in the deliberate
+// case, `go run ./internal/ai/golden` regenerates the goldens as a real,
+// reviewed step, never automatically.
 func TestRequestGoldensMatchPreRefactorRunnerForEveryCaseAndLanguage(t *testing.T) {
 	root := repoRoot()
 	goldenDir := filepath.Join(root, "ai", "eval", "run", "testdata", "golden")
@@ -171,7 +174,7 @@ func TestRequestGoldensMatchPreRefactorRunnerForEveryCaseAndLanguage(t *testing.
 				t.Fatalf("[%s.%s] reading golden: %v (run: go run ./internal/ai/golden to (re)capture)", id, lang, err)
 			}
 			if string(got) != string(want) {
-				t.Errorf("[%s.%s] request body drifted from the pre-refactor golden at %s", id, lang, goldenPath)
+				t.Errorf("[%s.%s] request body drifted from the golden at %s (run: go run ./internal/ai/golden to regenerate, if this drift is intentional)", id, lang, goldenPath)
 			}
 			compared++
 		}

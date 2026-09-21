@@ -18,6 +18,17 @@ package ai
 // its own ceiling" (§4.10) becomes a `"maximum"` bound on the confidence
 // fields themselves, so a value above the deterministic engine's own
 // confidence for this conclusion cannot be sampled at all.
+//
+// `maxLength` on every string field is the same idea applied to verbosity,
+// added after evidence 55: a model that reasons out loud inside a field's
+// own text (observed there as one `entity` value running to hundreds of
+// words of hedged self-debate) exhausts the generation budget before the
+// object can close, which fails validation exactly like a fabricated
+// handle would. `shortField`/`freeTextItem`'s limits are generous over
+// every real corpus value seen so far (short kind-like causes, addresses,
+// hostnames) but firm enough that llama-server's own grammar - not just
+// the system prompt's request - stops a runaway string well short of the
+// token budget.
 func JSONSchemaFor(handles []string, ceiling int) map[string]any {
 	handleEnum := []any{}
 	for _, h := range handles {
@@ -27,17 +38,19 @@ func JSONSchemaFor(handles []string, ceiling int) map[string]any {
 	if ceiling > 0 {
 		confidenceField["maximum"] = ceiling
 	}
+	shortField := map[string]any{"type": "string", "maxLength": 100}
+	freeTextItem := map[string]any{"type": "string", "maxLength": 300}
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"summary": map[string]any{"type": "string"},
+			"summary": map[string]any{"type": "string", "maxLength": 600},
 			"ranked_hypotheses": map[string]any{
 				"type": "array",
 				"items": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"cause":      map[string]any{"type": "string"},
-						"entity":     map[string]any{"type": "string"},
+						"cause":      shortField,
+						"entity":     shortField,
 						"confidence": confidenceField,
 					},
 					"required": []any{"cause", "entity", "confidence"},
@@ -47,10 +60,10 @@ func JSONSchemaFor(handles []string, ceiling int) map[string]any {
 				"type":  "array",
 				"items": map[string]any{"type": "string", "enum": handleEnum},
 			},
-			"counter_evidence":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
-			"unknowns":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+			"counter_evidence":   map[string]any{"type": "array", "items": freeTextItem},
+			"unknowns":           map[string]any{"type": "array", "items": freeTextItem},
 			"confidence_ceiling": confidenceField,
-			"next_checks":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+			"next_checks":        map[string]any{"type": "array", "items": freeTextItem},
 		},
 		"required": []any{
 			"summary", "ranked_hypotheses", "evidence_handles", "counter_evidence",

@@ -11,9 +11,9 @@
 // this file is a thin wrapper over that package, kept that way on purpose
 // (see internal/ai's own package doc): the CLI and the desktop shell call
 // the identical functions, so what this runner measures and what the
-// product ships cannot drift apart. See internal/ai/golden_test.go and
-// ai/eval/run/golden_test.go for the parity proof against the pre-refactor
-// version of this file.
+// product ships cannot drift apart. See main_test.go's
+// TestRequestGoldensMatchPreRefactorRunnerForEveryCaseAndLanguage for the
+// parity proof, and internal/ai/golden for how its fixtures are captured.
 package main
 
 import (

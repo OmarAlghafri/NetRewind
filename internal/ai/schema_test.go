@@ -61,3 +61,33 @@ func TestJSONSchemaForWithNoCeilingStillBoundsConfidenceTo100(t *testing.T) {
 		t.Errorf("confidence_ceiling bounds = [%v,%v], want [0,100] even with no specific ceiling", ceiling["minimum"], ceiling["maximum"])
 	}
 }
+
+// TestJSONSchemaForBoundsEveryStringFieldsLength pins evidence 55's fix: a
+// model that reasons out loud inside a field's own text (there, an
+// `entity` value running to hundreds of words) must be stopped by the
+// grammar itself, not merely asked nicely by the system prompt - so every
+// string-bearing field carries a `maxLength`, with no field left
+// unbounded.
+func TestJSONSchemaForBoundsEveryStringFieldsLength(t *testing.T) {
+	s := JSONSchemaFor([]string{"E1"}, 0)
+	props := s["properties"].(map[string]any)
+
+	summary := props["summary"].(map[string]any)
+	if ml, ok := summary["maxLength"]; !ok || ml.(int) <= 0 {
+		t.Errorf("summary maxLength = %v, want a positive bound", ml)
+	}
+
+	hypProps := props["ranked_hypotheses"].(map[string]any)["items"].(map[string]any)["properties"].(map[string]any)
+	for _, field := range []string{"cause", "entity"} {
+		if ml, ok := hypProps[field].(map[string]any)["maxLength"]; !ok || ml.(int) <= 0 {
+			t.Errorf("ranked_hypotheses[].%s maxLength = %v, want a positive bound", field, ml)
+		}
+	}
+
+	for _, field := range []string{"counter_evidence", "unknowns", "next_checks"} {
+		item := props[field].(map[string]any)["items"].(map[string]any)
+		if ml, ok := item["maxLength"]; !ok || ml.(int) <= 0 {
+			t.Errorf("%s[] maxLength = %v, want a positive bound", field, ml)
+		}
+	}
+}
